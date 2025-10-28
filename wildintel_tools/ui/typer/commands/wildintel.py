@@ -285,6 +285,13 @@ def prepare_for_trapper(
     settings_manager: SettingsManager = ctx.obj.get("setting_manager")
     settings = settings_manager.load_settings(project_name)
 
+    xmp_info = {
+        "rp_name" : settings.wildintel.rp_name,
+        "rp_description ": settings.wildintel.rp_description,
+        "publisher" : settings.wildintel.publisher,
+        "owner" : settings.wildintel.owner,
+    }
+
     with Progress(
         TextColumn("[bold blue]{task.description}"),
         BarColumn(),
@@ -327,6 +334,8 @@ def prepare_for_trapper(
                 extensions=extensions,
                 deployments=deployments,
                 progress_callback=on_progress,
+                 max_workers = 4,
+                xmp_info = xmp_info
         )
 
     _show_report(report, output=report_file)

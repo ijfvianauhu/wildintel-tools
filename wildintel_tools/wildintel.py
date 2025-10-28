@@ -250,6 +250,7 @@ def prepare_collections_for_trapper(
     extensions: list[ResourceExtensionDTO] = None,
     progress_callback: Callable[[str], None] = None,
     max_workers: int = 4,
+    xmp_info : dict = None
 ) -> Report:
     """
     Prepare validated collections for Trapper in parallel.
@@ -314,10 +315,10 @@ def prepare_collections_for_trapper(
             # Placeholder info
             make = exif.get("Make", "Unknown")
             model = exif.get("Model", "Unknown")
-            rp_name = "TODO"
-            rp_description = "TODO"
-            publisher = "WildINTEL Project"
-            owner = "WildINTEL"
+            rp_name =  xmp_info.get("rp_name", "Unknown")
+            rp_description =   xmp_info.get("rp_description", "Unknown")
+            publisher =   xmp_info.get("publisher", "Unknown")
+            owner =   xmp_info.get("owner", "Unknown")
             where = rp_description or "Unknown Location"
             year = datetime.now().year
 

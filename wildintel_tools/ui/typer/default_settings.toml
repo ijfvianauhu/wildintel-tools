@@ -16,12 +16,11 @@ exiftool = "exiftool"
 data_dir = ""
 
 [WILDINTEL]
-rp_name = "Research project name"
-rp_description= "Research project description"
+rp_name = "WildINTEL"
+rp_description= "Doñana National Park"
 publisher = "University of Huelva"
 owner = "University of Hielva"
 tolerance_hours = 1
 resize_img = false
 resize_img_size = [800, 600]
 overwrite = false
-
