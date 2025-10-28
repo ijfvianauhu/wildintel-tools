@@ -1,8 +1,8 @@
 [LOGGER]
-logfilename=''
+filename=''
 loglevel=1
 
-[LANG]
+[LOCALE]
 language = "en"
 
 [GENERAL]

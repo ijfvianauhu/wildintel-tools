@@ -126,16 +126,26 @@ def check_deployments(
             progress_callback(f"collection_start:{col}", len(deployments))
 
         for deployment in deployments:
+
             deployment_path = col_path / deployment["name"]
 
             if not deployment_path.exists():
                 report.add_error(str(col), "missing deployment", f"Deployment folder '{deployment["name"]
                 }' not found in {col_path}")
+
+                if progress_callback:
+                    progress_callback(f"deployment_start:{col}:{deployment["name"]}:0",
+                                     0)
+                    progress_callback(f"deployment_complete:{col}:{deployment["name"]}", 1)
+
                 continue
 
             validated_file = deployment_path / ".validated"
             if validated_file.exists():
                 # TODO validar el sha1 del .validated ??
+                if progress_callback:
+                    progress_callback(f"deployment_complete:{col}:{deployment["name"]}", 1)
+
                 continue
 
             all_files = [p for p in deployment_path.rglob("*") if p.is_file()]
@@ -238,6 +248,8 @@ def check_deployments(
                         "validation record error",
                         f"Failed to create .validated file for deployment {deployment['name']}: {e}"
                     )
+            if progress_callback:
+                progress_callback(f"deployment_complete:{col}:{deployment["name"]}", 1)
 
     report.finish()
     return report
@@ -316,10 +328,9 @@ def prepare_collections_for_trapper(
             make = exif.get("Make", "Unknown")
             model = exif.get("Model", "Unknown")
             rp_name =  xmp_info.get("rp_name", "Unknown")
-            rp_description =   xmp_info.get("rp_description", "Unknown")
+            rp_description =   xmp_info.get("rp_description", "")
             publisher =   xmp_info.get("publisher", "Unknown")
             owner =   xmp_info.get("owner", "Unknown")
-            where = rp_description or "Unknown Location"
             year = datetime.now().year
 
             _, new_image = ResourceUtils.resize(Image.open(BytesIO(img_path.read_bytes())))
@@ -333,7 +344,7 @@ def prepare_collections_for_trapper(
                 "XMP-dc:Source": f"WildINTEL:{sha1_hash}",
                 "XMP-dc:Publisher": publisher,
                 "XMP-dc:Rights": f"© {owner}, {year}. All rights reserved.",
-                "XMP-dc:Coverage": f"This image was taken in {where}, as part of the WildINTEL project. https://wildintel.eu/",
+                "XMP-dc:Coverage": f"This image was taken in {rp_description}, as part of the WildINTEL project. https://wildintel.eu/",
                 "XMP-xmpRights:Marked": "true",
                 "XMP-xmpRights:Owner": owner,
                 "XMP-xmpRights:WebStatement": "https://creativecommons.org/licenses/by-nc/4.0/",
@@ -353,8 +364,6 @@ def prepare_collections_for_trapper(
         col_path = data_path / col
         trapper_col_path = output_dir / col
         trapper_col_path.mkdir(exist_ok=True)
-
-        #deploymentID, locationID, deploymentStart, deploymentEnd, cameraModel
 
         if not deployments:
             all_deployments = [d for d in col_path.iterdir() if d.is_dir()]

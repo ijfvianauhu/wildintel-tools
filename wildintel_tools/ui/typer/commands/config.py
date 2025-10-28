@@ -42,9 +42,8 @@ def init(
     ] = False,
 ):
     settings_manager = ctx.obj.get("setting_manager")
-    project_name: str(ctx.obj.get("project", "default"))
-    env_file: ctx.obj.get("project", "default")
-
+    project_name =  str(ctx.obj.get("project", "default"))
+    env_file =  ctx.obj.get("project", "default")
 
     template = ctx.obj.get("template", None)
     settings_file = settings_manager.create_project_settings(

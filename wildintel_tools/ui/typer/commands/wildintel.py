@@ -76,10 +76,6 @@ def check_collections(
 
     settings.validators.validate()
 
-    """for section, values in settings.as_dict().items():
-        print(section, values)
-       """
-
     with Progress(
         TextColumn("[bold blue]{task.description}"),
         BarColumn(),
@@ -196,10 +192,11 @@ def check_deployments(
                 nonlocal collection_tasks
                 if event.startswith("collection_start:"):
                     col_name = event.split(":", 1)[1]
-                    collection_tasks[col_name] = {
-                        "task_collection": progress.add_task(f"Collection {col_name}", total=count),
-                        "deployments": {}
-                    }
+                    if col_name not in collection_tasks:
+                        collection_tasks[col_name] = {
+                            "task_collection": progress.add_task(f"Collection {col_name}", total=count),
+                            "deployments": {}
+                        }
                 elif event.startswith("deployment_start:"):
                     _, col_name, dep_name, dep_total_str = event.split(":", 3)
                     dep_total = int(dep_total_str)
@@ -212,7 +209,9 @@ def check_deployments(
                     _, col_name, dep_name = event.split(":", 2)
                     task_dep = collection_tasks[col_name]["deployments"][dep_name]
                     progress.advance(task_dep, count)
-                    progress.advance(collection_tasks[col_name]["task_collection"], count)
+                elif event.startswith("deployment_complete:"):
+                    col_name, dep_name = event.split(":")[1:3]
+                    progress.advance(collection_tasks[col_name]["task_collection"], 1)
 
             report = wildintel_processing.check_deployments(
                     data_path=data_path,
@@ -221,7 +220,7 @@ def check_deployments(
                     progress_callback=on_progress,
                     tolerance_hours=tolerance_hours
             )
-            _show_report(report, output=report_file)
+        _show_report(report, output=report_file)
 
     except Exception as e:
         TyperUtils.error(_("An error occurred during deployment checking: {0}").format(str(e)))
@@ -287,7 +286,7 @@ def prepare_for_trapper(
 
     xmp_info = {
         "rp_name" : settings.wildintel.rp_name,
-        "rp_description ": settings.wildintel.rp_description,
+        "rp_description": settings.wildintel.rp_description,
         "publisher" : settings.wildintel.publisher,
         "owner" : settings.wildintel.owner,
     }
@@ -334,7 +333,7 @@ def prepare_for_trapper(
                 extensions=extensions,
                 deployments=deployments,
                 progress_callback=on_progress,
-                 max_workers = 4,
+                max_workers = 4,
                 xmp_info = xmp_info
         )
 
@@ -343,10 +342,7 @@ def prepare_for_trapper(
 def _show_report(report, success_msg="Validation completed successfully", error_msg ="There were errors during the validation", output = None):
     if output is None:
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".yaml")
-        print(tmp)
-        print(report)
         output = Path(tmp.name)
-        print(output)
         TyperUtils.console.print(f"No output file specified. Using temporary file: {output}")
 
     if report.get_status() == "success":

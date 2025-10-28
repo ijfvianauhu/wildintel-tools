@@ -109,14 +109,14 @@ def main_callback(ctx: typer.Context,
     if log_file is not None:
         settings.update({"LOGGER.filename": log_file}, validate=False)
     if locale_code is not None:
-        settings.update({"LANG.language": locale_code}, validate=False)
+        settings.update({"LOCALE.language": locale_code}, validate=False)
 
     # Setup locale
     locales_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "locales")
-    setup_locale(settings.lang.language, locales_dir)
+    setup_locale(settings.locale.language, locales_dir)
 
     # Setup logging
-    setup_logging(settings.LOGGER.loglevel, settings.LOGGER.logfilename)
+    setup_logging(settings.LOGGER.loglevel, settings.LOGGER.filename)
 
     ctx.obj = {
         "setting_manager": setting_manager,

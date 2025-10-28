@@ -29,9 +29,10 @@ SETTINGS_ORDER = {
         "loglevel",
         "filename",
     ],
-    "LANG": [
+    "LOCALE": [
         "language",
     ],
+
     "GENERAL": [
         "host",
         "login",
@@ -187,7 +188,7 @@ class SettingsManager:
 
             Validator(
                 "LOGGER.filename",
-                must_exist=False,
+                must_exist=True,
                 condition=lambda v: isinstance(v, str) and v.strip() != "" and v.endswith(".log"),
                 messages={
                     "condition": "LOGGER.filename must be a non-empty string ending with '.log'",
@@ -196,12 +197,12 @@ class SettingsManager:
 
             # LANG section
             Validator(
-                "LANG.language",
+                "LOCALE.language",
                 must_exist=True,
                 condition=lambda v: isinstance(v, str) and v.lower() in VALID_LANGS,
                 messages={
-                    "must_exist": "LANG.language must be defined",
-                    "condition": f"LANG.language must be one of: {', '.join(VALID_LANGS)}",
+                    "must_exist": "LOCALE.language must be defined",
+                    "condition": f"LOCALE.language must be one of: {', '.join(VALID_LANGS)}",
                 },
             ),
             # GENERAL section
