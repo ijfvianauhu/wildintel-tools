@@ -1,0 +1,27 @@
+[LOGGER]
+logfilename=''
+loglevel=1
+
+[LANG]
+language = "en"
+
+[GENERAL]
+host = "https://localhost"
+login = "trapper@os-conservation.org"
+password = "trapper"
+verify_ssl = true
+project_id = 999
+ffmpeg = "ffmpeg"
+exiftool = "exiftool"
+data_dir = ""
+
+[WILDINTEL]
+rp_name = "Research project name"
+rp_description= "Research project description"
+publisher = "University of Huelva"
+owner = "University of Hielva"
+tolerance_hours = 1
+resize_img = false
+resize_img_size = [800, 600]
+overwrite = false
+
