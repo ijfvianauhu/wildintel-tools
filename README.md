@@ -81,6 +81,12 @@ Subsequent sections describe the different methods available for installing wild
 # Install ExifTool
 sudo apt install libimage-exiftool-perl
 ```
+#### MAC
+
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+brew install exiftool
+```
 
 #### Windows 10/11
 
