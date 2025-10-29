@@ -66,40 +66,117 @@ See [Configuration](#configuration) section for details.
 
 ## 💻 Installation
 
-wildintel-tools requires several system utilities to be installed before it can be properly set up.
-The following section explains how to install these required tools.
+WildIntel-trap can be installed either using Docker or via a traditional Python virtual environment (venv). Docker allows 
+you to run the application in an isolated container with all dependencies included, while using a virtual environment lets 
+you install and run it directly on your system.
 
-Subsequent sections describe the different methods available for installing wildintel-tools.
+### Install wildintel-tools using `docker`
 
-> ⚠️ **Important:**  
-> If you choose to install wildintel-tools using Docker, you do not need to install these utilities manually.
+The easiest way to install wildintel-tools is by using the provided Docker Compose file. Follow the steps below:
 
-### Install required tools
+#### Step 1: Install Docker
+Follow the instructions for your operating system on the Docker website.
 
-#### Ubuntu/Debian
+#### Step 2: Download docker-compose.yml
+
+You can download the `docker-compose.yml` file from here or clone this repository:
+
+```
+git clone https://github.com/ijfvianauhu/wildintel-tools.git
+cd wildintel-tools
+```
+
+#### Step 3: Set up a directory with your camera trap data to mount into the container
+
+On the host machine where Docker is running, you need to have a directory containing the images you want to process. To
+make this directory accessible inside the Docker container, you must set the `DATA_PATH` environment variable to the path 
+of that directory.
+
+```
+# Linux bash 
+export DATA_PATH=/path/to/camera_trap_data
+
+# Windows PowerShell
+$env:DATA_PATH = "C:\path\to\camera_trap_data"
+```
+
+> **Note:** You can also define the DATA_PATH variable in a .env file located in the same directory as docker-compose.yml. 
+> The .env file can also include your trapper-tools global settings. See the example provided in this repository: env.example.
+
+#### Step 4: Set up a directory with your camera trap data to mount into the container
+
+```
+docker compose up -d
+docker compose exec --user trapper trapper-tools bash
+```
+
+#### Step 5: Run trapper-tools commands
+
+You can now run trapper-tools commands inside the container. Refer to the Usage section for available commands. For now, 
+let's verify that everything is working by running:
+
+```
+trapper-tools --help
+```
+
+You should see the following output:
+
+```
+Usage: wildintel-tools [OPTIONS] COMMAND [ARGS]...                             
+                                                                                
+ WildINTEL CLI Tool                                                             
+                                                                                
+╭─ Options ────────────────────────────────────────────────────────────────────╮
+│ --version                            Show program's version number and exit  │
+│ --verbosity                 INTEGER  Logger level: 0 (error), 1 (info), 2    │
+│                                      (debug).                                │
+│                                      [default: 1]                            │
+│ --logfile                   PATH     Path to the log file                    │
+│                                      [default:                               │
+│                                      /root/.config/wildintel-tools/app.log]  │
+│ --locale                    TEXT     Language code (for example, “es”,       │
+│                                      “en”). By default, the system language  │
+│                                      is used.                                │
+│                                      [default: C]                            │
+│ --project                   TEXT     Project name for settings               │
+│                                      [default: default]                      │
+│ --env-file                           Load .env file with dotenv              │
+│ --settings-dir              PATH     Directory containing settings files     │
+│                                      [default:                               │
+│                                      /root/.config/wildintel-tools]          │
+│ --install-completion                 Install completion for the current      │
+│                                      shell.                                  │
+│ --show-completion                    Show completion for the current shell,  │
+│                                      to copy it or customize the             │
+│                                      installation.                           │
+│ --help                               Show this message and exit.             │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭─ Commands ───────────────────────────────────────────────────────────────────╮
+│ config      Manage project configurations                                    │
+│ wildintel   Utilities for managing and validating WildIntel data             │
+╰──────────────────────────────────────────────────────────────────────────────╯
+```
+
+### Install wildintel-tools using `uv`
+
+wildintel-tools requires several system utilities to be installed before it can be properly set up using `uv`. These utilities 
+are exiftool and ffmpeg. To install them run:
+
 ```bash
+# 
 # Install ExifTool
 sudo apt install libimage-exiftool-perl
-```
-#### MAC
-
-```bash
+# MAC
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 brew install exiftool
-```
-
-#### Windows 10/11
+# Windows 10/11
+winget install -e --id Git.Git
 
 **Git Bash for Windows**, install using `winget`: 
 ```bash
 # Download from https://gitforwindows.org/
 # Or install using winget:
 winget install -e --id Git.Git
-```
-
-**FFmpeg & ExifTool**, install using `winget`:
-```bash
-# Install ExifTool
 winget install -e --id OliverBetz.ExifTool
 ```
 
@@ -111,17 +188,15 @@ After installation:
 1. Add FFmpeg's bin directory to your system PATH (typically `C:\Program Files\ffmpeg\bin`)
 2. Add ExifTool to your system PATH (typically `C:\Program Files\exiftool`)
 
-### Install wildintel-tools using `uv`
+Once the required applications are installed, we can install uv:
 
 ```
 # Install uv if not already installed
 curl -LsSf https://astral.sh/uv/install.sh | sh
 git clone https://github.com/ijfvianauhu/wildintel-tools.git
 cd wildintel-tools
-uv sync
+uv run trapper-tools --help
 ```
-
-### Install wildintel-tools using `docker`
 
 ## ⚙️ Configuration
 

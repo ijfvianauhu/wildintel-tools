@@ -1,5 +1,4 @@
 import tempfile
-from functools import wraps
 
 from rich.progress import Progress, TextColumn, BarColumn, TimeElapsedColumn
 

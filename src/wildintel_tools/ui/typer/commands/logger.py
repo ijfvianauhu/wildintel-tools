@@ -1,11 +1,7 @@
-from enum import Enum
 from dynaconf import ValidationError
 import typer
-from typing_extensions import Annotated
-from typing import Optional
-from pathlib import Path
-from wildintel_tools.ui.typer.i18n import _
-from wildintel_tools.ui.typer.TyperUtils import TyperUtils
+from src.wildintel_tools.ui.typer.i18n import _
+from src.wildintel_tools.ui.typer.TyperUtils import TyperUtils
 
 app = typer.Typer(
     help=_("Manage project logger"),

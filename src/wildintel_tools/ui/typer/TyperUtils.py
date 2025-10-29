@@ -2,8 +2,6 @@ from typing import List, Dict, Any, Callable
 
 from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 
-from wildintel_tools.ui.typer.i18n import _
-
 import logging
 import typer
 from rich.console import Console
