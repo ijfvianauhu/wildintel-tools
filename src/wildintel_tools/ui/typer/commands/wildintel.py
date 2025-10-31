@@ -7,7 +7,7 @@ from typer_config import conf_callback_factory
 import logging
 from wildintel_tools.resouceutils import ResourceExtensionDTO
 from wildintel_tools.ui.typer.i18n import _
-from wildintel_tools.ui.typer.TyperUtils import TyperUtils
+from wildintel_tools.ui.typer.TyperUtils import TyperUtils, HierarchicalProgress
 import wildintel_tools.wildintel as wildintel_processing
 from typing_extensions import Annotated
 from pathlib import Path
@@ -116,6 +116,9 @@ def check_collections(
     settings = ctx.obj.get("settings", {})
     logger = ctx.obj.get("logger", logging.getLogger(__name__))
 
+    if data_path is None or not data_path.exists() or data_path.is_dir():
+        raise typer.BadParameter(_(f"'--data_path' is not a valid directory or does not exist."))
+
     TyperUtils.info(_(f"Checking collections in {data_path}"))
 
     try:
@@ -192,6 +195,9 @@ def check_deployments(
 ):
     settings = ctx.obj.get("settings", {})
     logger = ctx.obj.get("logger", logging.getLogger(__name__))
+
+    if data_path is None or not data_path.exists() or data_path.is_dir():
+        raise typer.BadParameter(_(f"'--data_path' is not a valid directory or does not exist."))
 
     TyperUtils.info(_(f"Checking deployments in {data_path} using tolerance hours {tolerance_hours}"))
 
@@ -272,6 +278,11 @@ def prepare_for_trapper(
 ):
     settings = ctx.obj.get("settings", {})
     logger = ctx.obj.get("logger", logging.getLogger(__name__))
+
+    if data_path is None or not data_path.exists() or data_path.is_dir():
+        raise typer.BadParameter(_(f"'--data_path' is not a valid directory or does not exist."))
+    if output_path is None or not output_path.exists() or output_path.is_dir():
+        raise typer.BadParameter(_(f"'--output_path' is not a valid directory or does not exist."))
 
     xmp_info = {
         "rp_name" : rp_name,

@@ -1,4 +1,6 @@
 import json
+from pathlib import Path
+from typing import Annotated
 
 from dynaconf import Dynaconf
 from rich.table import Table
@@ -12,7 +14,9 @@ from wildintel_tools.helpers import(
     check_ffmpeg,
     check_exiftool,
     check_trapper_connection,
-    get_trapper_classification_projects
+    get_trapper_classification_projects,
+    get_trapper_research_projects,
+    get_trapper_locations
 )
 
 import typer
@@ -61,7 +65,7 @@ def main_callback(ctx: typer.Context):
     #typer.echo("Callback ejecutado")
     pass
     
-@app.command(help=_("Test connection to Trapper server (API & FTPS)"), short_help=_("Test connection to Trapper server (API & FTPS)"))
+@app.command(help=_("Test connection to Trapper server (API)"), short_help=_("Test connection to Trapper server (API & FTPS)"))
 def test_connection(ctx: typer.Context,
                     url: str = typer.Argument(
                         None,
@@ -82,8 +86,16 @@ def test_connection(ctx: typer.Context,
                         "--token",
                         "-t",
                         help=_("Access token for the Trapper API (alternative to using a password)"),
-                        callback=dynamic_dynaconf_callback
                     ),
+
+                    config: Annotated[
+                        Path,
+                        typer.Option(
+                            hidden=True,
+                            help=_("File to save the report"),
+                            callback=dynamic_dynaconf_callback
+                        )
+                    ] = None,
     ):
 
     settings = ctx.obj.get("settings", {})
@@ -116,7 +128,7 @@ def test_external_tools(ctx: typer.Context):
         TyperUtils.error(_(f"exiftool test failed: {str(e)}"))
 
 
-@app.command(help=_("Get research project info from trapper instance"), short_help=_("Get research project info"))
+@app.command(help=_("Get classification project info from trapper instance"), short_help=_("Get classification project info"))
 def classification_projects(ctx: typer.Context,
         url: str = typer.Argument(
             None,
@@ -137,41 +149,105 @@ def classification_projects(ctx: typer.Context,
             "--token",
             "-t",
             help=_("Access token for the Trapper API (alternative to using a password)"),
-            callback=dynamic_dynaconf_callback
         ),
-    ):
+
+        config: Annotated[
+            Path,
+            typer.Option(
+                hidden=True,
+                help=_("File to save the report"),
+                callback=dynamic_dynaconf_callback
+            )
+        ] = None,
+):
     settings = ctx.obj.get("settings", {})
 
     try:
-        TyperUtils.info(_("Testing Trapper API connection..."))
+        cps=get_trapper_classification_projects(url,user, password,None)
+        data = [cp.model_dump() for cp in cps.results]
+        TyperUtils.show_table(data, _("Trapper Classification Projects"), fields=["pk","name", "research_project"])
+    except Exception as e:
+        TyperUtils.fatal(_(f"Failed getting trapper classification projects: {str(e)}"))
 
-        cp=get_trapper_classification_projects(settings.get("GENERAL.host"),
-                                 settings.get("GENERAL.login"),
-                                 settings.get("GENERAL.password"),
-                                 # settings.get("GENERAL.access_token")
-                                 None
-                                 )
+@app.command(help=_("Get research project info from trapper instance"), short_help=_("Get research project info"))
+def research_projects(ctx: typer.Context,
+        url: str = typer.Argument(
+            None,
+            help=_("Base URL of the Trapper server (e.g., https://trapper.example.org)"),
+        ),
+        user: str = typer.Argument(
+            None,
+            help=_("Username to authenticate with the Trapper server")
+        ),
+        password: str = typer.Option(
+            None,
+            "--password",
+            "-p",
+            help=_("Password for the specified user (use only if no access token is provided)")
+        ),
+        token: str = typer.Option(
+            None,
+            "--token",
+            "-t",
+            help=_("Access token for the Trapper API (alternative to using a password)"),
+        ),
+        config: Annotated[
+              Path,
+              typer.Option(
+                  hidden=True,
+                  help=_("File to save the report"),
+                  callback=dynamic_dynaconf_callback
+              )
+          ] = None,
+):
+    settings = ctx.obj.get("settings", {})
 
-        # Crear la tabla
-        table = Table(title="Trapper Classification Projects")
+    try:
+        rps=get_trapper_research_projects(url,user,password, None)
 
-        table.add_column("PK", style="cyan", no_wrap=True)
-        table.add_column("Name", style="green")
-        table.add_column("Owner", style="magenta")
-        table.add_column("Research Project", style="yellow")
-        table.add_column("Status", style="blue")
-        table.add_column("Active", style="red")
-        table.add_column("Roles", style="white")
-
-        # Añadir filas
-        for p in cp.results:
-            roles_str = ", ".join([role.roles[0] for role in p.project_roles])
-            table.add_row(str(p.pk), p.name, p.owner, p.research_project, p.status, str(p.is_active), roles_str)
-
-        # Mostrar la tabla
-        TyperUtils.console.print(table)
-        #console.print("✅ Trapper API connection successful!", style="bold green")
+        data = [rp.model_dump() for rp in rps.results]
+        TyperUtils.show_table(data, "Trapper Research Projects", fields=["pk","acronym","name"])
 
     except Exception as e:
-        TyperUtils.fatal(_(f"Failed to connect to Trapper API. Check your settings: {str(e)}"))
+        TyperUtils.fatal(_(f"Failed getting trapper research projects: {str(e)}"))
 
+
+@app.command(help=_("Get locations info from trapper instance"), short_help=_("Get locations info"))
+def locations(ctx: typer.Context,
+        url: str = typer.Argument(
+            None,
+            help=_("Base URL of the Trapper server (e.g., https://trapper.example.org)"),
+        ),
+        user: str = typer.Argument(
+            None,
+            help=_("Username to authenticate with the Trapper server")
+        ),
+        password: str = typer.Option(
+            None,
+            "--password",
+            "-p",
+            help=_("Password for the specified user (use only if no access token is provided)")
+        ),
+        token: str = typer.Option(
+            None,
+            "--token",
+            "-t",
+            help=_("Access token for the Trapper API (alternative to using a password)"),
+        ),
+        config: Annotated[
+              Path,
+              typer.Option(
+                  hidden=True,
+                  help=_("File to save the report"),
+                  callback=dynamic_dynaconf_callback
+              )
+          ] = None,
+):
+    settings = ctx.obj.get("settings", {})
+
+    try:
+        locs=get_trapper_locations(url,user, password, None)
+        data = [cp.model_dump() for cp in locs.results]
+        TyperUtils.show_table(data, "Trapper Locations")
+    except Exception as e:
+        TyperUtils.fatal(_(f"Failed getting trapper locations: {str(e)}"))

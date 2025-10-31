@@ -59,3 +59,25 @@ def get_trapper_classification_projects(base_url:str, user_name:str, user_passwo
     )
 
     return trapper_client.classification_projects.get_all()
+
+def get_trapper_research_projects(base_url:str, user_name:str, user_password: str, access_token: str):
+
+    trapper_client = TrapperClient(
+        base_url=base_url,
+        user_name=user_name,
+        user_password=user_password,
+        access_token=access_token
+    )
+
+    return trapper_client.research_projects.get_all()
+
+def get_trapper_locations(base_url:str, user_name:str, user_password: str, access_token: str):
+
+    trapper_client = TrapperClient(
+        base_url=base_url,
+        user_name=user_name,
+        user_password=user_password,
+        access_token=access_token
+    )
+
+    return trapper_client.locations.get_all()

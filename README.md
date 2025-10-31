@@ -198,8 +198,33 @@ Once the required applications are installed, we can install `uv`:
 curl -LsSf https://astral.sh/uv/install.sh | sh
 git clone https://github.com/ijfvianauhu/wildintel-tools.git
 cd wildintel-tools
-uv run trapper-tools --help
+uv run wildintel-tools --help
 ```
+You should see the following output:
+
+```
+Usage: wildintel-tools [OPTIONS] COMMAND [ARGS]...                                                                                            
+                                                                                                                                               
+ WildINTEL CLI Tool                                                                                                                            
+                                                                                                                                               
+╭─ Options ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ --version               --no-version             Show program's version number and exit                                                     │
+│ --verbosity                             INTEGER  Logger level: 0 (error), 1 (info), 2 (debug).                                              │
+│ --logfile                               PATH     Path to the log file [default: /home/ijfviana/.config/wildintel-tools/app.log]             │
+│ --env-file                                       Load .env file with dotenv                                                                 │
+│ --settings-dir                          PATH     Directory containing settings files [default: /home/ijfviana/.config/wildintel-tools]      │
+│ --project                               TEXT     Project name for settings [default: default]                                               │
+│ --install-completion                             Install completion for the current shell.                                                  │
+│ --show-completion                                Show completion for the current shell, to copy it or customize the installation.           │
+│ --help                                           Show this message and exit.                                                                │
+╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭─ Commands ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ config      Manage project configurations                                                                                                   │
+│ helpers     Helpers                                                                                                                         │
+│ wildintel   Utilities for managing and validating WildIntel data                                                                            │
+╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+```
+
 
 ## ⚙️ Configuration
 
@@ -208,7 +233,7 @@ its own configuration, and every command performs strict validation, reporting m
 error messages. You can create multiple project configurations for different Trapper servers, projects, and settings, and 
 switch between them using the `--project` flag.
 
-To simplify the creation and management of configuration files, wildintel-tools provides the config command."
+To simplify the creation and management of configuration files, wildintel-tools provides the config command.
 
 ```bash
 uv run wildintel-tools config --help  
@@ -260,13 +285,13 @@ TODO
 
 ## ⚡ Usage
 
-Once you’ve installed [Wildintel-tools](https://github.com/ijfvianauhu/wildintel-tools), you can start using it 
+Once you’ve [installed wildintel-tools](#install-wildintel-tools-using-uv), you can start using it 
 right away from the command line. Here’s what a typical first session looks like from a user’s perspective.
 
 > *Note*: If the installation was done using uv, it is necessary to activate the virtual environment by running 
-> `source .venv/bin/activate.`
+> `source .venv/bin/activate`.
 
-### Configure 
+### Step 1: Configure 
 
 First of all, initialize the configuration file by running:
 
@@ -274,15 +299,31 @@ First of all, initialize the configuration file by running:
 wildintel-tools config init
 ```
 
-Once this is done, edit it and modify the environment variables (typically the username and password") by running:
+Once this is done, edit it and modify the environment variables (typically the `username` and `password`) by running:
 ```python
 wildintel-tools config edit
 ```
-You can find a detailed description of each configuration option in [configuración section](#-configuration)
 
-### check collections
+To confirm changes in the configuration file, you can run:
+```
+wildintel-tools config show
+```
 
-After creating the configuration file, we proceed to check the names of the collections and deployments.
+We can find a detailed description of each configuration option in [configuración section](#-configuration)
+
+### Step 2: Checking configuracion
+
+We can chck if the connection to the Trapper server is correct by running:
+
+```
+wildintel-tools helpers test-connection
+```
+
+### Step 3: check collections
+
+After creating the configuration file and validating trapper connection, we proceed to check the names of the collections 
+and deployments stored in a local folder. We need to provide the path to the main directory where all collections are stored
+using  `--data-path option`.  For this example, if our collections are stored in `$HOME/Download/trapper-collections/`, we run:
 
 ```python
 
@@ -290,101 +331,58 @@ After creating the configuration file, we proceed to check the names of the coll
 wildintel-tools wildintel check-collections  --data-path $HOME/Download/trapper-collections/
 ```
 
-You can check the help for this command:
-
-```python
-wildintel-tools wildintel check-collections --help
-                                                                                                                           
- Usage: wildintel-tools wildintel check-collections [OPTIONS] [COLLECTIONS]...                                             
-                                                                                                                           
- Validates the names of collections and deployments within a given data directory. It checks that collection folders       
- follow the 'RNNNN' format and that deployment folders use the '<COLLECTION>-<LOCATION>_<SUFFIX>' pattern. Reports errors  
- and successes for each validation step.                                                                                   
-                                                                                                                           
-╭─ Arguments ─────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│   collections      [COLLECTIONS]...  Collections to process (sub-dirs in root data path)                                │
-╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-╭─ Options ───────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ --data-path          DIRECTORY  Root data path                                                                          │
-│ --report-file        PATH       File to save the report                                                                 │
-│ --help                          Show this message and exit.                                                             │
-╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+If we are interesting in checking only specific collections, we can provide their names as additional arguments:
 
 ```
+wildintel-tools wildintel check-collections  R0033 --data-path $HOME/Download/trapper-collections/
+```
 
-### check deployments
+### Step 4: check collections check deployments
 
 Next, we will check whether the contents of each deployment are correct. The tool will verify the dates and the sequence of 
 the media in each deployment based on the data provided in the field sheet — a CSV file per collection that contains 
-information about each deployment.
+information about each deployment. The name of this csv file must be `<COLLECTION_NAME>_FileTimestampLog.csv`  and be 
+located in the root  directory of each collection.
 
 ```python
 wildintel-tools wildintel check-deployments --data-path $HOME/Download/trapper-collections/ 
 ```
-This command accepts additional options, which you can view by running
 
-```
-wildintel check-deployments --help
-                                                                                                                           
- Usage: wildintel-tools wildintel check-deployments [OPTIONS] [COLLECTIONS]...                                             
-                                                                                                                           
- Validates the structure and content of deployment folders within the specified collections. Checks that image files       
- exist, follow the expected chronological order, and that their timestamps are within the expected start and end ranges.   
- Also generates a '.validated' file for successfully verified deployments.                                                 
-                                                                                                                           
-╭─ Arguments ─────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│   collections      [COLLECTIONS]...  Collections to process (sub-dirs in root data path)                                │
-╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-╭─ Options ───────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ --data-path              DIRECTORY                                      Root data path                                  │
-│ --report-file            PATH                                           File to save the report                         │
-│ --tolerance-hours        INTEGER                                        Allowed time deviation (in hours) when          │
-│                                                                         comparing the first and last image timestamps   │
-│                                                                         against the expected deployment start and end   │
-│                                                                         times.                                          │
-│ --extensions             [.png|.jpg|.jpeg|.gif|.webp|.mp4|.mpeg|.mov|.  File extension to process                       │
-│                          avi]                                                                                           │
-│ --help                                                                  Show this message and exit.                     │
-╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+As above, we can also specify specific collections to check by providing their names as additional arguments:
+
+```python
+wildintel-tools wildintel check-deployments R0033 --data-path $HOME/Download/trapper-collections/ 
 ```
 
-### prepare collections for trapper
+Also, we can customize the accepted time tolerance (in hours) when comparing the first and last image timestamps against
+the expected deployment start and end times using the `--tolerance-hours` option. By default, this value is set to 1 hour.
 
-The final step of our workflow is responsible for 'flattening' each deployment and making several modifications to each media file.
-Specifically, it resizes, renames, and adds various pieces of information in XMP format.
+```python
+wildintel-tools wildintel check-deployments R0033 --data-path $HOME/Download/trapper-collections/ --tolerance-hours 1
+```
+
+### Step 5: prepare collections for trapper
+
+The final step of our workflow is responsible for 'flattening' each deployment and making several modifications to each
+media file. Specifically, it resizes, renames, and adds various pieces of information in XMP format.
+
+Its basic usage is as follows:
 
 ```python
 wildintel-tools wildintel prepare-for-trapper --data-path $HOME/Descargas/trapper-collections/ --output-path /tmp/trapper/
 ```
 
+where `--output-path` specifies the directory where the prepared collections will be stored.
+
+Similar to the previous commands, we can also specify specific collections to prepare by providing their names as additional arguments:
+
+```python
+wildintel-tools wildintel prepare-for-trapper R0033 --data-path $HOME/Descargas/trapper-collections/ --output-path /tmp/trapper/
 ```
-wildintel-tools wildintel prepare-for-trapper --help
-                                                                                                                           
- Usage: wildintel-tools wildintel prepare-for-trapper [OPTIONS]                                                            
-                                                      [COLLECTIONS]...                                                     
-                                                                                                                           
- Validate the internal structure of a collection by checking that all its deployments are correctly named, contain the     
- expected files, and match their associated metadata. The validation also ensures that deployment folders correspond to    
- the entries defined in the collection's CSV log and that image timestamps fall within the expected date ranges.           
-                                                                                                                           
-╭─ Arguments ─────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│   collections      [COLLECTIONS]...  Collections to process (sub-dirs in root data path)                                │
-╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-╭─ Options ───────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ --data-path          DIRECTORY                                        Root data path                                    │
-│ --output-path        DIRECTORY                                        Root output path                                  │
-│ --report-file        PATH                                             File to save the report                           │
-│ --deployments        TEXT                                             Deployments to process (sub-dirs in collections   │
-│                                                                       path)                                             │
-│ --extensions         [.png|.jpg|.jpeg|.gif|.webp|.mp4|.mpeg|.mov|.av  File extension to process                         │
-│                      i]                                                                                                 │
-│ --owner              TEXT                                             Resource owner                                    │
-│ --publisher          TEXT                                             Resource publisher                                │
-│ --coverage           TEXT                                             Resource publisher                                │
-│ --rp-name            TEXT                                             Research project name                             │
-│ --help                                                                Show this message and exit.                       │
-╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-```
+
+
+
+
 
 ## 🤝 Contributing
 
