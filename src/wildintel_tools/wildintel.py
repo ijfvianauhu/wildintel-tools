@@ -8,6 +8,10 @@ from io import BytesIO
 from pathlib import Path
 from typing import List, Callable
 
+from wildintel_tools.helpers import (
+        get_trapper_locations
+    )
+
 import yaml
 from PIL import Image
 
@@ -48,11 +52,17 @@ def _pil_to_bytes(pil_image: Image.Image, format: str = "JPEG") -> bytes:
 
 def check_collections(
     data_path: Path,
+    url:str,
+    user:str,
+    password:str,
     collections: List[str] = [],
     progress_callback: Callable[[str], None] = None,
 ) -> Report:
 
     report = Report("Validate collection and deployments names")
+
+    locs = get_trapper_locations(url, user, password, None)
+    locs_id = {cp.model_dump()["locationID"] for cp in locs.results}
 
     if not collections:
         collections = [entry.name for entry in data_path.iterdir() if entry.is_dir()]
@@ -78,6 +88,12 @@ def check_collections(
             if not re.fullmatch(r"^R[0-9]{4}-([0-9A-Za-z_-]+)(_.+)?$", deployment.name):
                 report.add_error(deployment.name, "validate_deployment_names",
                                  f"Name format is incorrect. It should follow the <CODE>-<NAME>_<SUFFIX> format.")
+            elif deployment.name.split("-")[0] != str(col):
+                report.add_error(deployment.name, "validate_deployment_names",
+                                 f"The deployment name must not include the collection name. It must include {str(col)}")
+            elif deployment.name.split("-")[1].lower() not in locs_id:
+                report.add_error(deployment.name, "validate_deployment_names",
+                                 f"The deployment name must not include a valid location id, not {deployment.name.split("-")[1].lower()}.")
             else:
                 report.add_success(deployment.name, "validate_deployment_names")
 
@@ -86,8 +102,6 @@ def check_collections(
             if collection_name != col:
                 report.add_error(deployment.name, "validate_deployment_names",
                                  f"Deployment '{deployment.name}' collection prefix ({collection_name}) does not match collection folder name '{col}'.")
-
-            ## TODO : connect to trapper and validate location exists ??
 
     report.finish()
     return report
@@ -100,7 +114,7 @@ def check_deployments(
         tolerance_hours: int = 1,
 ) -> Report:
 
-    report = Report("Validating collections")
+    report = Report("Validating deployments")
 
     if not collections:
         collections = [entry.name for entry in data_path.iterdir() if entry.is_dir()]

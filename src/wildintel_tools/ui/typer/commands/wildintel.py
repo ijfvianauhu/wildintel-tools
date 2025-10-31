@@ -56,15 +56,15 @@ def dynamic_dynaconf_callback(ctx, param, value):
         elif key == "rp_name":
             if value is None:
                 ctx.params[key] = settings["WILDINTEL"]["rp_name"]
-
-    #settings_dyn = Dynaconf(environments=False, settings_files=None)
-
-    #for k, v in settings.items():
-    #    setattr(settings_dyn, k, v)
-
-    #settings_dyn.validators.register(*settings_manager.get_validators())
-    #settings_dyn.validators.validate()
-    #ctx.obj["settings"] = settings_dyn
+        elif key == "user":
+            if value is None:
+                ctx.params[key] = settings["GENERAL"]["login"]
+        elif key == "url":
+            if value is None:
+                ctx.params[key] = settings["GENERAL"]["host"]
+        elif key == "password":
+            if value is None:
+                ctx.params[key] = settings["GENERAL"]["password"]
 
     return a
 
@@ -104,6 +104,27 @@ def check_collections(
          )
     ] = None,
 
+    url: str = typer.Argument(
+        None,
+        help=_("Base URL of the Trapper server (e.g., https://trapper.example.org)"),
+    ),
+    user: str = typer.Argument(
+        None,
+        help=_("Username to authenticate with the Trapper server")
+    ),
+    password: str = typer.Option(
+        None,
+        "--password",
+        "-p",
+        help=_("Password for the specified user (use only if no access token is provided)")
+    ),
+    token: str = typer.Option(
+        None,
+        "--token",
+        "-t",
+        help=_("Access token for the Trapper API (alternative to using a password)"),
+    ),
+
     config: Annotated[
          Path,
          typer.Option(
@@ -116,8 +137,9 @@ def check_collections(
     settings = ctx.obj.get("settings", {})
     logger = ctx.obj.get("logger", logging.getLogger(__name__))
 
-    if data_path is None or not data_path.exists() or data_path.is_dir():
-        raise typer.BadParameter(_(f"'--data_path' is not a valid directory or does not exist."))
+    if data_path is None or not data_path.exists() or not data_path.is_dir():
+        raise typer.BadParameter(_(f"'--data_path': {data_path} is not a valid directory or does not exist."))
+
 
     TyperUtils.info(_(f"Checking collections in {data_path}"))
 
@@ -158,6 +180,9 @@ def check_collections(
             report = wildintel_processing.check_collections(
                     data_path=Path(data_path),
                     collections=collections,
+                    url = url,
+                    user = user,
+                    password = password,
                     progress_callback=on_progress,
             )
 
@@ -196,8 +221,8 @@ def check_deployments(
     settings = ctx.obj.get("settings", {})
     logger = ctx.obj.get("logger", logging.getLogger(__name__))
 
-    if data_path is None or not data_path.exists() or data_path.is_dir():
-        raise typer.BadParameter(_(f"'--data_path' is not a valid directory or does not exist."))
+    if data_path is None or not data_path.exists() or not data_path.is_dir():
+        raise typer.BadParameter(_(f"'--data_path': {data_path} is not a valid directory or does not exist."))
 
     TyperUtils.info(_(f"Checking deployments in {data_path} using tolerance hours {tolerance_hours}"))
 
@@ -342,10 +367,11 @@ def prepare_for_trapper(
 
 def _show_report(report, success_msg="Validation completed successfully", error_msg ="There were errors during the validation", output = None):
     if output is None:
-        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".yaml")
+        base_dir=TyperUtils.get_default_report_dir()
+        Path.mkdir(base_dir, parents=True, exist_ok=True)
+        tmp = tempfile.NamedTemporaryFile(delete=False, dir=base_dir, prefix="report_", suffix=".yaml")
         output = Path(tmp.name)
         TyperUtils.console.print(f"No output file specified. Using temporary file: {output}")
-
     if report.get_status() == "success":
         TyperUtils.success(_(f"{success_msg}. Review the report for details {output}."))
         TyperUtils.console.print(report.summary())

@@ -18,16 +18,17 @@ from wildintel_tools.ui.typer.settings import SettingsManager
 from wildintel_tools.ui.typer.TyperUtils import TyperUtils
 
 from wildintel_tools.ui.typer.commands import config
+from wildintel_tools.ui.typer.commands import reports
 from wildintel_tools.ui.typer.commands import helpers
 from wildintel_tools.ui.typer.commands import wildintel
 
 APP_NAME = "wildintel-tools"
 __version__ = "0.1.0"
 
-
 app = typer.Typer(help="WildINTEL CLI Tool", invoke_without_command=True)
 app.add_typer(config.app, name="config")
 app.add_typer(helpers.app, name="helpers")
+app.add_typer(reports.app, name="reports")
 app.add_typer(wildintel.app, name="wildintel")
 
 # 🔹 Loader que recibe la ruta completa del archivo
@@ -120,6 +121,8 @@ def main_callback(ctx: typer.Context,
     settings = ctx.obj["settings"]
     settings_dyn=SettingsManager.load_from_array(settings)
     setup_logging(APP_NAME,verbosity, log_file)
+
+    TyperUtils.home = Path(typer.get_app_dir(APP_NAME))
 
     ctx.obj = {
         "setting_manager": SettingsManager(settings_dir=Path(settings_dir)),
