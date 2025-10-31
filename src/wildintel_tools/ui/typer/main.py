@@ -1,10 +1,13 @@
+from dynaconf import Dynaconf
+from typer_config import conf_callback_factory, use_config
+
 from wildintel_tools.ui.typer.i18n import _, setup_locale
 import locale
 import os, sys
 import typer
 
 from typing_extensions import Annotated
-from typing import Optional
+from typing import Optional, Dict, Any
 from pathlib import Path
 
 locales_dir=os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "locales")
@@ -15,43 +18,57 @@ from wildintel_tools.ui.typer.settings import SettingsManager
 from wildintel_tools.ui.typer.TyperUtils import TyperUtils
 
 from wildintel_tools.ui.typer.commands import config
-#from wildintel_tools.ui.typer.commands import convert
-#from wildintel_tools.ui.typer.commands import helpers
-#from wildintel_tools.ui.typer.commands import package
-#from wildintel_tools.ui.typer.commands import pipeline
-#from wildintel_tools.ui.typer.commands import upload
+from wildintel_tools.ui.typer.commands import helpers
 from wildintel_tools.ui.typer.commands import wildintel
 
 APP_NAME = "wildintel-tools"
 __version__ = "0.1.0"
 
+
 app = typer.Typer(help="WildINTEL CLI Tool", invoke_without_command=True)
 app.add_typer(config.app, name="config")
-#app.add_typer(convert.app, name="convert")
-#app.add_typer(helpers.app, name="helpers")
-#app.add_typer(package.app, name="package")
-#app.add_typer(pipeline.app, name="pipeline")
-#app.add_typer(upload.app, name="upload")
+app.add_typer(helpers.app, name="helpers")
 app.add_typer(wildintel.app, name="wildintel")
+
+# 🔹 Loader que recibe la ruta completa del archivo
+def dynaconf_loader(file_path: str) -> dict:
+    settings_dir = os.path.dirname(file_path)
+    file_name = os.path.basename(file_path)
+    setting_manager = SettingsManager(settings_dir=Path(settings_dir))
+    settings = setting_manager.load_settings(file_name, True, True)
+    return settings.as_dict()
+
+# 🔹 Callback base
+base_conf_callback = conf_callback_factory(dynaconf_loader)
+
+# 🔹 Callback dinámico que usa otro parámetro (base_path)
+def dynamic_dynaconf_callback(ctx, param, value):
+    base_path = ctx.params.get("settings_dir", ".")
+    file_path = os.path.join(base_path, ctx.params.get("project", "default"))
+    a= base_conf_callback(ctx, param, file_path)
+
+    if ctx.obj is None:
+        ctx.obj = {}
+
+    settings = ctx.default_map.copy() if ctx.default_map else {}
+
+    for key, value in ctx.params.items():
+        if key == "verbosity":
+            if value is None:
+                ctx.params[key] = settings["LOGGER"]["loglevel"]
+
+        if key == "log_file":
+            if value is None:
+                ctx.params[key] = settings["LOGGER"]["filename"]
+
+    ctx.obj["settings"] = settings
+
+    return a
 
 @app.callback()
 def main_callback(ctx: typer.Context,
-    version: Annotated[
-        Optional[bool],
-        typer.Option(
-            "--version",
-            help=_("Show program's version number and exit"),
-            is_eager=True
-        )
-    ] = None,
-    verbosity: Annotated[
-        Optional[int],
-        typer.Option(
-            "--verbosity",
-            help=_("Logger level: 0 (error), 1 (info), 2 (debug)."),
-            case_sensitive=False
-        )
-    ] = 1,
+    version: Annotated[Optional[bool], typer.Option( help=_("Show program's version number and exit"))] = None,
+    verbosity: Annotated[Optional[int], typer.Option( help=_("Logger level: 0 (error), 1 (info), 2 (debug).")) ] = None,
     
     log_file: Annotated[
         Optional[Path],
@@ -60,22 +77,6 @@ def main_callback(ctx: typer.Context,
             help="Path to the log file"
         )
     ] = Path(typer.get_app_dir(APP_NAME))/ "app.log",
-
-    locale_code: Annotated[
-        Optional[str],
-        typer.Option(
-            "--locale",
-            help=_("Language code (for example, “es”, “en”). By default, the system language is used.")
-        )
-    ] = locale.getdefaultlocale()[0] if locale.getdefaultlocale()[0] else "en_GB",
-
-    project: Annotated[
-        Optional[str],
-        typer.Option(
-            "--project",
-            help=_("Project name for settings")
-        )
-    ] = "default",
 
     env_file: Annotated[
         Optional[bool],
@@ -89,10 +90,25 @@ def main_callback(ctx: typer.Context,
         Optional[Path],
         typer.Option(
             "--settings-dir",
-            help=_("Directory containing settings files")
+            help=_("Directory containing settings files"),
         )
     ] = Path(typer.get_app_dir(APP_NAME)),
-    
+
+    project: Annotated[
+          Optional[str],
+          typer.Option(
+              "--project",
+              help=_("Project name for settings"),
+          )
+    ] = "default",
+
+    config: Annotated[
+      Path,
+      typer.Option(
+          hidden=True,
+          callback=dynamic_dynaconf_callback
+      )
+    ] = None,
 
 ):
     if (version):
@@ -100,27 +116,14 @@ def main_callback(ctx: typer.Context,
         TyperUtils.console.print(f"{prog}s {__version__}")
         exit(1)
 
-    ## Load settings
-    setting_manager= SettingsManager(settings_dir=settings_dir)
-    settings= setting_manager.load_settings(project)
-
-    if verbosity is not None:
-        settings.update({"LOGGER.loglevel": verbosity}, validate=False)
-    if log_file is not None:
-        settings.update({"LOGGER.filename": log_file}, validate=False)
-    if locale_code is not None:
-        settings.update({"LOCALE.language": locale_code}, validate=False)
-
-    # Setup locale
-    locales_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "locales")
-    setup_locale(settings.locale.language, locales_dir)
-
-    # Setup logging
-    setup_logging(settings.LOGGER.loglevel, settings.LOGGER.filename)
+    ## Load settings --> in project param callback
+    settings = ctx.obj["settings"]
+    settings_dyn=SettingsManager.load_from_array(settings)
+    setup_logging(APP_NAME,verbosity, log_file)
 
     ctx.obj = {
-        "setting_manager": setting_manager,
-        "settings": settings,
+        "setting_manager": SettingsManager(settings_dir=Path(settings_dir)),
+        "settings": settings_dyn,
         "logger": logger,
         "_":_,
         "project": project

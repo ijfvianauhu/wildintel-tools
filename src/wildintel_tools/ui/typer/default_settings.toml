@@ -1,26 +1,24 @@
 [LOGGER]
-filename=''
-loglevel=1
-
-[LOCALE]
-language = "en"
+loglevel = 1
+filename = ""
 
 [GENERAL]
-host = "https://localhost"
-login = "trapper@os-conservation.org"
-password = "trapper"
-verify_ssl = true
+host = "https://wildintel-trap.uhu.es"
+login = "username@uhu.es"
+password = "mi_password"
 project_id = 999
+verify_ssl = true
 ffmpeg = "ffmpeg"
 exiftool = "exiftool"
 data_dir = ""
 
 [WILDINTEL]
 rp_name = "WildINTEL"
-rp_description= "Doñana National Park"
+coverage = "Doñana National Park"
 publisher = "University of Huelva"
-owner = "University of Hielva"
+owner = "University of Huelva"
 tolerance_hours = 1
 resize_img = false
 resize_img_size = [800, 600]
 overwrite = false
+output_dir = ""

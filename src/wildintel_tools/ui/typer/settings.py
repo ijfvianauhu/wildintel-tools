@@ -9,9 +9,7 @@ from dynaconf import Dynaconf
 from dynaconf import loaders
 from dynaconf.validator import Validator
 
-
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
-
 
 def is_valid_timezone(tz_str):
     try:
@@ -20,17 +18,10 @@ def is_valid_timezone(tz_str):
     except ZoneInfoNotFoundError:
         return False
 
-# Lista de idiomas admitidos
-VALID_LANGS = ["en", "es"
-               ]
-
 SETTINGS_ORDER = {
     "LOGGER": [
         "loglevel",
         "filename",
-    ],
-    "LOCALE": [
-        "language",
     ],
 
     "GENERAL": [
@@ -46,13 +37,14 @@ SETTINGS_ORDER = {
 
     "WILDINTEL": [
         "rp_name",
-        "rp_description",
+        "coverage",
         "publisher",
         "owner",
         "tolerance_hours",
         "resize_img",
         "resize_img_size",
         "overwrite",
+        "output_dir"
     ],
 }
 
@@ -119,10 +111,19 @@ class SettingsManager:
 
         return settings_file
 
+    @staticmethod
+    def load_from_array(settings:dict) -> Dynaconf:
+        settings_dyn = Dynaconf(environments=False, settings_files=None)
+
+        for k, v in settings.items():
+            setattr(settings_dyn, k, v)
+        return settings_dyn
+
     def load_settings(
         self,
         project_name: str,
         validate: bool = False,
+        create:bool = True,
     ) -> Dynaconf:
         """Load settings for a specific project.
 
@@ -134,8 +135,10 @@ class SettingsManager:
             Dynaconf settings object
         """
         settings_file = self.settings_dir / f"{project_name}.toml"
-        if not settings_file.exists():
+        if not settings_file.exists() and create:
             settings_file = self.create_project_settings(project_name)
+        elif not settings_file.exists():
+           raise FileNotFoundError(f"Settings file not found: {settings_file}")
 
         settings_files = [str(settings_file)]
         settings = Dynaconf(settings_files=settings_files)
@@ -189,22 +192,17 @@ class SettingsManager:
             Validator(
                 "LOGGER.filename",
                 must_exist=True,
-                condition=lambda v: isinstance(v, str) and v.strip() != "" and v.endswith(".log"),
+                condition=lambda v: (
+                        isinstance(v, str)
+                        and (
+                                v.strip() == "" or v.strip().endswith(".log")
+                        )
+                ),
                 messages={
-                    "condition": "LOGGER.filename must be a non-empty string ending with '.log'",
+                    "condition": "LOGGER.filename must be an empty string or a non-empty string ending with '.log'",
                 },
             ),
 
-            # LANG section
-            Validator(
-                "LOCALE.language",
-                must_exist=True,
-                condition=lambda v: isinstance(v, str) and v.lower() in VALID_LANGS,
-                messages={
-                    "must_exist": "LOCALE.language must be defined",
-                    "condition": f"LOCALE.language must be one of: {', '.join(VALID_LANGS)}",
-                },
-            ),
             # GENERAL section
             Validator(
                 "GENERAL.host",
@@ -226,12 +224,21 @@ class SettingsManager:
             Validator("GENERAL.exiftool", must_exist=True, cast=str, cont="exiftool"),
             Validator(
                 "GENERAL.data_dir",
-                condition=lambda value: Path(value).is_dir(),
+                condition=lambda value: not value or Path(value).is_dir(),
                 must_exist=True,
                 messages={
                     "condition": "The path specified in GENERAL.data_dir must be an existing directory."
                 },
-            ),        ]
+            ),
+            Validator(
+                "WILDINTEL.output_dir",
+                condition=lambda value: Path(value).is_dir(),
+                must_exist=True,
+                messages={
+                    "condition": "The path specified in WILDINTEL.output_dir must be an existing directory."
+                },
+            ),
+        ]
         return validators
 
     def export_settings(self, settings_data: dict, setting_path: str) -> None:

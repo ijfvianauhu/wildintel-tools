@@ -328,7 +328,7 @@ def prepare_collections_for_trapper(
             make = exif.get("Make", "Unknown")
             model = exif.get("Model", "Unknown")
             rp_name =  xmp_info.get("rp_name", "Unknown")
-            rp_description =   xmp_info.get("rp_description", "")
+            coverage =   xmp_info.get("coverage", "")
             publisher =   xmp_info.get("publisher", "Unknown")
             owner =   xmp_info.get("owner", "Unknown")
             year = datetime.now().year
@@ -344,7 +344,7 @@ def prepare_collections_for_trapper(
                 "XMP-dc:Source": f"WildINTEL:{sha1_hash}",
                 "XMP-dc:Publisher": publisher,
                 "XMP-dc:Rights": f"© {owner}, {year}. All rights reserved.",
-                "XMP-dc:Coverage": f"This image was taken in {rp_description}, as part of the WildINTEL project. https://wildintel.eu/",
+                "XMP-dc:Coverage": f"This image was taken at {coverage}, as part of the WildINTEL project. https://wildintel.eu/",
                 "XMP-xmpRights:Marked": "true",
                 "XMP-xmpRights:Owner": owner,
                 "XMP-xmpRights:WebStatement": "https://creativecommons.org/licenses/by-nc/4.0/",

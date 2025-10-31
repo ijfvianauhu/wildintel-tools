@@ -13,6 +13,7 @@ dependencies = [
     "rich>=14.2.0",
     "filetype>=1.2.0",
     "trapper-client",
+    "typer-config>=1.4.3",
 ]
 
 [dependency-groups]

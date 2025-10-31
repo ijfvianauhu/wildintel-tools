@@ -3,11 +3,12 @@ from pathlib import Path
 # Create module logger
 logger = logging.getLogger(__name__)
 
-def setup_logging(verbosity: int, logger_file:Path=None) -> None:
+def setup_logging(app:str, verbosity: int, logger_file:Path=None) -> None:
     """Configure logging for all modules.
 
     Args:
         verbosity: Logging level (0=WARNING, 1=INFO, 2=DEBUG)
+        :param app:
     """
     # Map verbosity to logging level
     log_levels = {
@@ -25,7 +26,7 @@ def setup_logging(verbosity: int, logger_file:Path=None) -> None:
         "format":"[%(levelname)s] %(name)s: %(message)s",
         "datefmt":"%Y-%m-%d %H:%M:%S",
     }
-    
+
     if logger_file:
         logging_conf["filename"]=str(logger_file)
         logging_conf["filemode"]="a"
@@ -36,7 +37,7 @@ def setup_logging(verbosity: int, logger_file:Path=None) -> None:
     logger.setLevel(log_level)
 
     # Set level for trapper_tools modules
-    logging.getLogger("wildintel_tools").setLevel(log_level)
+    logging.getLogger(app).setLevel(log_level)
 
     # Quiet some noisy modules
     logging.getLogger("urllib3").setLevel(logging.WARNING)
