@@ -1,3 +1,4 @@
+# dockerfile
 # Base image
 FROM python:3.11-slim
 
@@ -30,17 +31,19 @@ COPY . /app
 WORKDIR /app
 
 # Install Python dependencies via UV
-RUN uv sync --frozen --no-dev
+# - Si existe `uv.lock`, usa build reproducible (--frozen)
+# - Si no existe, crea el lock y luego sincroniza
+RUN bash -lc 'if [ -f uv.lock ]; then uv sync --frozen --no-dev; else uv lock && uv sync --no-dev; fi'
 
 # Create data directory
-RUN mkdir /data
+RUN mkdir -p /data
 WORKDIR /data
 
 # Create non-root user
 RUN groupadd -g 1000 trapper && useradd -u 1000 -g 1000 -m -d /home/trapper trapper
 
 # Shell completions
-RUN echo 'eval "$(wildintel-tools --print-completion bash)"' >> /home/trapper/.bashrc
+RUN echo '\''eval "$(wildintel-tools --print-completion bash)"'\'' >> /home/trapper/.bashrc
 
 # Entrypoint
 RUN chmod +x /app/entrypoint.sh
