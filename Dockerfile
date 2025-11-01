@@ -43,7 +43,7 @@ WORKDIR /data
 RUN groupadd -g 1000 trapper && useradd -u 1000 -g 1000 -m -d /home/trapper trapper
 
 # Shell completions
-RUN echo '\''eval "$(wildintel-tools --print-completion bash)"'\'' >> /home/trapper/.bashrc
+RUN echo 'eval "$(wildintel-tools --show-completion bash)"' >> /home/trapper/.bashrc
 
 # Entrypoint
 RUN chmod +x /app/entrypoint.sh
