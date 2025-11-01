@@ -20,6 +20,14 @@ from wildintel_tools.resouceutils import ResourceExtensionDTO, ResourceUtils
 from natsort import natsorted
 
 def _read_field_notes_log(filepath: Path) -> List[dict]:
+    """
+    Read and parse the field notes log file.
+
+    :param filepath: Path to the field notes log file.
+    :type filepath: Path
+    :return: A list of dictionaries with the parsed log data.
+    :rtype: List[dict]
+    """
 
     deployments = []
 
@@ -42,9 +50,18 @@ def _read_field_notes_log(filepath: Path) -> List[dict]:
 
     return deployments
 
-
 def _pil_to_bytes(pil_image: Image.Image, format: str = "JPEG") -> bytes:
-    """Convierte una imagen PIL en una secuencia de bytes."""
+    """
+    Convert a PIL image to raw bytes.
+
+    :param pil_image: The PIL Image object to convert.
+    :type pil_image: Image.Image
+    :param format: The output image format (e.g. "JPEG", "PNG").
+                   Defaults to "JPEG".
+    :type format: str
+    :return: The image encoded as bytes.
+    :rtype: bytes
+    """
     buffer = BytesIO()
     pil_image.save(buffer, format=format)
     buffer.seek(0)
@@ -58,7 +75,27 @@ def check_collections(
     collections: List[str] = [],
     progress_callback: Callable[[str], None] = None,
 ) -> Report:
+    """
+    Check the collection names and their associated deployments.  For each deployment, verify that the linked location
+    exists.
 
+    :param data_path: Path to the local data directory containing the collections.
+    :type data_path: Path
+    :param url: Base URL of the remote Trapper instance.
+    :type url: str
+    :param user: Username for authentication.
+    :type user: str
+    :param password: Password for authentication.
+    :type password: str
+    :param collections: List of collection names to check. If empty, all available
+                        collections will be checked.
+    :type collections: List[str]
+    :param progress_callback: Optional callable used to report progress messages
+                              during the process.
+    :type progress_callback: Callable[[str], None], optional
+    :return: A report object containing the results of the collection checks.
+    :rtype: Report
+    """
     report = Report("Validate collection and deployments names")
 
     locs = get_trapper_locations(url, user, password, None)
@@ -77,7 +114,8 @@ def check_collections(
             progress_callback(f"collection_start:{col}", len(deployments))
 
         if not re.fullmatch(r"^R[0-9]{4}(_.+)?$", str(col)):
-            report.add_error(str(col), "validate_collection_names", f"Collection name '{str(col)}' does not follow the RNNNN format.")
+            report.add_error(str(col), "validate_collection_names",
+                             f"Collection name '{str(col)}' does not follow the RNNNN format.")
         else:
             report.add_success(str(col), "validate_collection_names")
 
@@ -87,13 +125,15 @@ def check_collections(
 
             if not re.fullmatch(r"^R[0-9]{4}-([0-9A-Za-z_-]+)(_.+)?$", deployment.name):
                 report.add_error(deployment.name, "validate_deployment_names",
-                                 f"Name format is incorrect. It should follow the <CODE>-<NAME>_<SUFFIX> format.")
+                         "Name format is incorrect. It should follow the <CODE>-<NAME>_<SUFFIX> format.")
             elif deployment.name.split("-")[0] != str(col):
-                report.add_error(deployment.name, "validate_deployment_names",
-                                 f"The deployment name must not include the collection name. It must include {str(col)}")
+                report.add_error(deployment.name,
+                         "validate_deployment_names",
+                         f"The deployment name must not include the collection name. It must include {str(col)}")
             elif deployment.name.split("-")[1].lower() not in locs_id:
+                invalid_loc_name = deployment.name.split("-")[1].lower()
                 report.add_error(deployment.name, "validate_deployment_names",
-                                 f"The deployment name must not include a valid location id, not {deployment.name.split("-")[1].lower()}.")
+                         f"The deployment name must not include a valid location id, not {invalid_loc_name}.")
             else:
                 report.add_success(deployment.name, "validate_deployment_names")
 
@@ -101,7 +141,8 @@ def check_collections(
 
             if collection_name != col:
                 report.add_error(deployment.name, "validate_deployment_names",
-                                 f"Deployment '{deployment.name}' collection prefix ({collection_name}) does not match collection folder name '{col}'.")
+                         f"Deployment '{deployment.name}' collection prefix ({collection_name}) does not match"
+                                 f" collection folder name '{col}'.")
 
     report.finish()
     return report
@@ -113,6 +154,28 @@ def check_deployments(
         progress_callback: Callable[[str], None] = None,
         tolerance_hours: int = 1,
 ) -> Report:
+    """
+    Check the integrity of each deployment. The checks include verifying the chronological sequence of images and
+    ensuring that all images were captured within a predefined date range. A tolerance window is allowed between the
+    first and last photo in each deployment.
+
+    :param data_path: Path to the local data directory containing the deployments.
+    :type data_path: Path
+    :param collections: List of collection names to include in the check. If None,
+                        all collections will be processed.
+    :type collections: List[str], optional
+    :param extensions: Optional list of resource extensions used for additional
+                       validation or metadata enrichment.
+    :type extensions: List[ResourceExtensionDTO], optional
+    :param progress_callback: Optional callable used to report progress messages
+                              during the process.
+    :type progress_callback: Callable[[str], None], optional
+    :param tolerance_hours: Number of hours of tolerance allowed between the first
+                            and last image of a deployment.
+    :type tolerance_hours: int, optional
+    :return: A report object containing the results of the deployment integrity checks.
+    :rtype: Report
+    """
 
     report = Report("Validating deployments")
 
@@ -132,7 +195,8 @@ def check_deployments(
         log_file = col_path / f"{col}_FileTimestampLog.csv"
 
         if not log_file.exists():
-            report.add_error(str(col), "check filetimestamplog", f"No FileTimestampLog {col}_FileTimestampLog.csv found in {col_path}")
+            report.add_error(str(col), "check filetimestamplog",
+                             f"No FileTimestampLog {col}_FileTimestampLog.csv found in {col_path}")
 
         deployments = _read_field_notes_log(log_file)
 
@@ -195,7 +259,8 @@ def check_deployments(
                         report.add_error(
                             img_path,
                             "date order",
-                            f"Image '{img_path.name}' (order {idx}) has earlier date than previous image {str(image_files[idx - 1])}."
+                            f"Image '{img_path.name}' (order {idx}) has earlier date "
+                                    f"than previous image {str(image_files[idx - 1])}."
                         )
                         continue
 
@@ -222,7 +287,8 @@ def check_deployments(
                     report.add_error(
                         deployment["name"],
                         "deployment start date",
-                        f"First image '{image_files[0].name}' date {first_date} is outside expected start {deployment["expected_start"]} ±{tolerance_hours}h"
+                        f"First image '{image_files[0].name}' date {first_date} is outside expected start " 
+                                f"{deployment["expected_start"]} ±{tolerance_hours}h"
                     )
 
                 if last_date < deployment["expected_end"] - tolerance or last_date > deployment[
@@ -231,7 +297,8 @@ def check_deployments(
                     report.add_error(
                         deployment["name"],
                         "deployment end date",
-                        f"Last image '{image_files[-1].name}' date {last_date} is outside expected end {deployment["expected_end"]} ±{tolerance_hours}h"
+                        f"Last image '{image_files[-1].name}' date {last_date} is outside expected "
+                                f" end {deployment["expected_end"]} ±{tolerance_hours}h"
                     )
             if not error:
                 try:
@@ -253,7 +320,8 @@ def check_deployments(
                     report.add_success(
                         deployment["name"],
                         "deployment validated",
-                        f"✓ Deployment '{deployment['name']}' validated successfully at {validation_info['validated_at']}"
+                        f"Deployment '{deployment['name']}' validated successfully at "
+                                f"{validation_info['validated_at']}"
                     )
 
                 except Exception as e:
@@ -279,33 +347,32 @@ def prepare_collections_for_trapper(
     xmp_info : dict = None
 ) -> Report:
     """
-    Prepare validated collections for Trapper in parallel.
+    Prepare validated collections for upload them to Trapper. Each deployment's images are copied and flattened
+    in parallel, with XMP metadata added. Progress callbacks are invoked for collections, deployments, and individual
+    files.
 
-    Each deployment's images are copied and flattened in parallel,
-    with XMP metadata added. Progress callbacks are invoked for collections,
-    deployments, and individual files.
-
-    Parameters
-    ----------
-    data_path : Path
-        Root directory containing collections.
-    output_dir : Path
-        Destination directory for the flattened collections.
-    collections : list of str, optional
-        Collections to process. Defaults to all.
-    deployments : list of str, optional
-        Specific deployments to process. Defaults to all.
-    extensions : list of ResourceExtensionDTO, optional
-        File extensions to include.
-    progress_callback : callable, optional
-        Callback for progress events.
-    max_workers : int, optional
-        Number of threads for parallel processing. Default 4.
-
-    Returns
-    -------
-    Report
-        Summary of processed collections and deployments.
+    :param data_path: Root directory containing the collections.
+    :type data_path: Path
+    :param output_dir: Destination directory for the flattened collections.
+    :type output_dir: Path
+    :param collections: List of collection names to process. If not provided,
+                        all collections will be included.
+    :type collections: list[str], optional
+    :param deployments: Specific deployments to process. If not provided,
+                        all deployments will be included.
+    :type deployments: list[str], optional
+    :param extensions: File extensions or resource types to include.
+    :type extensions: list[ResourceExtensionDTO], optional
+    :param progress_callback: Optional callable used to report progress events
+                              for collections, deployments, and individual files.
+    :type progress_callback: Callable, optional
+    :param max_workers: Number of threads to use for parallel processing.
+                        Defaults to 4.
+    :type max_workers: int, optional
+    :param xmp_info: XMP metadata information to be added to each image
+    :type xmp_info: dict
+    :return: A report summarizing the processed collections and deployments.
+    :rtype: Report
     """
     report = Report("Preparing collections for Trapper")
 
@@ -319,7 +386,7 @@ def prepare_collections_for_trapper(
 
     if extensions is None:
         extensions = list(ResourceExtensionDTO)
-    valid_exts = [ext.value.lower() for ext in extensions]
+    valid_extensions = [ext.value.lower() for ext in extensions]
 
     def process_file(col_name, dep_name, idx, img_path, trapper_deployment_path):
         """
@@ -358,7 +425,8 @@ def prepare_collections_for_trapper(
                 "XMP-dc:Source": f"WildINTEL:{sha1_hash}",
                 "XMP-dc:Publisher": publisher,
                 "XMP-dc:Rights": f"© {owner}, {year}. All rights reserved.",
-                "XMP-dc:Coverage": f"This image was taken at {coverage}, as part of the WildINTEL project. https://wildintel.eu/",
+                "XMP-dc:Coverage": f"This image was taken at {coverage}, as part of the WildINTEL project."
+                                   " https://wildintel.eu/",
                 "XMP-xmpRights:Marked": "true",
                 "XMP-xmpRights:Owner": owner,
                 "XMP-xmpRights:WebStatement": "https://creativecommons.org/licenses/by-nc/4.0/",
@@ -392,7 +460,7 @@ def prepare_collections_for_trapper(
             trapper_deployment_path = trapper_col_path / dep_name
             trapper_deployment_path.mkdir(exist_ok=True)
 
-            image_files = [f for f in deployment.rglob("*") if f.suffix.lower() in valid_exts]
+            image_files = [f for f in deployment.rglob("*") if f.suffix.lower() in valid_extensions]
             image_files = natsorted(image_files)
 
             if progress_callback:

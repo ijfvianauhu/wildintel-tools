@@ -1,4 +1,28 @@
-"""Settings management for trapper-tools."""
+"""
+Settings management module.
+
+This module provides functionality to manage project-specific configuration files
+based on the `Dynaconf` library. It includes utilities for:
+
+- Creating new project settings from a default or custom template.
+- Validating settings with type and value constraints.
+- Editing settings interactively via a command-line editor.
+- Managing multiple configuration environments.
+- Accessing and updating individual parameters safely.
+
+The configuration files are stored in TOML format (default location: ``~/.trapper-tools``)
+and grouped into logical sections such as ``LOGGER``, ``GENERAL``, and ``WILDINTEL``.
+
+Example:
+    .. code-block:: python
+
+        from wildintel_tools.config.settings_manager import SettingsManager
+
+        sm = SettingsManager()
+        sm.create_project_settings("my_project")
+        settings = sm.load_settings("my_project", validate=True)
+        print(settings.GENERAL.host)
+"""
 
 import os
 import subprocess
@@ -9,62 +33,42 @@ from dynaconf import Dynaconf
 from dynaconf import loaders
 from dynaconf.validator import Validator
 
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
-
-def is_valid_timezone(tz_str):
-    try:
-        ZoneInfo(tz_str)
-        return True
-    except ZoneInfoNotFoundError:
-        return False
 
 SETTINGS_ORDER = {
-    "LOGGER": [
-        "loglevel",
-        "filename",
-    ],
-
+    "LOGGER": ["loglevel", "filename"],
     "GENERAL": [
-        "host",
-        "login",
-        "password",
-        "project_id",
-        "verify_ssl",
-        "ffmpeg",
-        "exiftool",
-        "data_dir",
+        "host", "login", "password", "project_id", "verify_ssl",
+        "ffmpeg", "exiftool", "data_dir",
     ],
-
     "WILDINTEL": [
-        "rp_name",
-        "coverage",
-        "publisher",
-        "owner",
-        "tolerance_hours",
-        "resize_img",
-        "resize_img_size",
-        "overwrite",
-        "output_dir"
+        "rp_name", "coverage", "publisher", "owner", "tolerance_hours",
+        "resize_img", "resize_img_size", "overwrite", "output_dir",
     ],
 }
 
-
 class SettingsManager:
-    """Manage trapper-tools settings across different projects.
+    """
+    Manages Trapper-Tools configuration files across multiple projects.
 
-    This class handles:
-    - Loading settings from TOML files
-    - Creating new project settings from template
-    - Managing multiple project configurations
-    - Loading environment variables
+    This class wraps around :class:`dynaconf.Dynaconf` to provide:
+    - Loading and validating TOML-based settings.
+    - Creating new configuration files from a template.
+    - Interactive editing and validation of configuration.
+    - Parameter-level access and update utilities.
+
+    :param settings_dir: Optional directory path where settings files are stored.
+                         Defaults to ``~/.trapper-tools``.
+    :type settings_dir: Optional[Path]
     """
 
     def __init__(self, settings_dir: Optional[Path] = None):
-        """Initialize settings manager.
-
-        Args:
-            settings_dir: Directory to store settings files. Defaults to ~/.trapper-tools
         """
+        Initialize a :class:`SettingsManager` instance.
+
+        :param settings_dir: Directory to store settings files. Defaults to ``~/.trapper-tools``.
+        :type settings_dir: Optional[Path]
+        """
+
         self.settings_dir = (
             Path(settings_dir) if settings_dir else Path.home() / ".trapper-tools"
         )
@@ -79,18 +83,18 @@ class SettingsManager:
         template: Optional[Path] = None,
         env_file: bool = False,
     ) -> Path:
-        """Create new project settings from template.
+        """
+        Create a new project configuration file from a TOML template.
 
-        Args:
-            project_name: Name of the project/environment
-            template: Optional custom template file path
-            env_file: Load .env file with environment variables using Dynaconf
-
-        Returns:
-            Path to the created settings file
-
-        Raises:
-            FileNotFoundError: If template doesn't exist
+        :param project_name: Name of the project/environment.
+        :type project_name: str
+        :param template: Optional custom template file path. Defaults to the internal template.
+        :type template: Optional[Path]
+        :param env_file: Whether to load environment variables using Dynaconf.
+        :type env_file: bool
+        :raises FileNotFoundError: If the template file does not exist.
+        :return: Path to the newly created settings file.
+        :rtype: Path
         """
         settings_file = self.settings_dir / f"{project_name}.toml"
         template = template or self.default_template
@@ -113,6 +117,14 @@ class SettingsManager:
 
     @staticmethod
     def load_from_array(settings:dict) -> Dynaconf:
+        """
+        Load settings from a Python dictionary into a :class:`Dynaconf` object.
+
+        :param settings: Dictionary containing configuration keys and values.
+        :type settings: dict
+        :return: A Dynaconf object populated with the provided settings.
+        :rtype: Dynaconf
+        """
         settings_dyn = Dynaconf(environments=False, settings_files=None)
 
         for k, v in settings.items():
@@ -125,14 +137,18 @@ class SettingsManager:
         validate: bool = False,
         create:bool = True,
     ) -> Dynaconf:
-        """Load settings for a specific project.
+        """
+        Load settings for a given project.
 
-        Args:
-            project_name: Name of the project
-            validate: Validate settings
-
-        Returns:
-            Dynaconf settings object
+        :param project_name: Name of the project.
+        :type project_name: str
+        :param validate: Whether to validate settings upon loading.
+        :type validate: bool
+        :param create: Automatically create settings file if it does not exist.
+        :type create: bool
+        :raises FileNotFoundError: If the settings file does not exist and creation is disabled.
+        :return: A Dynaconf object containing loaded settings.
+        :rtype: Dynaconf
         """
         settings_file = self.settings_dir / f"{project_name}.toml"
         if not settings_file.exists() and create:
@@ -156,27 +172,31 @@ class SettingsManager:
         return settings
 
     def list_projects(self) -> list[str]:
-        """List all available project settings.
+        """
+        List all available project configuration files.
 
-        Returns:
-            List of project names (without .toml extension)
+        :return: List of project names (without the `.toml` extension).
+        :rtype: list[str]
         """
         return [f.stem for f in self.settings_dir.glob("*.toml")]
 
     def get_settings_path(self, project_name: str) -> Path:
-        """Get path to a project's settings file.
+        """
+        Get the absolute path to a project's settings file.
 
-        Args:
-            project_name: Name of the project/environment
-
-        Returns:
-            Path to the settings file
+        :param project_name: Project/environment name.
+        :type project_name: str
+        :return: Path to the TOML settings file.
+        :rtype: Path
         """
         return self.settings_dir / f"{project_name}.toml"
 
     def get_validators(self) -> List[Validator]:
         """
-        Get DynaConf validators.
+        Define and return Dynaconf validators for settings integrity checks.
+
+        :return: A list of :class:`dynaconf.validator.Validator` objects.
+        :rtype: List[Validator]
         """
         validators = [
             # LOGGER section
@@ -242,7 +262,16 @@ class SettingsManager:
         return validators
 
     def export_settings(self, settings_data: dict, setting_path: str) -> None:
-        """Export settings to a file."""
+        """
+        Export the given settings dictionary to a TOML file, preserving key order.
+
+        :param settings_data: Settings data as a nested dictionary.
+        :type settings_data: dict
+        :param setting_path: Path to write the TOML file.
+        :type setting_path: str
+        :return: None
+        :rtype: None
+        """
         # Restore the original settings order as Dynaconf does not guarantee order
         settings_dict = {}
         for group in SETTINGS_ORDER:
@@ -253,22 +282,20 @@ class SettingsManager:
         loaders.toml_loader.write(str(setting_path), settings_dict, merge=False)
 
     def edit_settings(self, project_name: str, editor="nano") -> None:
-        """Open settings in the default command line editor.
-
-        This method will:
-        1. Open the settings file in the system's default editor (from EDITOR env var)
-        2. Wait for the user to make changes and exit the editor
-        3. Validate the settings after changes
-        4. If validation fails, show errors and ask to retry editing
-
-        Args:
-            project_name: Name of the project to edit settings for
-            editor: Command line editor to use (default is 'nano')
-
-        Raises:
-            ValueError: If project doesn't exist
-            RuntimeError: If no suitable editor is found
         """
+        Open the specified project's settings file in a text editor for manual editing.
+
+        After editing, settings are validated. If validation fails, the user can retry
+        or restore the previous version.
+
+        :param project_name: Name of the project to edit.
+        :type project_name: str
+        :param editor: Command-line editor to use (default: ``nano``).
+        :type editor: str
+        :raises ValueError: If the project does not exist.
+        :raises RuntimeError: If the editor command fails.
+        """
+
         settings_file = self.get_settings_path(project_name)
         if not settings_file.exists():
             raise ValueError(f"Project '{project_name}' not found")
@@ -309,14 +336,15 @@ class SettingsManager:
 
     def get_param(self, project_name: str, param: str):
         """
-        Obtener el valor de un parámetro específico.
+        Retrieve the value of a specific configuration parameter.
 
-        Args:
-            project_name: Nombre del proyecto
-            param: Nombre del parámetro con formato 'SECCION.CLAVE', ej. 'GENERAL.host'
-
-        Returns:
-            Valor del parámetro
+        :param project_name: Name of the project.
+        :type project_name: str
+        :param param: Parameter key in the format ``SECTION.KEY``, e.g. ``GENERAL.host``.
+        :type param: str
+        :raises KeyError: If the parameter is not found.
+        :return: Value of the requested parameter.
+        :rtype: Any
         """
         settings = self.load_settings(project_name)
         # Usamos getattr de Dynaconf
@@ -327,16 +355,17 @@ class SettingsManager:
 
     def set_param(self, project_name: str, param: str, value, validate: bool = True):
         """
-        Asignar un valor a un parámetro específico.
+        Assign a new value to a specific configuration parameter.
 
-        Args:
-            project_name: Nombre del proyecto
-            param: Nombre del parámetro con formato 'SECCION.CLAVE', ej. 'GENERAL.host'
-            value: Nuevo valor para el parámetro
-            validate: Validar los settings después de asignar (por defecto True)
-
-        Raises:
-            ValueError: Si la validación falla
+        :param project_name: Name of the project.
+        :type project_name: str
+        :param param: Parameter key in the format ``SECTION.KEY``, e.g. ``GENERAL.host``.
+        :type param: str
+        :param value: New value for the parameter.
+        :type value: Any
+        :param validate: Whether to validate the settings after updating. Default is ``True``.
+        :type validate: bool
+        :raises ValueError: If settings validation fails.
         """
         settings_file = self.get_settings_path(project_name)
         settings = self.load_settings(project_name)

@@ -19,7 +19,9 @@ dependencies = [
 [dependency-groups]
 dev = [
     "babel>=2.17.0",
+    "pyright>=1.1.407",
     "pytest>=8.4.2",
+    "ruff>=0.14.3",
 ]
 
 [project.scripts]
@@ -31,6 +33,14 @@ build-backend = "uv_build"
 
 [tool.uv]
 package = true
+
+[tool.ruff]
+# Set the maximum line length to 79.
+line-length = 120
+
+[tool.ruff.lint]
+# Add the `line-too-long` rule to the enforced rule set.
+extend-select = ["E501"]
 
 [tool.uv.sources]
 trapper-client = { git = "https://github.com/ijfvianauhu/trapper-client.git", rev = "main" }

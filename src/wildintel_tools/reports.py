@@ -1,3 +1,12 @@
+"""
+Module for recording and exporting the results of media processing or upload operations.
+
+Defines:
+    - ReportStatus: Enumeration of possible report outcomes.
+    - Report: Dataclass for recording detailed results (successes and errors)
+      and exporting them to YAML.
+"""
+
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
 from enum import Enum
@@ -7,7 +16,19 @@ import yaml
 from wildintel_tools.ui.typer.i18n import _
 
 class ReportStatus(str, Enum):
-    """Possible states of a report."""
+    """
+    Enumeration of possible states of a report.
+
+    Each value represents the global outcome of a processing or upload operation:
+
+    - ``success``: All actions completed successfully.
+    - ``failed``: All actions failed.
+    - ``partial``: Some actions succeeded, others failed.
+    - ``empty``: No actions recorded.
+
+    This class inherits from :class:`str` and :class:`Enum` so its members behave
+    both as strings and as enumeration values.
+    """
     SUCCESS = "success"
     FAILED = "failed"
     PARTIAL = "partial"
@@ -16,9 +37,22 @@ class ReportStatus(str, Enum):
 @dataclass()
 class Report:
     """
-    Class to record the result of a media upload process.
-    Each identifier (e.g., image, subject, or file) can have multiple
-    actions with associated successes or errors.
+    Records the results of a media upload or processing operation.
+
+    Each identifier (e.g., image, subject, or file) can have multiple actions
+    with associated successes or errors. The report tracks all these events,
+    computes an overall status, and can export/import its contents as YAML.
+
+    :ivar title: Descriptive title of the report.
+    :vartype title: str
+    :ivar start_time: Time when the report was created or started.
+    :vartype start_time: datetime
+    :ivar end_time: Time when the report was finished, or ``None`` if still active.
+    :vartype end_time: Optional[datetime]
+    :ivar errors: Map of identifiers to lists of error entries.
+    :vartype errors: Dict[str, List[Dict[str, Any]]]
+    :ivar successes: Map of identifiers to lists of success entries.
+    :vartype successes: Dict[str, List[Dict[str, Any]]]
     """
     title: str
     start_time: datetime = field(default_factory=datetime.now)
@@ -28,21 +62,48 @@ class Report:
     successes: Dict[str, List[Dict[str, Any]]] = field(default_factory=dict)
 
     def add_error(self, identifier: str, action: str, message: str, **extra: Any) -> None:
-        """Adds an error related to a specific identifier and action."""
+        """
+        Adds an error record for a specific identifier and action.
+
+        :param identifier: Unique identifier (e.g., file name or ID).
+        :type identifier: str
+        :param action: The operation that failed (e.g., ``"upload"``).
+        :type action: str
+        :param message: A human-readable description of the error.
+        :type message: str
+        :param extra: Optional keyword arguments with additional metadata (e.g., error code).
+        :type extra: Any
+        """
         entry = {"action": action, "message": message, **extra}
         self.errors.setdefault(identifier, []).append(entry)
 
-    def add_success(self, identifier: str, action: str, **extra: Any) -> None:
-        """Adds a success related to a specific identifier and action."""
-        entry = {"action": action, **extra}
+    def add_success(self, identifier: str, action: str, message: str = None, **extra: Any) -> None:
+        """
+        Adds a success record for a specific identifier and action.
+
+        :param identifier: Unique identifier (e.g., file name or ID).
+        :type identifier: str
+        :param action: The operation that succeeded (e.g., ``"upload"``).
+        :type action: str
+        :param message: Optional message describing the success.
+        :type message: Optional[str]
+        :param extra: Optional keyword arguments with additional metadata (e.g., timestamps).
+        :type extra: Any
+        """
+        entry = {"action": action, "message": message, **extra}
         self.successes.setdefault(identifier, []).append(entry)
 
     def finish(self) -> None:
         """Marks the report as finished by setting the end time."""
         self.end_time = datetime.now()
 
-    def get_status(self) -> str:
-        """Returns the overall status of the report."""
+    def get_status(self) -> ReportStatus:
+        """
+        Determines the overall report status based on recorded results.
+
+        :return: One of ``"success"``, ``"failed"``, ``"partial"`` or ``"empty"``.
+        :rtype: str
+        """
         has_errors = any(self.errors.values())
         has_successes = any(self.successes.values())
 
@@ -56,27 +117,51 @@ class Report:
             return ReportStatus.EMPTY
 
     def is_success(self) -> bool:
-        """True if report finished successfully."""
+        """
+        Checks if the report completed successfully (no errors, at least one success).
+
+        :return: ``True`` if the report status is :data:`ReportStatus.SUCCESS`, otherwise ``False``.
+        :rtype: bool
+        """
         return self.get_status() ==  ReportStatus.SUCCESS
 
     def is_failed(self) -> bool:
-        """True if report finished with only errors."""
+        """
+        Checks if the report contains only errors and no successes.
+
+        :return: ``True`` if the report status is :data:`ReportStatus.FAILED`, otherwise ``False``.
+        :rtype: bool
+        """
         return self.get_status() ==  ReportStatus.FAILED
 
     def is_partial(self) -> bool:
-        """True if report finished partially successful."""
+        """
+        Checks if the report contains both successes and errors.
+
+        :return: ``True`` if the report status is :data:`ReportStatus.PARTIAL`, otherwise ``False``.
+        :rtype: bool
+        """
         return self.get_status() == ReportStatus.PARTIAL
 
     def is_empty(self) -> bool:
-        """True if report contains no results."""
+        """
+        Checks if the report contains no recorded actions.
+
+        :return: ``True`` if the report status is :data:`ReportStatus.EMPTY`, otherwise ``False``.
+        :rtype: bool
+        """
         return self.get_status() == ReportStatus.EMPTY
 
-    # -----------------------------
-    # ✅ Get entries filtered by action
-    # -----------------------------
     def get_by_action(self, action: str) -> Dict[str, Dict[str, List[Dict[str, Any]]]]:
         """
-        Returns all errors and successes corresponding to a specific action.
+        Retrieves all entries (successes and errors) associated with a specific action.
+
+        :param action: The action name to filter by (e.g., ``"upload"``).
+        :type action: str
+        :return: A dictionary with two keys:
+            - ``"errors"``: Matching error entries grouped by identifier.
+            - ``"successes"``: Matching success entries grouped by identifier.
+        :rtype: Dict[str, Dict[str, List[Dict[str, Any]]]]
         """
         filtered_errors = {
             identifier: [err for err in entries if err.get("action") == action]
@@ -92,17 +177,12 @@ class Report:
 
         return {"errors": filtered_errors, "successes": filtered_successes}
 
-    # -----------------------------
-    # ✅ NEW: Get all unique actions
-    # -----------------------------
     def get_actions(self) -> List[str]:
         """
-        Returns a sorted list of all distinct actions
-        found in both errors and successes.
+        Lists all distinct actions recorded in both errors and successes.
 
-        Example:
-            >>> report.get_actions()
-            ['upload', 'validate', 'convert']
+        :return: Sorted list of unique action names.
+        :rtype: List[str]
         """
         actions = set()
 
@@ -113,11 +193,14 @@ class Report:
 
         return sorted(actions)
 
-    # -----------------------------
-    # ✅ Summary
-    # -----------------------------
     def summary(self) -> str:
-        """Returns a readable summary of the report."""
+        """
+        Generates a human-readable summary of the report, including timestamps,
+        duration, total counts, and overall status.
+
+        :return: Multiline summary string suitable for console or log output.
+        :rtype: str
+        """
         duration = None
         if self.end_time:
             duration = (self.end_time - self.start_time).total_seconds()
@@ -138,35 +221,34 @@ class Report:
 
         return "\n".join(summary_lines)
 
-    # -----------------------------
-    # ✅ Load from YAML
-    # -----------------------------
     @classmethod
     def from_yaml(cls, filepath: Path) -> "Report":
-        """Creates a Report instance from a YAML file."""
+        """
+        Creates a :class:`Report` instance from a YAML file.
+
+        :param filepath: Path to the YAML file containing the report data.
+        :type filepath: Path
+        :return: A new :class:`Report` instance populated with the loaded data.
+        :rtype: Report
+        """
         with open(filepath, "r", encoding="utf-8") as f:
             data = yaml.safe_load(f)
         return cls(**data)
 
     def to_yaml(self, filepath: Path | None = None) -> str:
-        """Convert the Report instance to a YAML string and optionally save it to a file.
+        """
+        Converts the current report to a YAML string and optionally saves it to a file.
 
-        Parameters:
-            filepath (Path | None): Path where the YAML will be written. If `None`, no file
-                is written and only the YAML string is returned.
+        :param filepath: If provided, the YAML will also be written to this file
+            using UTF-8 encoding. If ``None``, only the string is returned.
+        :type filepath: Optional[Path]
+        :return: The YAML representation of the report.
+        :rtype: str
 
-        Returns:
-            str: The YAML representation of the Report instance.
-
-        Behavior:
-            - Uses `asdict` to convert the dataclass to a dictionary.
-            - Produces YAML with `yaml.safe_dump` (preserves Unicode and does not sort keys).
-            - If `filepath` is provided, writes the YAML to that file using UTF-8 encoding.
-            - Always returns the resulting YAML string, even when the file is written.
-
-        Note:
-            `datetime` objects are preserved and will be serialized by PyYAML using its
-            default datetime representation.
+        .. note::
+           - Uses :func:`dataclasses.asdict` for serialization.
+           - Preserves Unicode and does not sort keys.
+           - :class:`datetime` objects are serialized using PyYAML's default ISO format.
         """
         data = asdict(self)
         yaml_str = yaml.safe_dump(data, sort_keys=False, allow_unicode=True)
