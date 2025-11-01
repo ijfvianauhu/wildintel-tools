@@ -1,19 +1,36 @@
+# python
+"""
+Commands for managing generated reports via Typer.
+
+This module provides commands to list, view, archive and remove report YAML
+files created by the application.
+
+Functions
+---------
+main_callback(ctx)
+    Typer callback executed before any command.
+list(ctx)
+    Show a list of generated reports.
+info(ctx, filename=None)
+    Validate and display a report file.
+archive(ctx, days=60)
+    Archive report files older than a given number of days.
+remove(ctx, days=60)
+    Remove previously archived report files.
+_choose_report_file(results_dir, filename=None)
+    Select a report file from the results directory.
+"""
 import datetime
 import logging
-import os
-import time
-
-from dynaconf import ValidationError
 import typer
 from rich.prompt import Confirm
 from typing_extensions import Annotated
-from typing import Optional
 from pathlib import Path
 
 from wildintel_tools.reports import Report
 from wildintel_tools.ui.typer.i18n import _
 from wildintel_tools.ui.typer.TyperUtils import TyperUtils
-from wildintel_tools.ui.typer.settings import SettingsManager, SETTINGS_ORDER
+from wildintel_tools.ui.typer.settings import SettingsManager
 
 app = typer.Typer(
     help=_("Manage project configurations"),
@@ -22,6 +39,15 @@ app = typer.Typer(
 
 @app.callback()
 def main_callback(ctx: typer.Context                  ):
+    """
+    Typer callback executed before any command.
+
+    Use this callback to initialize or modify the shared Typer context.
+
+    :param ctx: Typer context object.
+    :type ctx: typer.Context
+    :return: None
+    """
     pass
 
 @app.command(
@@ -31,6 +57,16 @@ def main_callback(ctx: typer.Context                  ):
 def list(
         ctx: typer.Context,
 ):
+    """
+    Show a list of generated report YAML files.
+
+    The command locates the default reports directory and prints a summary
+    of report files found there.
+
+    :param ctx: Typer context (expects `setting_manager`, `project`, `logger`).
+    :type ctx: typer.Context
+    :return: None
+    """
     settings_manager = ctx.obj.get("setting_manager")
     project_name = str(ctx.obj.get("project", "default"))
     logger = ctx.obj.get("logger", logging.getLogger(__name__))
@@ -46,6 +82,20 @@ def info(ctx: typer.Context,
         typer.Argument(help=_("Name of the YAML report file to display (optional)"))
     ] = None,
 ):
+    """
+    Load and display a report file.
+
+    If `filename` is not provided, the most recent report file from the
+    default reports directory is selected.
+
+    :param ctx: Typer context (expects `setting_manager`, `project`, `logger`).
+    :type ctx: typer.Context
+    :param filename: Optional YAML filename to display.
+    :type filename: str | None
+    :raises SystemExit: Exits with a fatal message if no reports are found or
+        if the requested file does not exist.
+    :return: None
+    """
     settings_manager: SettingsManager = ctx.obj.get("setting_manager")
     project_name = str(ctx.obj.get("project", "default"))
     logger = ctx.obj.get("logger", logging.getLogger(__name__))
@@ -63,6 +113,17 @@ def archive(ctx: typer.Context,
                 typer.Argument(help=_("Number of days since the report was created after which it will be deleted."))
             ] = 60,
 ):
+    """
+    Archive report files older than `days`.
+
+    Files older than the threshold are renamed with a leading dot (hidden).
+
+    :param ctx: Typer context (expects `setting_manager`, `project`, `logger`).
+    :type ctx: typer.Context
+    :param days: Age threshold in days for archiving files.
+    :type days: int
+    :return: None
+    """
     settings_manager: SettingsManager = ctx.obj.get("setting_manager")
     project_name = str(ctx.obj.get("project", "default"))
     logger = ctx.obj.get("logger", logging.getLogger(__name__))
@@ -89,6 +150,18 @@ def remove(ctx: typer.Context,
                 typer.Argument(help=_("Number of days since the report was created after which it will be deleted."))
             ] = 60,
 ):
+    """
+    Remove archived (hidden) report files.
+
+    The function lists files with the pattern `.*.yaml`, displays them,
+    and requests confirmation before deleting.
+
+    :param ctx: Typer context (expects `setting_manager`, `project`, `logger`).
+    :type ctx: typer.Context
+    :param days: Unused parameter kept for CLI compatibility.
+    :type days: int
+    :return: None
+    """
     settings_manager: SettingsManager = ctx.obj.get("setting_manager")
     project_name = str(ctx.obj.get("project", "default"))
     logger = ctx.obj.get("logger", logging.getLogger(__name__))
@@ -112,7 +185,20 @@ def remove(ctx: typer.Context,
         TyperUtils.console.print("[cyan]Operation cancelled.[/cyan]")
 
 def _choose_report_file(results_dir:Path, filename:str = None) -> Path:
+    """
+    Choose a report YAML file to operate on.
 
+    If `filename` is omitted, the most recent `*.yaml` file in `results_dir`
+    is returned. If `filename` is provided, the corresponding path is validated.
+
+    :param results_dir: Directory where report YAML files are stored.
+    :type results_dir: pathlib.Path
+    :param filename: Optional filename to select.
+    :type filename: str | None
+    :raises SystemExit: If no reports are found or the requested file does not exist.
+    :return: Path to the selected YAML file.
+    :rtype: pathlib.Path
+    """
     # Si el usuario no pasa ningún archivo → mostrar el último
     if filename is None:
         yaml_files = sorted(

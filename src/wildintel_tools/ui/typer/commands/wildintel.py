@@ -1,3 +1,29 @@
+# python
+"""
+Utilities for validating and preparing WildIntel collections and deployments.
+
+This module exposes Typer commands to validate collection and deployment
+naming, check image timestamp consistency, and prepare collections for
+upload to Trapper.
+
+Functions
+---------
+dynaconf_loader(file_path: str) -> dict
+    Load Dynaconf settings from a JSON string.
+dynamic_dynaconf_callback(ctx, param, value)
+    Inject runtime defaults into CLI parameters from project settings.
+main_callback(ctx: typer.Context)
+    Typer callback executed before any command.
+check_collections(...)
+    Validate collection and deployment folder naming and structure.
+check_deployments(...)
+    Validate deployments and image timestamp consistency.
+prepare_for_trapper(...)
+    Prepare collections for ingestion into Trapper.
+_show_report(report, success_msg, error_msg, output)
+    Render and persist a report in YAML format.
+"""
+
 import json
 import tempfile
 
@@ -21,6 +47,19 @@ app = typer.Typer(
 
 # 🔹 Loader que recibe la ruta completa del archivo
 def dynaconf_loader(file_path: str) -> dict:
+    """
+    Load a Dynaconf-compatible configuration from a JSON string.
+
+    Note:
+        Although its name suggests a path loader, this function expects a JSON
+        string and returns a Python ``dict`` usable by ``typer_config`` and Dynaconf.
+
+    :param file_path: JSON string containing the configuration.
+    :type file_path: str
+    :returns: Parsed configuration dictionary.
+    :rtype: dict
+    :raises json.JSONDecodeError: If the input is not valid JSON.
+    """
     return json.loads(file_path)
 
 # 🔹 Callback base
@@ -28,6 +67,24 @@ base_conf_callback = conf_callback_factory(dynaconf_loader)
 
 # 🔹 Callback dinámico que usa otro parámetro (base_path)
 def dynamic_dynaconf_callback(ctx, param, value):
+    """
+    Dynamic callback that injects runtime defaults into Typer parameters.
+
+    Serializes the runtime settings from ``ctx.obj["settings"]`` and delegates
+    loading to the base configuration callback. It also fills CLI parameters
+    when omitted by the user, using project settings:
+    ``data_path``, ``tolerance_hours``, ``output_path``, ``owner``, ``publisher``,
+    ``coverage``, ``rp_name``, ``user``, ``url`` y ``password``.
+
+    :param ctx: Typer/Click context.
+    :type ctx: typer.Context
+    :param param: Parameter associated with the callback.
+    :type param: click.Parameter
+    :param value: Current value of the processed parameter.
+    :type value: Any
+    :returns: Result of the underlying base configuration callback.
+    :rtype: Any
+    """
     settings : Dynaconf = ctx.obj.get("settings", {}).as_dict()
     json_str = json.dumps(settings, default=str)
     a=base_conf_callback(ctx, param, json_str)
@@ -71,6 +128,16 @@ def dynamic_dynaconf_callback(ctx, param, value):
 @app.callback()
 def main_callback(ctx: typer.Context,
 ):
+    """
+    Typer callback executed before any command in this application.
+
+    Use it to initialize or mutate shared values in ``ctx.obj`` such as
+    ``settings``, ``setting_manager``, ``logger`` or ``project``.
+
+    :param ctx: Typer context object.
+    :type ctx: typer.Context
+    :returns: None
+    """
     pass
 
 @app.command(
@@ -134,6 +201,33 @@ def check_collections(
          )
     ] = None,
 ):
+    """
+    Validate collection and deployment folder naming and basic structure.
+
+    Performs checks over the collections found in ``data_path``, validating
+    collection and deployment naming patterns and reporting progress.
+
+    :param ctx: Typer context (expects ``settings`` and ``logger`` in ``ctx.obj``).
+    :type ctx: typer.Context
+    :param collections: Optional list of collection names to process.
+    :type collections: list[str] | None
+    :param data_path: Root directory that contains collections (must exist).
+    :type data_path: pathlib.Path
+    :param report_file: Path to write the validation report (YAML).
+    :type report_file: pathlib.Path | None
+    :param url: Trapper base URL (optional, used by the checker).
+    :type url: str | None
+    :param user: Username for Trapper authentication (optional).
+    :type user: str | None
+    :param password: Password for Trapper authentication (optional).
+    :type password: str | None
+    :param token: Access token for Trapper (optional).
+    :type token: str | None
+    :param config: Internal option supplied by Typer config callback.
+    :type config: pathlib.Path | None
+    :raises typer.BadParameter: If ``data_path`` is missing or invalid.
+    :returns: None
+    """
     settings = ctx.obj.get("settings", {})
     logger = ctx.obj.get("logger", logging.getLogger(__name__))
 
@@ -157,6 +251,19 @@ def check_collections(
 
             # Callback que la función llamará
             def on_progress(event: str, count: int):
+                """
+                Progress callback used to render nested progress bars.
+
+                The event string indicates the stage:
+                ``collection_start:<COLLECTION>``, ``deployment_start:<COLLECTION>:<DEPLOYMENT>:<TOTAL>``,
+                ``file_progress:<COLLECTION>:<DEPLOYMENT>``.
+
+                :param event: Event identifier with context tokens.
+                :type event: str
+                :param count: Amount of progress to advance.
+                :type count: int
+                :returns: None
+                """
                 nonlocal collection_tasks
                 if event.startswith("collection_start:"):
                     col_name = event.split(":", 1)[1]
@@ -218,6 +325,29 @@ def check_deployments(
         )
     ] = None,
 ):
+    """
+    Validate deployments inside collections and verify image timestamp consistency.
+
+    Ensures that deployments contain the expected files and that image timestamps
+    are ordered and fall within the expected ranges according to ``tolerance_hours``.
+
+    :param ctx: Typer context (expects ``settings`` and ``logger`` in ``ctx.obj``).
+    :type ctx: typer.Context
+    :param collections: Optional list of collection names to process.
+    :type collections: list[str] | None
+    :param data_path: Root directory that contains collections (must exist).
+    :type data_path: pathlib.Path
+    :param report_file: Path to write the validation report (YAML).
+    :type report_file: pathlib.Path | None
+    :param tolerance_hours: Allowed time deviation (in hours) for timestamp checks.
+    :type tolerance_hours: int | None
+    :param extensions: Optional list of file extensions to include.
+    :type extensions: list[ResourceExtensionDTO] | None
+    :param config: Internal option supplied by Typer config callback.
+    :type config: pathlib.Path | None
+    :raises typer.BadParameter: If ``data_path`` is missing or invalid.
+    :returns: None
+    """
     settings = ctx.obj.get("settings", {})
     logger = ctx.obj.get("logger", logging.getLogger(__name__))
 
@@ -239,6 +369,13 @@ def check_deployments(
 
             # Callback que la función llamará
             def on_progress(event: str, count: int):
+                """
+                Progress callback used to render nested progress bars.
+
+                Event forms:
+                ``collection_start:<COLLECTION>``, ``deployment_start:<COLLECTION>:<DEPLOYMENT>:<TOTAL>``,
+                ``file_progress:<COLLECTION>:<DEPLOYMENT>``, ``deployment_complete:<COLLECTION>:<DEPLOYMENT>``.
+                """
                 nonlocal collection_tasks
                 if event.startswith("collection_start:"):
                     col_name = event.split(":", 1)[1]
@@ -301,6 +438,40 @@ def prepare_for_trapper(
     ] = None,
 
 ):
+    """
+    Prepare collections for ingestion into Trapper.
+
+    Verifies and normalizes collection and deployment structure, writes XMP
+    metadata when required, and exports prepared artifacts into ``output_path``.
+    Progress is reported via a callback.
+
+    :param ctx: Typer context (expects ``settings`` and ``logger`` in ``ctx.obj``).
+    :type ctx: typer.Context
+    :param data_path: Root directory that contains collections (must exist).
+    :type data_path: pathlib.Path
+    :param output_path: Destination directory for prepared outputs (must exist).
+    :type output_path: pathlib.Path
+    :param collections: Optional list of collections to process.
+    :type collections: list[str] | None
+    :param report_file: Path to write the preparation report (YAML).
+    :type report_file: pathlib.Path | None
+    :param deployments: Optional list of deployment names to process.
+    :type deployments: list[str] | None
+    :param extensions: Optional list of file extensions to include.
+    :type extensions: list[ResourceExtensionDTO] | None
+    :param owner: Resource owner metadata to embed.
+    :type owner: str | None
+    :param publisher: Resource publisher metadata to embed.
+    :type publisher: str | None
+    :param coverage: Coverage metadata to embed.
+    :type coverage: str | None
+    :param rp_name: Research project name metadata to embed.
+    :type rp_name: str | None
+    :param config: Internal option supplied by Typer config callback.
+    :type config: pathlib.Path | None
+    :raises typer.BadParameter: If ``data_path`` or ``output_path`` are missing or invalid.
+    :returns: None
+    """
     settings = ctx.obj.get("settings", {})
     logger = ctx.obj.get("logger", logging.getLogger(__name__))
 
@@ -328,6 +499,13 @@ def prepare_for_trapper(
             collection_tasks = {}
 
             def on_progress(event: str, count: int):
+                """
+                Progress callback used to render nested progress bars.
+
+                Event forms:
+                ``collection_start:<COLLECTION>``, ``deployment_start:<COLLECTION>:<DEPLOYMENT>:<TOTAL>``,
+                ``file_progress:<COLLECTION>:<DEPLOYMENT>``, ``deployment_complete:<COLLECTION>:<DEPLOYMENT>``.
+                """
                 nonlocal collection_tasks
                 if event.startswith("collection_start:"):
                     col_name = event.split(":", 1)[1]
@@ -366,6 +544,23 @@ def prepare_for_trapper(
         TyperUtils.error(_("An error occurred during preparing collections fot trapper: {0}").format(str(e)))
 
 def _show_report(report, success_msg="Validation completed successfully", error_msg ="There were errors during the validation", output = None):
+    """
+    Render a report result to console and optionally save it to a YAML file.
+
+    If ``output`` is not provided a temporary YAML file is created in the default
+    report directory. Prints a success or error message according to the report status
+    and always persists the report to ``output``.
+
+    :param report: Report object with ``get_status``, ``to_yaml`` and ``summary`` methods.
+    :type report: Any
+    :param success_msg: Message to show on success.
+    :type success_msg: str
+    :param error_msg: Message to show on failure.
+    :type error_msg: str
+    :param output: Optional path to write the report YAML; if omitted a temp file is created.
+    :type output: pathlib.Path | None
+    :returns: None
+    """
     if output is None:
         base_dir=TyperUtils.get_default_report_dir()
         Path.mkdir(base_dir, parents=True, exist_ok=True)
