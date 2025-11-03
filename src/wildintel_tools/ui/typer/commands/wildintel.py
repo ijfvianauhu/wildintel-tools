@@ -171,11 +171,11 @@ def check_collections(
          )
     ] = None,
 
-    url: str = typer.Argument(
+    url: str = typer.Option(
         None,
         help=_("Base URL of the Trapper server (e.g., https://trapper.example.org)"),
     ),
-    user: str = typer.Argument(
+    user: str = typer.Option(
         None,
         help=_("Username to authenticate with the Trapper server")
     ),
@@ -193,7 +193,7 @@ def check_collections(
     ),
 
     validate_locations: Annotated[bool, typer.Option(help=_("Check if locations are created in Trapper."))] = True,
-    max_workers: Annotated[ int, typer.Option(help=_("Check if locations are created in Trapper."))] = 4,
+    max_workers: Annotated[ int, typer.Option(help=_("Number of parallel threads to use ."))] = 4,
 
     config: Annotated[
      Path,
@@ -248,8 +248,6 @@ def check_collections(
             "[progress.percentage]{task.percentage:>3.0f}%",
             TimeElapsedColumn(),
         ) as progress:
-
-            # Mapa para almacenar tareas de colecciones y deployments
             collection_tasks = {}
 
             # Callback que la función llamará
@@ -269,23 +267,24 @@ def check_collections(
                 """
                 nonlocal collection_tasks
                 if event.startswith("collection_start:"):
-                    col_name = event.split(":", 1)[1]
+                    _, col_name = event.split(":", 1)
                     collection_tasks[col_name] = {
                         "task_collection": progress.add_task(f"Collection {col_name}", total=count),
                         "deployments": {}
                     }
                 elif event.startswith("deployment_start:"):
-                    _, col_name, dep_name, dep_total_str = event.split(":", 3)
-                    dep_total = int(dep_total_str)
-                    task_collection = collection_tasks[col_name]["task_collection"]
+                    _, col_name, dep_name = event.split(":", 2)
                     collection_tasks[col_name]["deployments"][dep_name] = progress.add_task(
-                        f"  Deployment {dep_name}", total=dep_total
+                        f"  Deployment {dep_name}", total=count
                     )
                 elif event.startswith("file_progress:"):
-                    _, col_name, dep_name = event.split(":", 2)
+                    _, col_name, dep_name, filename = event.split(":", 3)
                     task_dep = collection_tasks[col_name]["deployments"][dep_name]
                     progress.advance(task_dep, count)
                     progress.advance(collection_tasks[col_name]["task_collection"], count)
+                elif event.startswith("deployment_complete:"):
+                    _,col_name, dep_name = event.split(":", 2)
+                    progress.advance(collection_tasks[col_name]["task_collection"], 1)
 
             report = wildintel_processing.check_collections(
                     data_path=Path(data_path),
@@ -320,8 +319,9 @@ def check_deployments(
         typer.Option( help=_("Allowed time deviation (in hours) when comparing the first and last image timestamps "
                              "against the expected deployment start and end times."))] = None,
     extensions: Annotated[List[ResourceExtensionDTO],typer.Option(help=_("File extension to process"))] = None,
+    max_workers: Annotated[int, typer.Option(help=_("Number of parallel threads to use ."))] = 4,
 
-    config: Annotated[
+        config: Annotated[
         Path,
         typer.Option(
             hidden=True,
@@ -383,26 +383,23 @@ def check_deployments(
                 """
                 nonlocal collection_tasks
                 if event.startswith("collection_start:"):
-                    col_name = event.split(":", 1)[1]
+                    _, col_name = event.split(":", 1)
                     if col_name not in collection_tasks:
                         collection_tasks[col_name] = {
                             "task_collection": progress.add_task(f"Collection {col_name}", total=count),
                             "deployments": {}
                         }
                 elif event.startswith("deployment_start:"):
-                    _, col_name, dep_name, dep_total_str = event.split(":", 3)
-                    dep_total = int(dep_total_str)
-                    task_collection = collection_tasks[col_name]["task_collection"]
-                    # Crear la tarea para el deployment
+                    _, col_name, dep_name  = event.split(":", 2)
                     collection_tasks[col_name]["deployments"][dep_name] = progress.add_task(
-                        f"  Deployment {dep_name}", total=dep_total
+                        f"  Deployment {dep_name}", total=count
                     )
                 elif event.startswith("file_progress:"):
-                    _, col_name, dep_name = event.split(":", 2)
+                    _, col_name, dep_name, file_name = event.split(":", 3)
                     task_dep = collection_tasks[col_name]["deployments"][dep_name]
                     progress.advance(task_dep, count)
                 elif event.startswith("deployment_complete:"):
-                    col_name, dep_name = event.split(":")[1:3]
+                    _, col_name, dep_name = event.split(":",2)
                     progress.advance(collection_tasks[col_name]["task_collection"], 1)
 
             report = wildintel_processing.check_deployments(
@@ -410,6 +407,7 @@ def check_deployments(
                     collections=collections,
                     extensions=extensions,
                     progress_callback=on_progress,
+                    max_workers=max_workers,
                     tolerance_hours=tolerance_hours
             )
         _show_report(report, output=report_file)
@@ -513,24 +511,22 @@ def prepare_for_trapper(
                 """
                 nonlocal collection_tasks
                 if event.startswith("collection_start:"):
-                    col_name = event.split(":", 1)[1]
+                    _,col_name = event.split(":", 1)
                     collection_tasks[col_name] = {
                         "task_collection": progress.add_task(f"Collection {col_name}", total=count),
                         "deployments": {}
                     }
                 elif event.startswith("deployment_start:"):
-                    _, col_name, dep_name, dep_total_str = event.split(":", 3)
-                    dep_total = int(dep_total_str)
-                    task_collection = collection_tasks[col_name]["task_collection"]
+                    _, col_name, dep_name = event.split(":", 2)
                     collection_tasks[col_name]["deployments"][dep_name] = progress.add_task(
-                        f"  Deployment {dep_name}", total=dep_total
+                        f"  Deployment {dep_name}", total=count
                     )
                 elif event.startswith("file_progress:"):
-                    _, col_name, dep_name = event.split(":", 2)
+                    _, col_name, dep_name, file_name = event.split(":", 3)
                     task_dep = collection_tasks[col_name]["deployments"][dep_name]
                     progress.advance(task_dep, count)
                 elif event.startswith("deployment_complete:"):
-                    col_name, dep_name = event.split(":")[1:3]
+                    _, col_name, dep_name = event.split(":", 2)
                     progress.advance(collection_tasks[col_name]["task_collection"], 1)
 
             report = wildintel_processing.prepare_collections_for_trapper(
@@ -547,6 +543,79 @@ def prepare_for_trapper(
         _show_report(report, output=report_file)
     except Exception as e:
         TyperUtils.error(_("An error occurred during preparing collections fot trapper: {0}").format(str(e)))
+
+@app.command(
+    help=_("Run a pipeline of check collections, check deployments, and prepare for trapper steps."),
+    short_help=_("Run a pipeline of check collections, check deployments, and prepare for trapper steps."))
+def pipeline(
+    ctx: typer.Context,
+    data_path: Annotated[ Path, typer.Option( help=_("Root data path"), exists=True,  file_okay=False,  dir_okay=True ) ]=None,
+    output_path: Annotated[ Path,typer.Option(help=_("Root output path"),exists=True,file_okay=False,  dir_okay=True)] = None,
+    collections: Annotated[ List[str], typer.Argument(help=_("Collections to process (sub-dirs in root data path)"))] = None,
+    report_file: Annotated[Path, typer.Option(help=_("File to save the report"))] = None,
+    deployments: Annotated[List[str], typer.Option( help=_("Deployments to process (sub-dirs in collections path)"))] = None,
+    extensions: Annotated[List[ResourceExtensionDTO], typer.Option(help=_("File extension to process"))] = None,
+    owner: Annotated[str, typer.Option(help=_("Resource owner"))] = None,
+    publisher: Annotated[str, typer.Option(help=_("Resource publisher"))] = None,
+    coverage: Annotated[str, typer.Option( help=_("Resource publisher") ) ] = None,
+    rp_name: Annotated[str, typer.Option( help=_("Research project name") ) ] = None,
+    tolerance_hours: Annotated[int,
+    typer.Option(help=_("Allowed time deviation (in hours) when comparing the first and last image timestamps "
+                        "against the expected deployment start and end times."))] = None,
+
+    url: str = typer.Option(
+        None,
+        help=_("Base URL of the Trapper server (e.g., https://trapper.example.org)"),
+    ),
+    user: str = typer.Option(
+        None,
+        help=_("Username to authenticate with the Trapper server")
+    ),
+    password: str = typer.Option(
+        None,
+        "--password",
+        "-p",
+        help=_("Password for the specified user (use only if no access token is provided)")
+    ),
+    token: str = typer.Option(
+        None,
+        "--token",
+        "-t",
+        help=_("Access token for the Trapper API (alternative to using a password)"),
+    ),
+
+    validate_locations: Annotated[bool, typer.Option(help=_("Check if locations are created in Trapper."))] = True,
+    max_workers: Annotated[int, typer.Option(help=_("Number of parallel threads to use ."))] = 4,
+
+    config: Annotated[
+    Path,
+    typer.Option(
+        hidden=True,
+        help=_("File to save the report"),
+        callback=dynamic_dynaconf_callback
+    )
+    ] = None,
+):
+    check_collections(ctx, collections,data_path, report_file, url, user,
+            password,
+            token,
+            validate_locations,
+            max_workers,
+            config)
+
+    check_deployments(
+            ctx,
+            collections,
+            data_path,
+            report_file,
+            tolerance_hours,
+            extensions,
+            max_workers,
+            config
+    )
+
+    prepare_for_trapper(ctx,data_path, output_path, collections, report_file, deployments, extensions,owner,publisher, coverage,
+    rp_name, config)
 
 def _show_report(report, success_msg="Validation completed successfully", error_msg ="There were errors during the validation", output = None):
     """

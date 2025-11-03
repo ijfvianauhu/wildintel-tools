@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from io import BytesIO
 from pathlib import Path
 from queue import Queue, Empty
+from time import sleep
 from typing import List, Callable
 
 from wildintel_tools.helpers import (
@@ -78,7 +79,7 @@ def check_collections(
     collections: List[str] = [],
     validate_locations: bool = True,
     max_workers: int = 4,
-    progress_callback: Callable[[str], None] = None,
+    progress_callback: Callable[[str,int], None] = None,
 
 ) -> Report:
     """
@@ -100,7 +101,7 @@ def check_collections(
     :type validate_locations: bool
     :param progress_callback: Optional callable used to report progress messages
                               during the process.
-    :type progress_callback: Callable[[str], None], optional
+    :type progress_callback: Callable[[str,int], None], optional
     :return: A report object containing the results of the collection checks.
     :rtype: Report
     """
@@ -115,8 +116,12 @@ def check_collections(
         collections = [entry.name for entry in data_path.iterdir() if entry.is_dir() and entry.name in collections]
 
     # Helper function to check a single deployment
-    def check_deployment(col: str, deployment: Path, queue: Queue):
+    def check_deployment(col: str, deployment: Path):
         results = []
+
+        if progress_callback:
+            progress_callback(f"deployment_start:{col}:{deployment.name}", 1)
+
         if not any(deployment.iterdir()):
             return results
 
@@ -139,7 +144,13 @@ def check_collections(
             results.append(("error", deployment.name, "validate_deployment_names",
                             f"Deployment '{deployment.name}' collection prefix ({collection_name}) does not match"
                             f" collection folder name '{col}'."))
-        queue.put(("progress", col, deployment.name))
+
+        if progress_callback:
+            progress_callback(f"file_progress:{col}:{deployment.name}:xxx", 1)
+
+        if progress_callback:
+            progress_callback(f"deployment_complete:{col}:{deployment.name}", 1)
+
         return results
 
     for col in collections:
@@ -155,29 +166,8 @@ def check_collections(
         else:
             report.add_success(str(col), "validate_collection_names")
 
-        # Check deployments in parallel
-        completed = 0
-        total = len(deployments)
-        q = Queue()
-
-
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {executor.submit(check_deployment, col, d, q): d for d in deployments}
-
-            def progress_listener():
-                nonlocal completed
-                while completed < total:
-                    try:
-                        msg_type, ccol, dep_name = q.get(timeout=0.1)
-                        if msg_type == "progress":
-                            completed += 1
-                            if progress_callback:
-                                progress_callback(f"collection_progress:{ccol}", completed / total)
-                    except Empty:
-                        continue
-
-            listener = threading.Thread(target=progress_listener, daemon=True)
-            listener.start()
+            futures = {executor.submit(check_deployment, col, d): d for d in deployments}
 
             for future in as_completed(futures):
                 results = future.result()
@@ -186,36 +176,7 @@ def check_collections(
                         report.add_error(name, section, msg)
                     else:
                         report.add_success(name, section)
-                listener.join(timeout=1)
 
-        if progress_callback:
-            progress_callback(f"collection_end:{col}", len(deployments))
-
-        """for deployment in deployments:
-            if not any(deployment.iterdir()):
-                continue
-
-            if not re.fullmatch(r"^R[0-9]{4}-([0-9A-Za-z_-]+)(_.+)?$", deployment.name):
-                report.add_error(deployment.name, "validate_deployment_names",
-                         "Name format is incorrect. It should follow the <CODE>-<NAME>_<SUFFIX> format.")
-            elif deployment.name.split("-")[0] != str(col):
-                report.add_error(deployment.name,
-                         "validate_deployment_names",
-                         f"The deployment name must not include the collection name. It must include {str(col)}")
-            elif validate_locations and deployment.name.split("-")[1].lower() not in locs_id:
-                invalid_loc_name = deployment.name.split("-")[1].lower()
-                report.add_error(deployment.name, "validate_deployment_names",
-                         f"The deployment name must not include a valid location id, not {invalid_loc_name}.")
-            else:
-                report.add_success(deployment.name, "validate_deployment_names")
-
-            collection_name, location = deployment.name.split("-",1)
-
-            if collection_name != col:
-                report.add_error(deployment.name, "validate_deployment_names",
-                         f"Deployment '{deployment.name}' collection prefix ({collection_name}) does not match"
-                                 f" collection folder name '{col}'.")
-        """
     report.finish()
     return report
 
@@ -223,8 +184,9 @@ def check_deployments(
         data_path: Path,
         collections: List[str] = None,
         extensions: List[ResourceExtensionDTO] = None,
-        progress_callback: Callable[[str], None] = None,
+        progress_callback: Callable[[str,int], None] = None,
         tolerance_hours: int = 1,
+        max_workers:int =4
 ) -> Report:
     """
     Check the integrity of each deployment. The checks include verifying the chronological sequence of images and
@@ -241,7 +203,7 @@ def check_deployments(
     :type extensions: List[ResourceExtensionDTO], optional
     :param progress_callback: Optional callable used to report progress messages
                               during the process.
-    :type progress_callback: Callable[[str], None], optional
+    :type progress_callback: Callable[[str,int], None], optional
     :param tolerance_hours: Number of hours of tolerance allowed between the first
                             and last image of a deployment.
     :type tolerance_hours: int, optional
@@ -267,8 +229,12 @@ def check_deployments(
         log_file = col_path / f"{col}_FileTimestampLog.csv"
 
         if not log_file.exists():
+            if progress_callback:
+                progress_callback(f"collection_start:{col}", 0)
+
             report.add_error(str(col), "check filetimestamplog",
                              f"No FileTimestampLog {col}_FileTimestampLog.csv found in {col_path}")
+            continue
 
         deployments = _read_field_notes_log(log_file)
 
@@ -284,8 +250,7 @@ def check_deployments(
                 }' not found in {col_path}")
 
                 if progress_callback:
-                    progress_callback(f"deployment_start:{col}:{deployment["name"]}:0",
-                                     0)
+                    progress_callback(f"deployment_start:{col}:{deployment["name"]}",0)
                     progress_callback(f"deployment_complete:{col}:{deployment["name"]}", 1)
 
                 continue
@@ -307,48 +272,60 @@ def check_deployments(
             date_list = []
             error = False
 
-            if progress_callback:
-                progress_callback(f"deployment_start:{col}:{deployment["name"]}:{len(image_files)}", {len(image_files)})
-
-            for idx, img_path in enumerate(image_files, start=1):
+            def process_image(img_path, idx):
                 try:
-                    if progress_callback:
-                        progress_callback(f"file_progress:{col}:{deployment["name"]}", 1)
-
-                    date_taken = None
                     img_bytes = img_path.read_bytes()
                     exif = ResourceUtils.get_exif_from_bytes(img_bytes)
-
                     date_str = exif.get("DateTimeOriginal") or exif.get("DateTime")
-                    if date_str:
-                        try:
-                            date_taken = datetime.strptime(date_str, "%Y:%m:%d %H:%M:%S")
-                        except ValueError:
-                            date_taken = None
-
-                    if previous_date and date_taken and date_taken < previous_date:
-                        error = True
-                        report.add_error(
-                            img_path,
-                            "date order",
-                            f"Image '{img_path.name}' (order {idx}) has earlier date "
-                                    f"than previous image {str(image_files[idx - 1])}."
-                        )
-                        continue
-
+                    date_taken = datetime.strptime(date_str, "%Y:%m:%d %H:%M:%S") if date_str else None
                     img_hash, _ = ResourceUtils.calculate_hash(img_bytes)
-                    sha1.update(img_hash.encode())
-
-                    if date_taken:
-                        previous_date = date_taken
-                        date_list.append(date_taken)
-
+                    return idx, date_taken, img_hash, None
                 except Exception as e:
-                    report.add_error(str(img_path), "gather_metadata", f"Failed to process image: {e}")
+                    return idx, None, None, str(e)
+
+            results = []
+            if progress_callback:
+                progress_callback(f"deployment_start:{col}:{deployment["name"]}", len(image_files))
+
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                future_to_img = {
+                    executor.submit(process_image, img_path, idx): (idx, img_path)
+                    for idx, img_path in enumerate(image_files, start=1)
+                }
+                for future in as_completed(future_to_img):
+                    idx, img_path = future_to_img[future]
+                    if progress_callback:
+                        progress_callback(f"file_progress:{col}:{deployment['name']}:{img_path}", 1)
+                    try:
+                        result = future.result()
+                        results.append(result)
+                    except Exception as e:
+                        report.add_error(str(img_path), "thread_error", str(e))
+
+            # Ordenamos los resultados por índice para mantener la secuencia original
+            results.sort(key=lambda x: x[0])
+
+            previous_date = None
+            for idx, date_taken, img_hash, err in results:
+                img_path = image_files[idx - 1]
+                if err:
+                    report.add_error(str(img_path), "gather_metadata", f"Failed to process image: {err}")
+                    error = True
                     continue
 
-            # Validar primera y última imagen respecto al rango esperado
-            if deployment["expected_start"] and deployment["expected_end"] and date_list:
+                if previous_date and date_taken and date_taken < previous_date:
+                    report.add_error(
+                        str(img_path),
+                        "date order",
+                        f"Image '{img_path.name}' (order {idx}) has earlier date than previous image."
+                    )
+                    error = True
+                previous_date = date_taken
+                if date_taken:
+                    date_list.append(date_taken)
+                sha1.update(img_hash.encode())
+
+            if deployment.get("expected_start") and deployment.get("expected_end") and date_list:
                 tolerance = timedelta(hours=tolerance_hours)
                 first_date = date_list[0]
                 last_date = date_list[-1]
@@ -359,8 +336,8 @@ def check_deployments(
                     report.add_error(
                         deployment["name"],
                         "deployment start date",
-                        f"First image '{image_files[0].name}' date {first_date} is outside expected start " 
-                                f"{deployment["expected_start"]} ±{tolerance_hours}h"
+                        f"First image '{image_files[0].name}' date {first_date} is outside expected start "
+                        f"{deployment['expected_start']} ±{tolerance_hours}h"
                     )
 
                 if last_date < deployment["expected_end"] - tolerance or last_date > deployment[
@@ -369,41 +346,26 @@ def check_deployments(
                     report.add_error(
                         deployment["name"],
                         "deployment end date",
-                        f"Last image '{image_files[-1].name}' date {last_date} is outside expected "
-                                f" end {deployment["expected_end"]} ±{tolerance_hours}h"
-                    )
-            if not error:
-                try:
-                    combined_hash = sha1.hexdigest()
-
-                    # Creamos el contenido del archivo de validación
-                    validation_info = {
-                        "validated_at": datetime.now().isoformat(),
-                        "collection": col,
-                        "deployment": deployment["name"],
-                        "hash": combined_hash,
-                    }
-
-                    # Guardamos el fichero oculto `.validated` en el deployment
-                    validation_file = deployment_path / ".validated"
-                    with open(validation_file, "w", encoding="utf-8") as f:
-                        yaml.dump(validation_info, f, indent=2)
-
-                    report.add_success(
-                        deployment["name"],
-                        "deployment validated",
-                        f"Deployment '{deployment['name']}' validated successfully at "
-                                f"{validation_info['validated_at']}"
+                        f"Last image '{image_files[-1].name}' date {last_date} is outside expected end "
+                        f"{deployment['expected_end']} ±{tolerance_hours}h"
                     )
 
-                except Exception as e:
-                    report.add_error(
-                        deployment["name"],
-                        "validation record error",
-                        f"Failed to create .validated file for deployment {deployment['name']}: {e}"
-                    )
+            # Validación temporal y guardado del .validated (igual que antes)
+            if not error and date_list:
+                combined_hash = sha1.hexdigest()
+                validation_info = {
+                    "validated_at": datetime.now().isoformat(),
+                    "collection": col,
+                    "deployment": deployment["name"],
+                    "hash": combined_hash,
+                }
+                with open(deployment_path / ".validated", "w", encoding="utf-8") as f:
+                    yaml.dump(validation_info, f, indent=2)
+                report.add_success(deployment["name"], "deployment validated",
+                                   f"Deployment '{deployment['name']}' validated successfully.")
+
             if progress_callback:
-                progress_callback(f"deployment_complete:{col}:{deployment["name"]}", 1)
+                progress_callback(f"deployment_complete:{col}:{deployment['name']}", 1)
 
     report.finish()
     return report
@@ -414,7 +376,7 @@ def prepare_collections_for_trapper(
     collections: list[str] = None,
     deployments: list[str] = None,
     extensions: list[ResourceExtensionDTO] = None,
-    progress_callback: Callable[[str], None] = None,
+    progress_callback: Callable[[str,int], None] = None,
     max_workers: int = 4,
     xmp_info : dict = None
 ) -> Report:
@@ -536,7 +498,7 @@ def prepare_collections_for_trapper(
             image_files = natsorted(image_files)
 
             if progress_callback:
-                progress_callback(f"deployment_start:{col}:{dep_name}:{len(image_files)}", len(image_files))
+                progress_callback(f"deployment_start:{col}:{dep_name}", len(image_files))
 
             copied_count = 0
             futures = []
@@ -551,7 +513,7 @@ def prepare_collections_for_trapper(
                     else:
                         report.add_error(dep_name, "copy error", error_msg)
                     if progress_callback:
-                        progress_callback(f"file_progress:{col}:{dep_name}", 1)
+                        progress_callback(f"file_progress:{col}:{dep_name}:{img_path}", 1)
 
             if copied_count:
                 report.add_success(dep_name, "deployment exported")
