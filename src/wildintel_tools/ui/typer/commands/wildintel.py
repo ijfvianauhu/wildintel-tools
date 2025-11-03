@@ -475,9 +475,9 @@ def prepare_for_trapper(
     settings = ctx.obj.get("settings", {})
     logger = ctx.obj.get("logger", logging.getLogger(__name__))
 
-    if data_path is None or not data_path.exists() or data_path.is_dir():
+    if data_path is None or not data_path.exists() or not data_path.is_dir():
         raise typer.BadParameter(_(f"'--data_path' is not a valid directory or does not exist."))
-    if output_path is None or not output_path.exists() or output_path.is_dir():
+    if output_path is None or not output_path.exists() or not output_path.is_dir():
         raise typer.BadParameter(_(f"'--output_path' is not a valid directory or does not exist."))
 
     xmp_info = {
