@@ -38,10 +38,11 @@ def _read_field_notes_log(filepath: Path) -> List[dict]:
             start_date = row.get("StartDate")
             start_time = row.get("StartTime")
             end_date = row.get("EndDate")
+            end_time = row.get("EndTime")
 
             if deployment_name and start_date and end_date:
                 expected_start = datetime.strptime(f"{start_date} {start_time}", "%Y:%m:%d %H:%M:%S")
-                expected_end = datetime.strptime(f"{end_date} 23:59:59", "%Y:%m:%d %H:%M:%S")
+                expected_end = datetime.strptime(f"{end_date} {end_time}", "%Y:%m:%d %H:%M:%S")
                 deployments.append({
                     "name": deployment_name,
                     "expected_start": expected_start,
