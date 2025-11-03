@@ -1,11 +1,13 @@
 import csv
 import hashlib
 import re
+import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import shutil
 from datetime import datetime, timedelta
 from io import BytesIO
 from pathlib import Path
+from queue import Queue, Empty
 from typing import List, Callable
 
 from wildintel_tools.helpers import (
@@ -74,7 +76,10 @@ def check_collections(
     user:str,
     password:str,
     collections: List[str] = [],
+    validate_locations: bool = True,
+    max_workers: int = 4,
     progress_callback: Callable[[str], None] = None,
+
 ) -> Report:
     """
     Check the collection names and their associated deployments.  For each deployment, verify that the linked location
@@ -91,6 +96,8 @@ def check_collections(
     :param collections: List of collection names to check. If empty, all available
                         collections will be checked.
     :type collections: List[str]
+    param validate_locations: If set to true, it will check that the locations are created in Trapper.
+    :type validate_locations: bool
     :param progress_callback: Optional callable used to report progress messages
                               during the process.
     :type progress_callback: Callable[[str], None], optional
@@ -107,6 +114,34 @@ def check_collections(
     else:
         collections = [entry.name for entry in data_path.iterdir() if entry.is_dir() and entry.name in collections]
 
+    # Helper function to check a single deployment
+    def check_deployment(col: str, deployment: Path, queue: Queue):
+        results = []
+        if not any(deployment.iterdir()):
+            return results
+
+        if not re.fullmatch(r"^R[0-9]{4}-([0-9A-Za-z_-]+)(_.+)?$", deployment.name):
+            results.append(("error", deployment.name, "validate_deployment_names",
+                            "Name format is incorrect. It should follow the <CODE>-<NAME>_<SUFFIX> format."))
+        elif deployment.name.split("-")[0] != str(col):
+            results.append(("error", deployment.name, "validate_deployment_names",
+                            f"The deployment name must not include the collection name. It must include {str(col)}"))
+        elif validate_locations and deployment.name.split("-")[1].lower() not in locs_id:
+            invalid_loc_name = deployment.name.split("-")[1].lower()
+            results.append(("error", deployment.name, "validate_deployment_names",
+                            f"The deployment name must include a valid location id, not '{invalid_loc_name}'."))
+        else:
+            results.append(("success", deployment.name, "validate_deployment_names", "Deployment name is valid."))
+
+        # Check that collection prefix matches folder name
+        collection_name, _ = deployment.name.split("-", 1)
+        if collection_name != col:
+            results.append(("error", deployment.name, "validate_deployment_names",
+                            f"Deployment '{deployment.name}' collection prefix ({collection_name}) does not match"
+                            f" collection folder name '{col}'."))
+        queue.put(("progress", col, deployment.name))
+        return results
+
     for col in collections:
         col_path = data_path / col
         deployments = [d for d in col_path.iterdir() if d.is_dir()]
@@ -120,7 +155,43 @@ def check_collections(
         else:
             report.add_success(str(col), "validate_collection_names")
 
-        for deployment in deployments:
+        # Check deployments in parallel
+        completed = 0
+        total = len(deployments)
+        q = Queue()
+
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {executor.submit(check_deployment, col, d, q): d for d in deployments}
+
+            def progress_listener():
+                nonlocal completed
+                while completed < total:
+                    try:
+                        msg_type, ccol, dep_name = q.get(timeout=0.1)
+                        if msg_type == "progress":
+                            completed += 1
+                            if progress_callback:
+                                progress_callback(f"collection_progress:{ccol}", completed / total)
+                    except Empty:
+                        continue
+
+            listener = threading.Thread(target=progress_listener, daemon=True)
+            listener.start()
+
+            for future in as_completed(futures):
+                results = future.result()
+                for status, name, section, msg in results:
+                    if status == "error":
+                        report.add_error(name, section, msg)
+                    else:
+                        report.add_success(name, section)
+                listener.join(timeout=1)
+
+        if progress_callback:
+            progress_callback(f"collection_end:{col}", len(deployments))
+
+        """for deployment in deployments:
             if not any(deployment.iterdir()):
                 continue
 
@@ -131,7 +202,7 @@ def check_collections(
                 report.add_error(deployment.name,
                          "validate_deployment_names",
                          f"The deployment name must not include the collection name. It must include {str(col)}")
-            elif deployment.name.split("-")[1].lower() not in locs_id:
+            elif validate_locations and deployment.name.split("-")[1].lower() not in locs_id:
                 invalid_loc_name = deployment.name.split("-")[1].lower()
                 report.add_error(deployment.name, "validate_deployment_names",
                          f"The deployment name must not include a valid location id, not {invalid_loc_name}.")
@@ -144,7 +215,7 @@ def check_collections(
                 report.add_error(deployment.name, "validate_deployment_names",
                          f"Deployment '{deployment.name}' collection prefix ({collection_name}) does not match"
                                  f" collection folder name '{col}'.")
-
+        """
     report.finish()
     return report
 

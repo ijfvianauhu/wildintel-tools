@@ -192,13 +192,16 @@ def check_collections(
         help=_("Access token for the Trapper API (alternative to using a password)"),
     ),
 
+    validate_locations: Annotated[bool, typer.Option(help=_("Check if locations are created in Trapper."))] = True,
+    max_workers: Annotated[ int, typer.Option(help=_("Check if locations are created in Trapper."))] = 4,
+
     config: Annotated[
-         Path,
-         typer.Option(
-             hidden=True,
-             help=_("File to save the report"),
-             callback=dynamic_dynaconf_callback
-         )
+     Path,
+     typer.Option(
+         hidden=True,
+         help=_("File to save the report"),
+         callback=dynamic_dynaconf_callback
+     )
     ] = None,
 ):
     """
@@ -290,6 +293,8 @@ def check_collections(
                     url = url,
                     user = user,
                     password = password,
+                    validate_locations = validate_locations,
+                    max_workers=max_workers,
                     progress_callback=on_progress,
             )
 
