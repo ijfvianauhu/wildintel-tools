@@ -1,0 +1,439 @@
+# Spanish (Spain) translations for PROJECT.
+# Copyright (C) 2025 ORGANIZATION
+# This file is distributed under the same license as the PROJECT project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2025.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2025-11-04 01:08+0100\n"
+"PO-Revision-Date: 2025-11-04 01:08+0100\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: es_ES\n"
+"Language-Team: es_ES <LL@li.org>\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.17.0\n"
+
+#: src/wildintel_tools/reports.py:214
+msgid "in progress"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/TyperUtils.py:138
+msgid "Nothing to show."
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/TyperUtils.py:159
+msgid ", "
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/main.py:133
+msgid "Show program's version number and exit"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/main.py:134
+msgid "Logger level: 0 (error), 1 (info), 2 (debug)."
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/main.py:137
+msgid "Load .env file with dotenv"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/main.py:140
+msgid "Directory containing settings files"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/main.py:146
+msgid "Project name for settings"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/config.py:37
+#: src/wildintel_tools/ui/typer/commands/config.py:38
+#: src/wildintel_tools/ui/typer/commands/reports.py:36
+#: src/wildintel_tools/ui/typer/commands/reports.py:37
+msgid "Manage project configurations"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/config.py:56
+#: src/wildintel_tools/ui/typer/commands/config.py:57
+msgid "Initialize a new project configuration"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/config.py:63
+msgid "Path to custom settings template"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/config.py:67
+msgid "Load .env file with environment variables"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/config.py:94
+#: src/wildintel_tools/ui/typer/commands/reports.py:77
+#: src/wildintel_tools/ui/typer/commands/reports.py:78
+msgid "Validate and show current project settings"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/config.py:129
+msgid "List all available project configurations"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/config.py:145
+msgid "No project configurations found"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/config.py:148
+msgid ""
+"\n"
+"Available project configurations:"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/config.py:152
+msgid "Edit settings file in default editor"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/config.py:155
+msgid "Name of the project whose configuration will be edited"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/config.py:179
+msgid "Show the value of a specific project configuration setting"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/config.py:180
+msgid "Display a project setting"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/config.py:215
+msgid "Set or update the value of a specific project setting parameter"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/config.py:216
+msgid "Set a project setting"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/config.py:222
+msgid "Nombre del proyecto que se va a inicializar."
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/config.py:226
+msgid "Parameter to set in the format 'GROUP.key'"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/config.py:230
+msgid "Value to set "
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/helpers.py:47
+#: src/wildintel_tools/ui/typer/commands/helpers.py:48
+msgid "Helpers"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/helpers.py:125
+msgid "Test connection to Trapper server (API)"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/helpers.py:126
+msgid "Test connection to Trapper server (API & FTPS)"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/helpers.py:130
+#: src/wildintel_tools/ui/typer/commands/helpers.py:223
+#: src/wildintel_tools/ui/typer/commands/helpers.py:282
+#: src/wildintel_tools/ui/typer/commands/helpers.py:340
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:176
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:568
+msgid "Base URL of the Trapper server (e.g., https://trapper.example.org)"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/helpers.py:134
+#: src/wildintel_tools/ui/typer/commands/helpers.py:227
+#: src/wildintel_tools/ui/typer/commands/helpers.py:286
+#: src/wildintel_tools/ui/typer/commands/helpers.py:344
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:180
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:572
+msgid "Username to authenticate with the Trapper server"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/helpers.py:140
+#: src/wildintel_tools/ui/typer/commands/helpers.py:233
+#: src/wildintel_tools/ui/typer/commands/helpers.py:292
+#: src/wildintel_tools/ui/typer/commands/helpers.py:350
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:186
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:578
+msgid "Password for the specified user (use only if no access token is provided)"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/helpers.py:146
+#: src/wildintel_tools/ui/typer/commands/helpers.py:239
+#: src/wildintel_tools/ui/typer/commands/helpers.py:298
+#: src/wildintel_tools/ui/typer/commands/helpers.py:356
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:192
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:584
+msgid "Access token for the Trapper API (alternative to using a password)"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/helpers.py:153
+#: src/wildintel_tools/ui/typer/commands/helpers.py:246
+#: src/wildintel_tools/ui/typer/commands/helpers.py:304
+#: src/wildintel_tools/ui/typer/commands/helpers.py:362
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:170
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:202
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:317
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:328
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:426
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:438
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:555
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:594
+msgid "File to save the report"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/helpers.py:181
+msgid "Testing Trapper API connection..."
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/helpers.py:183
+msgid "Trapper API connection successful!"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/helpers.py:188
+#: src/wildintel_tools/ui/typer/commands/helpers.py:189
+msgid "Test the availability of FFMPEG & exiftool"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/helpers.py:205
+msgid "Testing FFMPEG"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/helpers.py:207
+msgid "FFMPEG test successful!"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/helpers.py:212
+msgid "Testing exiftool."
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/helpers.py:214
+msgid "exiftool test successful!"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/helpers.py:218
+msgid "Get classification project info from trapper instance"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/helpers.py:219
+msgid "Get classification project info"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/helpers.py:273
+msgid "Trapper Classification Projects"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/helpers.py:278
+msgid "Get research project info from trapper instance"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/helpers.py:278
+msgid "Get research project info"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/helpers.py:336
+msgid "Get locations info from trapper instance"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/helpers.py:336
+msgid "Get locations info"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/logger.py:23
+#: src/wildintel_tools/ui/typer/commands/logger.py:24
+msgid "Manage project logger"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/logger.py:41
+msgid "Show log file content"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/logger.py:44
+msgid "Follow file content (like tail -f)"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/logger.py:85
+msgid "Compress the log file and remove the original"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/logger.py:86
+msgid "Compress and archive log"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/reports.py:54
+#: src/wildintel_tools/ui/typer/commands/reports.py:55
+msgid "Show a list of generated reports"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/reports.py:82
+msgid "Name of the YAML report file to display (optional)"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/reports.py:108
+#: src/wildintel_tools/ui/typer/commands/reports.py:109
+msgid "Archive old reports"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/reports.py:113
+#: src/wildintel_tools/ui/typer/commands/reports.py:150
+msgid ""
+"Number of days since the report was created after which it will be "
+"deleted."
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/reports.py:145
+#: src/wildintel_tools/ui/typer/commands/reports.py:146
+msgid "Remove archived reports"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:45
+msgid ""
+"Includes several utilities to validate and ensure the quality of "
+"collections and deployments produced within the WildIntel project"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:46
+msgid "Utilities for managing and validating WildIntel data"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:145
+msgid ""
+"Validates the names of collections and deployments within a given data "
+"directory. It checks that collection folders follow the 'RNNNN' format "
+"and that deployment folders use the '<COLLECTION>-<LOCATION>_<SUFFIX>' "
+"pattern. Reports errors and successes for each validation step."
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:150
+msgid "Validate collection and deployment folder naming conventions"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:156
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:315
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:425
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:554
+msgid "Collections to process (sub-dirs in root data path)"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:161
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:316
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:423
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:552
+msgid "Root data path"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:195
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:587
+msgid "Check if locations are created in Trapper."
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:196
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:322
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:588
+msgid "Number of parallel threads to use ."
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:302
+#, python-brace-format
+msgid "An error occurred during collection checking: {0}"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:306
+msgid ""
+"Validates the structure and content of deployment folders within the "
+"specified collections. Checks that image files exist, follow the expected"
+" chronological order, and that their timestamps are within the expected "
+"start and end ranges. Also generates a '.validated' file for successfully"
+" verified deployments."
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:311
+msgid "Validate deployment folders and image timestamp consistency"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:319
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:563
+msgid ""
+"Allowed time deviation (in hours) when comparing the first and last image"
+" timestamps against the expected deployment start and end times."
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:321
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:428
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:557
+msgid "File extension to process"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:416
+#, python-brace-format
+msgid "An error occurred during deployment checking: {0}"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:419
+msgid ""
+"Validate the internal structure of a collection by checking that all its "
+"deployments are correctly named, contain the expected files, and match "
+"their associated metadata. The validation also ensures that deployment "
+"folders correspond to the entries defined in the collection's CSV log and"
+" that image timestamps fall within the expected date ranges."
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:420
+msgid "Validate the integrity and metadata of deployments in a collection."
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:424
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:553
+msgid "Root output path"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:427
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:556
+msgid "Deployments to process (sub-dirs in collections path)"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:429
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:558
+msgid "Resource owner"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:430
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:431
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:559
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:560
+msgid "Resource publisher"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:432
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:561
+msgid "Research project name"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:482
+msgid "'--data_path' is not a valid directory or does not exist."
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:484
+msgid "'--output_path' is not a valid directory or does not exist."
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:545
+#, python-brace-format
+msgid "An error occurred during preparing collections fot trapper: {0}"
+msgstr ""
+
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:548
+#: src/wildintel_tools/ui/typer/commands/wildintel.py:549
+msgid ""
+"Run a pipeline of check collections, check deployments, and prepare for "
+"trapper steps."
+msgstr ""
+
