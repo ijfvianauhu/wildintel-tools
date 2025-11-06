@@ -1,13 +1,14 @@
 services:
-  trapper-tools:
-    image: registry.gitlab.com/trapper-project/trapper-tools:latest
+  wildintel-tools:
+    image: ghcr.io/ijfvianauhu/wildintel-tools/wildintel-tools:latest
     container_name: wildintel-tools
     restart: unless-stopped
     volumes:
       # Internal volume for settings persistence
-      - wildintel_tools_settings:/home/trapper/.wildintel-tools
+      - wildintel_tools_settings:/home/trapper/.config/wildintel-tools
       # Mount for data directory (user-defined)
-      - ${DATA_PATH:-./data}:/data
+      - ${DATA_PATH:-./wildintel-tools-data/collections}:/wildintel-tools-data/collections
+      - ${OUTPUT_PATH:-./wildintel-tools-data/collections-ready-for-trapper}:/wildintel-tools-data/collections-ready-for-trapper
     # user: "1000:1000"
     env_file:
       - .env

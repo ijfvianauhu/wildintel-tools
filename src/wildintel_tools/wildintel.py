@@ -210,7 +210,7 @@ def check_deployments(
     :return: A report object containing the results of the deployment integrity checks.
     :rtype: Report
     """
-
+    max_workers=1
     report = Report("Validating deployments")
 
     if not collections:
@@ -255,13 +255,13 @@ def check_deployments(
 
                 continue
 
-            validated_file = deployment_path / ".validated"
-            if validated_file.exists():
+            #validated_file = deployment_path / ".validated"
+            #if validated_file.exists():
                 # TODO validar el sha1 del .validated ??
-                if progress_callback:
-                    progress_callback(f"deployment_complete:{col}:{deployment["name"]}", 1)
+            #    if progress_callback:
+            #        progress_callback(f"deployment_complete:{col}:{deployment["name"]}", 1)
 
-                continue
+            #    continue
 
             all_files = [p for p in deployment_path.rglob("*") if p.is_file()]
             image_files = [f for f in all_files if f.suffix.lower() in valid_exts]
@@ -284,6 +284,7 @@ def check_deployments(
                     return idx, None, None, str(e)
 
             results = []
+
             if progress_callback:
                 progress_callback(f"deployment_start:{col}:{deployment["name"]}", len(image_files))
 
@@ -352,15 +353,15 @@ def check_deployments(
 
             # Validación temporal y guardado del .validated (igual que antes)
             if not error and date_list:
-                combined_hash = sha1.hexdigest()
-                validation_info = {
-                    "validated_at": datetime.now().isoformat(),
-                    "collection": col,
-                    "deployment": deployment["name"],
-                    "hash": combined_hash,
-                }
-                with open(deployment_path / ".validated", "w", encoding="utf-8") as f:
-                    yaml.dump(validation_info, f, indent=2)
+            #    combined_hash = sha1.hexdigest()
+            #    validation_info = {
+            #        "validated_at": datetime.now().isoformat(),
+            #        "collection": col,
+            #        "deployment": deployment["name"],
+            #        "hash": combined_hash,
+            #    }
+            #    with open(deployment_path / ".validated", "w", encoding="utf-8") as f:
+            #        yaml.dump(validation_info, f, indent=2)
                 report.add_success(deployment["name"], "deployment validated",
                                    f"Deployment '{deployment['name']}' validated successfully.")
 

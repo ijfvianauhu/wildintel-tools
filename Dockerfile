@@ -36,8 +36,8 @@ WORKDIR /app
 RUN bash -lc 'if [ -f uv.lock ]; then uv sync --frozen --no-dev; else uv lock && uv sync --no-dev; fi'
 
 # Create data directory
-RUN mkdir -p /data
-WORKDIR /data
+RUN mkdir -p /wildintel-tools-data
+WORKDIR /wildintel-tools-data
 
 # Create non-root user
 RUN groupadd -g 1000 trapper && useradd -u 1000 -g 1000 -m -d /home/trapper trapper
