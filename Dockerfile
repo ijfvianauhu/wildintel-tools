@@ -23,29 +23,42 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Download UV binary directly
-RUN curl -L "https://github.com/astral-sh/uv/releases/latest/download/uv-x86_64-unknown-linux-gnu.tar.gz" \
-    | tar -xz --strip-components=1 -C /usr/local/bin
+#RUN curl -L "https://github.com/astral-sh/uv/releases/latest/download/uv-x86_64-unknown-linux-gnu.tar.gz" \
+#    | tar -xz --strip-components=1 -C /usr/local/bin
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
 
 # Copy app code
 COPY . /app
 WORKDIR /app
 
+RUN groupadd -g 1000 trapper && useradd -u 1000 -g 1000 -m -d /home/trapper trapper && \
+    chown -R trapper:trapper /app
+RUN mkdir -p /home/trapper/.cache/uv && chown -R trapper:trapper /home/trapper/.cache
+
+# Create data directory
+RUN mkdir -p /wildintel-tools-data && chown -R trapper:trapper /wildintel-tools-data
+
+USER trapper
+
 # Install Python dependencies via UV
 # - Si existe `uv.lock`, usa build reproducible (--frozen)
 # - Si no existe, crea el lock y luego sincroniza
-RUN bash -lc 'if [ -f uv.lock ]; then uv sync --frozen --no-dev; else uv lock && uv sync --no-dev; fi'
+#RUN bash -lc 'if [ -f uv.lock ]; then uv sync --frozen --no-dev; else uv lock && uv sync --no-dev; fi'
+RUN XDG_CACHE_HOME=/home/trapper/.cache uv sync --frozen --no-dev
+#RUN --mount=type=cache,target=/home/trapper/.cache/uv uv sync --frozen --no-dev
 
-# Create data directory
-RUN mkdir -p /wildintel-tools-data
 WORKDIR /wildintel-tools-data
 
-# Create non-root user
-RUN groupadd -g 1000 trapper && useradd -u 1000 -g 1000 -m -d /home/trapper trapper
 
 # Shell completions
 RUN echo 'eval "$(wildintel-tools --show-completion bash)"' >> /home/trapper/.bashrc
 
+USER root
+
 # Entrypoint
+COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 ENTRYPOINT ["/app/entrypoint.sh"]
 

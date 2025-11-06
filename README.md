@@ -144,6 +144,8 @@ $env:DATA_PATH = "C:\path\to\wildintel-tools-data\collections-ready-to-trapper"
 docker compose up -d
 docker compose exec --user trapper wildintel-tools bash
 ```
+> **Note:** To update the container to the latest version, run `docker compose pull` 
+> before starting it.
 
 #### Step 5: Run trapper-tools commands
 
