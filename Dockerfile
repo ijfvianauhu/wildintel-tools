@@ -2,6 +2,8 @@
 # Base image
 FROM python:3.11-slim
 
+LABEL org.opencontainers.image.description="Command-line tools for managing image and metadata workflows in the WildINTEL wildlife monitoring platform."
+
 # Environment variables
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
