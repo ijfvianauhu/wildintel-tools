@@ -1,26 +1,45 @@
 import csv
 import hashlib
 import re
-import threading
+import unicodedata
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import shutil
 from datetime import datetime, timedelta
 from io import BytesIO
 from pathlib import Path
-from queue import Queue, Empty
-from time import sleep
+
 from typing import List, Callable
 
 from wildintel_tools.helpers import (
         get_trapper_locations
     )
 
-import yaml
 from PIL import Image
 
 from wildintel_tools.reports import Report
 from wildintel_tools.resouceutils import ResourceExtensionDTO, ResourceUtils
 from natsort import natsorted
+
+# same as django.utils.text.slugify
+def slugify(value: str, allow_unicode: bool = False):
+    """
+    Convert to ASCII if 'allow_unicode' is False. Convert spaces or repeated
+    dashes to single dashes. Remove characters that aren't alphanumerics,
+    underscores, or hyphens. Convert to lowercase. Also strip leading and
+    trailing whitespace, dashes, and underscores.
+    """
+    value = str(value)
+    if allow_unicode:
+        value = unicodedata.normalize("NFKC", value)
+    else:
+        value = (
+            unicodedata.normalize("NFKD", value)
+            .encode("ascii", "ignore")
+            .decode("ascii")
+        )
+    value = re.sub(r"[^\w\s-]", "", value.lower())
+    return re.sub(r"[-\s]+", "-", value).strip("-_")
+
 
 def _read_field_notes_log(filepath: Path) -> List[dict]:
     """
@@ -183,6 +202,7 @@ def check_collections(
 def check_deployments(
         data_path: Path,
         collections: List[str] = None,
+        deployments: List[str] = None,
         extensions: List[ResourceExtensionDTO] = None,
         progress_callback: Callable[[str,int], None] = None,
         tolerance_hours: int = 1,
@@ -210,7 +230,7 @@ def check_deployments(
     :return: A report object containing the results of the deployment integrity checks.
     :rtype: Report
     """
-    max_workers=1
+
     report = Report("Validating deployments")
 
     if not collections:
@@ -236,39 +256,46 @@ def check_deployments(
                              f"No FileTimestampLog {col}_FileTimestampLog.csv found in {col_path}")
             continue
 
-        deployments = _read_field_notes_log(log_file)
+        deployments_csv = _read_field_notes_log(log_file)
+
+        if deployments:
+            deployments_csv = [d for d in deployments_csv if d["name"] in deployments]
 
         if progress_callback:
-            progress_callback(f"collection_start:{col}", len(deployments))
+            progress_callback(f"collection_start:{col}", len(deployments_csv))
 
-        for deployment in deployments:
+        for deployment in deployments_csv:
 
+            expected_start = deployment.get("expected_start")
+            expected_end = deployment.get("expected_end")
+
+            # check deployment dates
+            if not expected_start or not expected_end or expected_start >= expected_end:
+                report.add_error(f"{str(col)}:{deployment["name"]}", "invalid date", f"Expected start date {expected_start} and/or expected end date {expected_end} are invalid")
+                progress_callback(f"deployment_start:{col}:{deployment["name"]}", 0)
+                progress_callback(f"deployment_complete:{col}:{deployment["name"]}", 1)
+                continue
+
+            # check deployment folder exists
             deployment_path = col_path / deployment["name"]
 
             if not deployment_path.exists():
-                report.add_error(str(col), "missing deployment", f"Deployment folder '{deployment["name"]
-                }' not found in {col_path}")
+                report.add_error(f"{str(col)}:{deployment["name"]}", "missing deployment",
+                                 f"Deployment folder '{deployment_path}' not found")
 
                 if progress_callback:
                     progress_callback(f"deployment_start:{col}:{deployment["name"]}",0)
                     progress_callback(f"deployment_complete:{col}:{deployment["name"]}", 1)
-
                 continue
-
-            #validated_file = deployment_path / ".validated"
-            #if validated_file.exists():
-                # TODO validar el sha1 del .validated ??
-            #    if progress_callback:
-            #        progress_callback(f"deployment_complete:{col}:{deployment["name"]}", 1)
-
-            #    continue
 
             all_files = [p for p in deployment_path.rglob("*") if p.is_file()]
             image_files = [f for f in all_files if f.suffix.lower() in valid_exts]
             image_files = natsorted(image_files)
 
+            if progress_callback:
+                progress_callback(f"deployment_start:{col}:{deployment["name"]}", len(image_files))
+
             sha1 = hashlib.sha1()
-            previous_date = None
             date_list = []
             error = False
 
@@ -284,9 +311,6 @@ def check_deployments(
                     return idx, None, None, str(e)
 
             results = []
-
-            if progress_callback:
-                progress_callback(f"deployment_start:{col}:{deployment["name"]}", len(image_files))
 
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 future_to_img = {
@@ -306,63 +330,68 @@ def check_deployments(
             # Ordenamos los resultados por índice para mantener la secuencia original
             results.sort(key=lambda x: x[0])
 
+            tolerance = timedelta(hours=tolerance_hours)
             previous_date = None
-            for idx, date_taken, img_hash, err in results:
+            sha1 = hashlib.sha1()
+            error = False
+
+            for idx, (date_taken, img_hash, err) in enumerate(
+                        [(r[1], r[2], r[3]) for r in results], start=1):
                 img_path = image_files[idx - 1]
+
+                img_id = f"{col}:{deployment['name']}:{img_path.name}"
+
+                # check metadata
                 if err:
-                    report.add_error(str(img_path), "gather_metadata", f"Failed to process image: {err}")
+                    report.add_error(img_id, "gather_metadata", f"Failed to process image: {err}")
                     error = True
                     continue
 
+                # check chronological order
                 if previous_date and date_taken and date_taken < previous_date:
                     report.add_error(
-                        str(img_path),
+                        img_id,
                         "date order",
                         f"Image '{img_path.name}' (order {idx}) has earlier date than previous image."
                     )
                     error = True
+                #else:
+                #    report.add_success(
+                #        img_id,
+                #        "date order",
+                #        f"Image '{img_path.name}' (order {idx}) chronological order OK."
+                #    )
+
                 previous_date = date_taken
+
+                # check datetime range
                 if date_taken:
-                    date_list.append(date_taken)
-                sha1.update(img_hash.encode())
+                    if idx == 1:  # Primera imagen
+                        in_range = expected_start - tolerance <= date_taken <= expected_start + tolerance
+                        context = f"expected start {expected_start} ±{tolerance_hours}h"
+                    elif idx == len(results):  # Última imagen
+                        in_range = expected_end - tolerance <= date_taken <= expected_end + tolerance
+                        context = f"expected end {expected_end} ±{tolerance_hours}h"
+                    else:  # Intermedias
+                        in_range = expected_start <= date_taken <= expected_end
+                        context = f"({expected_start} - {expected_end})"
 
-            if deployment.get("expected_start") and deployment.get("expected_end") and date_list:
-                tolerance = timedelta(hours=tolerance_hours)
-                first_date = date_list[0]
-                last_date = date_list[-1]
-
-                if first_date < deployment["expected_start"] - tolerance or first_date > deployment[
-                    "expected_start"] + tolerance:
-                    error = True
-                    report.add_error(
-                        deployment["name"],
-                        "deployment start date",
-                        f"First image '{image_files[0].name}' date {first_date} is outside expected start "
-                        f"{deployment['expected_start']} ±{tolerance_hours}h"
-                    )
-
-                if last_date < deployment["expected_end"] - tolerance or last_date > deployment[
-                    "expected_end"] + tolerance:
-                    error = True
-                    report.add_error(
-                        deployment["name"],
-                        "deployment end date",
-                        f"Last image '{image_files[-1].name}' date {last_date} is outside expected end "
-                        f"{deployment['expected_end']} ±{tolerance_hours}h"
-                    )
-
-            # Validación temporal y guardado del .validated (igual que antes)
-            if not error and date_list:
-            #    combined_hash = sha1.hexdigest()
-            #    validation_info = {
-            #        "validated_at": datetime.now().isoformat(),
-            #        "collection": col,
-            #        "deployment": deployment["name"],
-            #        "hash": combined_hash,
-            #    }
-            #    with open(deployment_path / ".validated", "w", encoding="utf-8") as f:
-            #        yaml.dump(validation_info, f, indent=2)
-                report.add_success(deployment["name"], "deployment validated",
+                    if not in_range:
+                        error = True
+                        report.add_error(
+                            img_id,
+                            "image date out of range",
+                            f"Image '{img_path.name}' date {date_taken} is outside allowed range {context}"
+                        )
+                    #else:
+                    #    report.add_success(
+                    #        img_id,
+                    #        "image date in range",
+                    #        f"Image '{img_path.name}' date {date_taken} is within allowed range {context}"
+                    #    )
+                    #    sha1.update(img_hash.encode())
+            if not error:
+                report.add_success(f"{col}:{deployment["name"]}", "deployment validated",
                                    f"Deployment '{deployment['name']}' validated successfully.")
 
             if progress_callback:
@@ -491,7 +520,7 @@ def prepare_collections_for_trapper(
             progress_callback(f"collection_start:{col}", len(all_deployments))
 
         for deployment in all_deployments:
-            dep_name = deployment.name
+            dep_name = slugify(deployment.name)
             trapper_deployment_path = trapper_col_path / dep_name
             trapper_deployment_path.mkdir(exist_ok=True)
 
