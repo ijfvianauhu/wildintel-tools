@@ -320,6 +320,11 @@ def check_deployments(
                              "against the expected deployment start and end times."))] = None,
     extensions: Annotated[List[ResourceExtensionDTO],typer.Option(help=_("File extension to process"))] = None,
     max_workers: Annotated[int, typer.Option(help=_("Number of parallel threads to use ."))] = 4,
+    deployments: Annotated[List[str],
+        typer.Option(
+            help=_("Deployments to process (sub-dirs in root data path)")
+        )
+    ] = None,
 
         config: Annotated[
         Path,
@@ -408,11 +413,13 @@ def check_deployments(
                     extensions=extensions,
                     progress_callback=on_progress,
                     max_workers=max_workers,
-                    tolerance_hours=tolerance_hours
+                    tolerance_hours=tolerance_hours,
+                    deployments=deployments
             )
         _show_report(report, output=report_file)
 
     except Exception as e:
+        raise e
         TyperUtils.error(_("An error occurred during deployment checking: {0}").format(str(e)))
 
 @app.command(
