@@ -41,35 +41,92 @@ def slugify(value: str, allow_unicode: bool = False):
     return re.sub(r"[-\s]+", "-", value).strip("-_")
 
 
-def _read_field_notes_log(filepath: Path) -> List[dict]:
+def _read_field_notes_log(filepath: Path) -> List[Dict]:
     """
-    Read and parse the field notes log file.
+    Read and validate the field notes log file.
+
+    Validates that all required columns exist (and are not duplicated),
+    and that each deployment has valid and consistent start/end timestamps.
 
     :param filepath: Path to the field notes log file.
     :type filepath: Path
-    :return: A list of dictionaries with the parsed log data.
+    :return: A list of dictionaries with validated and parsed deployment data.
     :rtype: List[dict]
+    :raises ValueError: If required columns are missing, duplicated, or data is invalid.
     """
 
+    required_fields = {"Deployment", "StartDate", "StartTime", "EndDate", "EndTime"}
     deployments = []
 
     with open(filepath, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
-        for row in reader:
-            deployment_name = row.get("Deployment")
-            start_date = row.get("StartDate")
-            start_time = row.get("StartTime")
-            end_date = row.get("EndDate")
-            end_time = row.get("EndTime")
 
-            if deployment_name and start_date and end_date:
-                expected_start = datetime.strptime(f"{start_date} {start_time}", "%Y:%m:%d %H:%M:%S")
-                expected_end = datetime.strptime(f"{end_date} {end_time}", "%Y:%m:%d %H:%M:%S")
-                deployments.append({
-                    "name": deployment_name,
-                    "expected_start": expected_start,
-                    "expected_end": expected_end
-                })
+        # --- 1. Validate header ---
+        if reader.fieldnames is None:
+            raise ValueError(f"No header row found in {filepath.name}")
+
+        header_fields = reader.fieldnames
+        duplicates = {x for x in header_fields if header_fields.count(x) > 1}
+        if duplicates:
+            raise ValueError(
+                f"Duplicated column names in {filepath.name}: {', '.join(duplicates)}"
+            )
+
+        header_set = set(header_fields)
+        missing = required_fields - header_set
+        if missing:
+            raise ValueError(
+                f"Missing required columns in {filepath.name}: {', '.join(missing)}"
+            )
+
+        seen_names = set()
+
+        # --- 2. Parse and validate rows ---
+        for row_num, row in enumerate(reader, start=2):  # start=2 = header line
+            deployment_name = row.get("Deployment", "").strip()
+            start_date = row.get("StartDate", "").strip()
+            start_time = row.get("StartTime", "").strip()
+            end_date = row.get("EndDate", "").strip()
+            end_time = row.get("EndTime", "").strip()
+
+            # --- 3. Check missing values ---
+            if not all([deployment_name, start_date, start_time, end_date, end_time]):
+                raise ValueError(
+                    f"Row {row_num} in {filepath.name} is missing required values: {row}"
+                )
+
+            # --- 4. Check duplicate deployment names ---
+            if deployment_name in seen_names:
+                raise ValueError(
+                    f"Duplicate deployment name '{deployment_name}' found in {filepath.name} (line {row_num})"
+                )
+            seen_names.add(deployment_name)
+
+            # --- 5. Parse datetime fields ---
+            try:
+                expected_start = datetime.strptime(
+                    f"{start_date} {start_time}", "%Y:%m:%d %H:%M:%S"
+                )
+                expected_end = datetime.strptime(
+                    f"{end_date} {end_time}", "%Y:%m:%d %H:%M:%S"
+                )
+            except ValueError as e:
+                raise ValueError(
+                    f"Invalid datetime format in row {row_num} ({deployment_name}): {e}"
+                )
+
+            # --- 6. Logical consistency ---
+            if expected_start >= expected_end:
+                raise ValueError(
+                    f"Deployment '{deployment_name}' has start >= end "
+                    f"({expected_start} vs {expected_end})"
+                )
+
+            deployments.append({
+                "name": deployment_name,
+                "expected_start": expected_start,
+                "expected_end": expected_end,
+            })
 
     return deployments
 
