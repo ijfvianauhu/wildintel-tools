@@ -139,6 +139,8 @@ DATA_PATH=./wildintel-tools-data/
 > **Note:** The .env file can also include your wildintel-tools global settings. See the example provided
 > in this repository: env.example.
 
+Optinally, you can also set the `DATA_PATH` environment variable directly in your shell before starting the Docker 
+container:
 
 ```
 # Linux bash 
@@ -343,7 +345,9 @@ First of all, initialize the configuration file by running:
 wildintel-tools config init
 ```
 
-Once this is done, edit it and modify the environment variables (typically the `username` and `password`) by running:
+Once this is done, edit it and modify the environment variables (typically the `username`, `password`, `data_dir`, 
+and `output_dir`) by running:
+
 ```python
 wildintel-tools config edit
 ```
@@ -351,6 +355,38 @@ wildintel-tools config edit
 To confirm changes in the configuration file, you can run:
 ```
 wildintel-tools config show
+```
+
+It should display something like this:
+
+```
+Settings for project 'default':
+
+[LOGGER]
+loglevel = 1
+filename = 
+
+[GENERAL]
+host = https://wildintel-trap.uhu.es
+login = username@uhu.es
+password = mipassword
+project_id = 999
+verify_ssl = True
+ffmpeg = ffmpeg
+exiftool = exiftool
+data_dir = /data/WICP_01/collections
+
+[WILDINTEL]
+rp_name = WildINTEL
+coverage = Doñana National Park
+publisher = University of Huelva
+owner = University of Huelva
+tolerance_hours = 1
+resize_img = False
+resize_img_size = [800, 600]
+overwrite = False
+output_dir = /data/WICP_01/collections-ready-to-trapper
+
 ```
 
 We can find a detailed description of each configuration option in [configuración section](#-configuration)
@@ -366,10 +402,14 @@ wildintel-tools helpers test-connection
 ### Step 3: check collections
 
 After creating the configuration file and validating trapper connection, we proceed to check the names of the collections 
-and deployments stored in a local folder. We need to provide the path to the main directory where all collections are stored
-using  `--data-path option`.  For this example, if our collections are stored in `$HOME/Download/trapper-collections/`, we run:
+and deployments stored in a local folder. 
 
 ```python
+wildintel-tools wildintel check-collections
+```
+
+If the data path has not been defined in the configuration file, or if you want to override the existing value, you must 
+specify it explicitly using the `--data-path` option.
 
 ```python
 wildintel-tools wildintel check-collections  --data-path $HOME/Download/trapper-collections/
@@ -378,7 +418,26 @@ wildintel-tools wildintel check-collections  --data-path $HOME/Download/trapper-
 If we are interesting in checking only specific collections, we can provide their names as additional arguments:
 
 ```
-wildintel-tools wildintel check-collections  R0033 --data-path $HOME/Download/trapper-collections/
+wildintel-tools wildintel check-collections  R0033
+```
+
+After completing the validation process, we can review any errors that occurred by running:
+
+```
+wildintel-tools reports info
+```
+
+wildintel-tools stores reports for all validation processes that have been executed.
+You can list all available reports by running:
+
+```
+wildintel-tools reports list
+```
+
+If you want to display the contents of a specific report, provide its name:
+
+```
+wildintel-tools reports info report_6f72740p.yaml
 ```
 
 ### Step 4: check collections check deployments
@@ -386,16 +445,16 @@ wildintel-tools wildintel check-collections  R0033 --data-path $HOME/Download/tr
 Next, we will check whether the contents of each deployment are correct. The tool will verify the dates and the sequence of 
 the media in each deployment based on the data provided in the field sheet — a CSV file per collection that contains 
 information about each deployment. The name of this csv file must be `<COLLECTION_NAME>_FileTimestampLog.csv`  and be 
-located in the root  directory of each collection.
+located in the root  directory of each collection (see [section overview](#-overview).
 
 ```python
-wildintel-tools wildintel check-deployments --data-path $HOME/Download/trapper-collections/ 
+wildintel-tools wildintel check-deployments 
 ```
 
 As above, we can also specify specific collections to check by providing their names as additional arguments:
 
 ```python
-wildintel-tools wildintel check-deployments R0033 --data-path $HOME/Download/trapper-collections/ 
+wildintel-tools wildintel check-deployments R0033 
 ```
 
 Also, we can customize the accepted time tolerance (in hours) when comparing the first and last image timestamps against
@@ -403,6 +462,12 @@ the expected deployment start and end times using the `--tolerance-hours` option
 
 ```python
 wildintel-tools wildintel check-deployments R0033 --data-path $HOME/Download/trapper-collections/ --tolerance-hours 1
+```
+
+Moreover, we can limit the validation to a single deployment within a collection by using the --deployments option.
+
+```python
+wildintel-tools wildintel check-deployments R0033 --deployments roo33-dona-01 --tolerance-hours 1
 ```
 
 ### Step 5: prepare collections for trapper
@@ -413,20 +478,22 @@ media file. Specifically, it resizes, renames, and adds various pieces of inform
 Its basic usage is as follows:
 
 ```python
-wildintel-tools wildintel prepare-for-trapper --data-path $HOME/Descargas/trapper-collections/ --output-path /tmp/trapper/
+wildintel-tools wildintel prepare-for-trapper
 ```
+When this command is executed, all collections located in `DATA_PATH` will be processed and the results will be stored
+in `OUTPUT_PATH`.
 
-where `--output-path` specifies the directory where the prepared collections will be stored.
+If desired, you can customize these paths using the --data-path and --out-path options.
+
+```python
+wildintel-tools wildintel prepare-for-trapper  --data-path /data/collections --out-path options /data/collections-for-trapper .
+```
 
 Similar to the previous commands, we can also specify specific collections to prepare by providing their names as additional arguments:
 
 ```python
 wildintel-tools wildintel prepare-for-trapper R0033 --data-path $HOME/Descargas/trapper-collections/ --output-path /tmp/trapper/
 ```
-
-
-
-
 
 ## 🤝 Contributing
 
