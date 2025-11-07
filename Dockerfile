@@ -40,7 +40,7 @@ RUN groupadd -g 1000 trapper && useradd -u 1000 -g 1000 -m -d /home/trapper trap
 RUN mkdir -p /home/trapper/.cache/uv && chown -R trapper:trapper /home/trapper/.cache
 
 # Create data directory
-RUN mkdir -p /wildintel-tools-data && chown -R trapper:trapper /wildintel-tools-data
+RUN mkdir -p /data && chown -R trapper:trapper /data
 
 USER trapper
 
@@ -51,8 +51,7 @@ USER trapper
 RUN XDG_CACHE_HOME=/home/trapper/.cache uv sync --frozen --no-dev
 #RUN --mount=type=cache,target=/home/trapper/.cache/uv uv sync --frozen --no-dev
 
-WORKDIR /wildintel-tools-data
-
+WORKDIR /data
 
 # Shell completions
 RUN echo 'eval "$(wildintel-tools --show-completion bash)"' >> /home/trapper/.bashrc

@@ -1,5 +1,9 @@
 services:
   wildintel-tools:
+    #build:
+    #  context: .
+    #  dockerfile: Dockerfile
+    #image: wildintel-tools:local
     image: ghcr.io/ijfvianauhu/wildintel-tools/wildintel-tools:latest
     container_name: wildintel-tools
     restart: unless-stopped
@@ -7,8 +11,7 @@ services:
       # Internal volume for settings persistence
       - wildintel_tools_settings:/home/trapper/.config/wildintel-tools
       # Mount for data directory (user-defined)
-      - ${DATA_PATH:-./wildintel-tools-data/collections}:/wildintel-tools-data/collections
-      - ${OUTPUT_PATH:-./wildintel-tools-data/collections-ready-for-trapper}:/wildintel-tools-data/collections-ready-for-trapper
+      - ${DATA_PATH:-./wildintel-tools-data/}:/data
     # user: "1000:1000"
     env_file:
       - .env

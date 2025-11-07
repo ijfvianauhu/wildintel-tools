@@ -32,13 +32,13 @@ from wildintel_tools.ui.typer.i18n import _
 from wildintel_tools.ui.typer.TyperUtils import TyperUtils
 from wildintel_tools.ui.typer.settings import SettingsManager
 
-from wildintel_tools.helpers import(
+from wildintel_tools.helpers import (
     check_ffmpeg,
     check_exiftool,
     check_trapper_connection,
     get_trapper_classification_projects,
     get_trapper_research_projects,
-    get_trapper_locations
+    get_trapper_locations, get_trapper_deployments
 )
 
 import typer
@@ -386,6 +386,65 @@ def locations(ctx: typer.Context,
     try:
         locs = get_trapper_locations(url, user, password, None)
         data = [cp.model_dump() for cp in locs.results]
-        TyperUtils.show_table(data, "Trapper Locations")
+        TyperUtils.show_table(data, "Trapper Locations"
+                              , fields=["id", "locationID", "timezone", "ignoreDST", "latitude", "longitude"], )
     except Exception as e:
         TyperUtils.fatal(_(f"Failed getting trapper locations: {str(e)}"))
+
+@app.command(help=_("Get deployments info from trapper instance"), short_help=_("Get deployments info"))
+def deployments(ctx: typer.Context,
+        url: str = typer.Argument(
+            None,
+            help=_("Base URL of the Trapper server (e.g., https://trapper.example.org)"),
+        ),
+        user: str = typer.Argument(
+            None,
+            help=_("Username to authenticate with the Trapper server")
+        ),
+        password: str = typer.Option(
+            None,
+            "--password",
+            "-p",
+            help=_("Password for the specified user (use only if no access token is provided)")
+        ),
+        token: str = typer.Option(
+            None,
+            "--token",
+            "-t",
+            help=_("Access token for the Trapper API (alternative to using a password)"),
+        ),
+        config: Annotated[
+              Path,
+              typer.Option(
+                  hidden=True,
+                  help=_("File to save the report"),
+                  callback=dynamic_dynaconf_callback
+              )
+          ] = None,
+):
+    """
+    Retrieve locations from a Trapper instance and display them.
+
+    :param ctx: Typer context.
+    :type ctx: typer.Context
+    :param url: Base URL of the Trapper server.
+    :type url: str
+    :param user: Username for authentication.
+    :type user: str
+    :param password: Password for the user (optional).
+    :type password: str
+    :param token: Access token (optional).
+    :type token: str
+    :param config: Internal configuration option (dynamic callback).
+    :type config: pathlib.Path | None
+    :raises Exception: If retrieval fails a fatal message is logged.
+    """
+    settings = ctx.obj.get("settings", {})
+
+    try:
+        locs = get_trapper_deployments(url, user, password, None)
+        data = [cp.model_dump() for cp in locs.results]
+        TyperUtils.show_table(data, "Trapper Deployments",
+                        fields=["id", "deploymentID", "locationName", "deploymentStart", "deploymentEnd", "timezone"], )
+    except Exception as e:
+        TyperUtils.fatal(_(f"Failed getting trapper deployments: {str(e)}"))

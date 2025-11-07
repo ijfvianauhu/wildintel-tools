@@ -122,21 +122,31 @@ cd wildintel-tools
 On the host machine where Docker is running, you need to have a directory containing the images you want to process. Read
 [overview](#-overview) section for details on how to structure this directory.
 
-To make this directory accessible inside the Docker container, you must set the `DATA_PATH` environment variable to the path 
-of **collections directory** and `OUTPUT_PATH` environment variable to the path of **collections-ready-to-trapper** directory.
+To make this directory accessible inside the Docker container, you must set the `DATA_PATH` environment variable to this 
+main directory. 
+
+To set the values of this variable, copy the `env.example` file located in the root directory of this repository in a
+`.env` file located in the same directory  as docker-compose.yml.Once copied, edit the `.env` file and update the values
+of `DATA_PATH` environment variable.
+
+```
+# Linux bash
+cp env.example .env
+
+DATA_PATH=./wildintel-tools-data/
+```
+
+> **Note:** The .env file can also include your wildintel-tools global settings. See the example provided
+> in this repository: env.example.
+
 
 ```
 # Linux bash 
-export DATA_PATH=/path/to/wildintel-tools-data/collections
-export OUTPUT_PATH=/path/to/wildintel-tools-data/collections-ready-to-trapper
+export DATA_PATH=/path/to/wildintel-tools-data/
 # Windows PowerShell
-$env:DATA_PATH = "C:\path\to\wildintel-tools-data\collections"
-$env:DATA_PATH = "C:\path\to\wildintel-tools-data\collections-ready-to-trapper"
+$env:DATA_PATH = "C:\path\to\wildintel-tools-data\"
 ```
 
-> **Note:** You can also define DATA_PATH and OUTPUT_PATH variables in a .env file located in the same directory 
-> as docker-compose.yml. The .env file can also include your wildintel-tools global settings. See the example provided
-> in this repository: env.example.
 
 #### Step 4: Start the Docker container and open a terminal inside it
 

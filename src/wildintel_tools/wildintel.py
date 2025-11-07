@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from io import BytesIO
 from pathlib import Path
 
-from typing import List, Callable
+from typing import List, Callable, Dict
 
 from wildintel_tools.helpers import (
         get_trapper_locations
@@ -201,22 +201,22 @@ def check_collections(
         if not any(deployment.iterdir()):
             return results
 
-        if not re.fullmatch(r"^R[0-9]{4}-([0-9A-Za-z_-]+)(_.+)?$", deployment.name):
-            results.append(("error", deployment.name, "validate_deployment_names",
+        if not re.fullmatch(r"^[Rr][0-9]{4}-([0-9A-Za-z_-]+)(_.+)?$", deployment.name):
+            results.append(("error", f"{col}:{deployment.name}", "validate_deployment_names",
                             "Name format is incorrect. It should follow the <CODE>-<NAME>_<SUFFIX> format."))
-        elif deployment.name.split("-")[0] != str(col):
-            results.append(("error", deployment.name, "validate_deployment_names",
+        elif deployment.name.split("-")[0].lower() != str(col).lower():
+            results.append(("error", f"{col}:{deployment.name}", "validate_deployment_names",
                             f"The deployment name must not include the collection name. It must include {str(col)}"))
         elif validate_locations and deployment.name.split("-")[1].lower() not in locs_id:
             invalid_loc_name = deployment.name.split("-")[1].lower()
-            results.append(("error", deployment.name, "validate_deployment_names",
+            results.append(("error", f"{col}:{deployment.name}", "validate_deployment_names",
                             f"The deployment name must include a valid location id, not '{invalid_loc_name}'."))
         else:
-            results.append(("success", deployment.name, "validate_deployment_names", "Deployment name is valid."))
+            results.append(("success", f"{col}:{deployment.name}", "validate_deployment_names", "Deployment name is valid."))
 
         # Check that collection prefix matches folder name
         collection_name, _ = deployment.name.split("-", 1)
-        if collection_name != col:
+        if collection_name.lower() != col.lower():
             results.append(("error", deployment.name, "validate_deployment_names",
                             f"Deployment '{deployment.name}' collection prefix ({collection_name}) does not match"
                             f" collection folder name '{col}'."))

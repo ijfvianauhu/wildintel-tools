@@ -192,3 +192,28 @@ def get_trapper_locations(base_url:str, user_name:str, user_password: str, acces
     )
 
     return trapper_client.locations.get_all()
+
+def get_trapper_deployments(base_url:str, user_name:str, user_password: str, access_token: str):
+    """
+    Retrieves all deployments from the Trapper API.
+
+    :param base_url: Base URL of the Trapper API.
+    :type base_url: str
+    :param user_name: Username or email used for authentication.
+    :type user_name: str
+    :param user_password: User password for authentication.
+    :type user_password: str
+    :param access_token: Optional API access token (can be ``None``).
+    :type access_token: str
+    :return: List of location objects retrieved from the API.
+    :rtype: list
+    :raises Exception: If the request fails due to connection or authentication errors.
+    """
+    trapper_client = TrapperClient(
+        base_url=base_url,
+        user_name=user_name,
+        user_password=user_password,
+        access_token=access_token
+    )
+
+    return trapper_client.deployments.get_all()

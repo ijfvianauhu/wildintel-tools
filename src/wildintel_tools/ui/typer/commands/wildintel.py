@@ -419,7 +419,6 @@ def check_deployments(
         _show_report(report, output=report_file)
 
     except Exception as e:
-        raise e
         TyperUtils.error(_("An error occurred during deployment checking: {0}").format(str(e)))
 
 @app.command(
