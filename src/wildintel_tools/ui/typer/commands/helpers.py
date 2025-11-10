@@ -387,7 +387,7 @@ def locations(ctx: typer.Context,
         locs = get_trapper_locations(url, user, password, None)
         data = [cp.model_dump() for cp in locs.results]
         TyperUtils.show_table(data, "Trapper Locations"
-                              , fields=["id", "locationID", "timezone", "ignoreDST", "latitude", "longitude"], )
+                              , fields=["pk", "location_id", "research_project", "timezone", "ignoreDST", "coordinates"], )
     except Exception as e:
         TyperUtils.fatal(_(f"Failed getting trapper locations: {str(e)}"))
 
@@ -445,6 +445,6 @@ def deployments(ctx: typer.Context,
         locs = get_trapper_deployments(url, user, password, None)
         data = [cp.model_dump() for cp in locs.results]
         TyperUtils.show_table(data, "Trapper Deployments",
-                        fields=["id", "deploymentID", "locationName", "deploymentStart", "deploymentEnd", "timezone"], )
+                        fields=["pk", "deployment_id", "research_project", "location", "location_id", "start_date", "end_date"], )
     except Exception as e:
         TyperUtils.fatal(_(f"Failed getting trapper deployments: {str(e)}"))
