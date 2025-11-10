@@ -184,7 +184,7 @@ def check_collections(
     report = Report("Validate collection and deployments names")
 
     locs = get_trapper_locations(url, user, password, None)
-    locs_id = {cp.model_dump()["locationID"] for cp in locs.results}
+    locs_id = {cp.model_dump()["location_id"] for cp in locs.results}
 
     if not collections:
         collections = [entry.name for entry in data_path.iterdir() if entry.is_dir()]
