@@ -430,7 +430,7 @@ def check_deployments(
                         in_range = expected_end - tolerance <= date_taken <= expected_end + tolerance
                         context = f"expected end {expected_end} ±{tolerance_hours}h"
                     else:  # Intermedias
-                        in_range = expected_start <= date_taken <= expected_end
+                        in_range = expected_start - tolerance <= date_taken <= expected_end + tolerance
                         context = f"({expected_start} - {expected_end})"
 
                     if not in_range:
@@ -465,7 +465,8 @@ def prepare_collections_for_trapper(
     extensions: list[ResourceExtensionDTO] = None,
     progress_callback: Callable[[str,int], None] = None,
     max_workers: int = 4,
-    xmp_info : dict = None
+    xmp_info : dict = None,
+    scale_images: bool = True,
 ) -> Report:
     """
     Prepare validated collections for upload them to Trapper. Each deployment's images are copied and flattened
@@ -509,7 +510,7 @@ def prepare_collections_for_trapper(
         extensions = list(ResourceExtensionDTO)
     valid_extensions = [ext.value.lower() for ext in extensions]
 
-    def process_file(col_name, dep_name, idx, img_path, trapper_deployment_path):
+    def process_file(col_name, dep_name, idx, img_path, trapper_deployment_path, scale_image):
         """
         Copy image, generate new name, add metadata, and return success/error info.
         """
@@ -535,7 +536,11 @@ def prepare_collections_for_trapper(
             owner =   xmp_info.get("owner", "Unknown")
             year = datetime.now().year
 
-            _, new_image = ResourceUtils.resize(Image.open(BytesIO(img_path.read_bytes())))
+            if scale_image:
+                _, new_image = ResourceUtils.resize(Image.open(BytesIO(img_path.read_bytes())))
+            else:
+                new_image = Image.open(BytesIO(img_path.read_bytes()))
+
             new_hash, _ = ResourceUtils.calculate_hash(_pil_to_bytes(new_image))
 
             tags = {
@@ -591,7 +596,7 @@ def prepare_collections_for_trapper(
             futures = []
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 for idx, img_path in enumerate(image_files, start=1):
-                    futures.append(executor.submit(process_file, col, dep_name, idx, img_path, trapper_deployment_path))
+                    futures.append(executor.submit(process_file, col, dep_name, idx, img_path, trapper_deployment_path, scale_images))
 
                 for future in as_completed(futures):
                     success, error_msg = future.result()

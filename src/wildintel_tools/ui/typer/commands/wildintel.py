@@ -426,26 +426,28 @@ def check_deployments(
     short_help=_("Validate the integrity and metadata of deployments in a collection."))
 def prepare_for_trapper(
     ctx: typer.Context,
-    data_path: Annotated[ Path, typer.Option( help=_("Root data path"), exists=True,  file_okay=False,  dir_okay=True ) ]=None,
-    output_path: Annotated[ Path,typer.Option(help=_("Root output path"),exists=True,file_okay=False,  dir_okay=True)] = None,
-    collections: Annotated[ List[str], typer.Argument(help=_("Collections to process (sub-dirs in root data path)"))] = None,
+    data_path: Annotated[
+        Path, typer.Option(help=_("Root data path"), exists=True, file_okay=False, dir_okay=True)
+    ] = None,
+    output_path: Annotated[
+        Path, typer.Option(help=_("Root output path"), exists=True, file_okay=False, dir_okay=True)
+    ] = None,
+    collections: Annotated[
+        List[str], typer.Argument(help=_("Collections to process (sub-dirs in root data path)"))
+    ] = None,
     report_file: Annotated[Path, typer.Option(help=_("File to save the report"))] = None,
-    deployments: Annotated[List[str], typer.Option( help=_("Deployments to process (sub-dirs in collections path)"))] = None,
+    deployments: Annotated[
+        List[str], typer.Option(help=_("Deployments to process (sub-dirs in collections path)"))
+    ] = None,
     extensions: Annotated[List[ResourceExtensionDTO], typer.Option(help=_("File extension to process"))] = None,
     owner: Annotated[str, typer.Option(help=_("Resource owner"))] = None,
     publisher: Annotated[str, typer.Option(help=_("Resource publisher"))] = None,
-    coverage: Annotated[str, typer.Option( help=_("Resource publisher") ) ] = None,
-    rp_name: Annotated[str, typer.Option( help=_("Research project name") ) ] = None,
-
+    coverage: Annotated[str, typer.Option(help=_("Resource coverage"))] = None,
+    rp_name: Annotated[str, typer.Option(help=_("Research project name"))] = None,
+    scale: Annotated[bool, typer.Option(help=_("Scale resources"))] = True,
     config: Annotated[
-        Path,
-        typer.Option(
-            hidden=True,
-            help=_("File to save the report"),
-            callback=dynamic_dynaconf_callback
-        )
+        Path, typer.Option(hidden=True, help=_("File to save the report"), callback=dynamic_dynaconf_callback)
     ] = None,
-
 ):
     """
     Prepare collections for ingestion into Trapper.
@@ -543,7 +545,8 @@ def prepare_for_trapper(
                     deployments=deployments,
                     progress_callback=on_progress,
                     max_workers = 4,
-                    xmp_info = xmp_info
+                    xmp_info = xmp_info,
+                    scale_images=scale,
             )
 
         _show_report(report, output=report_file)
