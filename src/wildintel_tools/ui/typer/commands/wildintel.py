@@ -301,6 +301,8 @@ def check_collections(
     except Exception as e:
         TyperUtils.error(_("An error occurred during collection checking: {0}").format(str(e)))
 
+app.command(name="cc", hidden=True, help=_("Alias for check_collections")) (check_collections)
+
 @app.command(
     help=_(
         "Validates the structure and content of deployment folders within the specified collections. "
@@ -420,6 +422,7 @@ def check_deployments(
 
     except Exception as e:
         TyperUtils.error(_("An error occurred during deployment checking: {0}").format(str(e)))
+app.command(name="cd", hidden=True, help=_("Alias for check_deployments")) (check_deployments)
 
 @app.command(
     help=_("Validate the internal structure of a collection by checking that all its deployments are correctly named, contain the expected files, and match their associated metadata. The validation also ensures that deployment folders correspond to the entries defined in the collection's CSV log and that image timestamps fall within the expected date ranges."),
@@ -552,6 +555,7 @@ def prepare_for_trapper(
         _show_report(report, output=report_file)
     except Exception as e:
         TyperUtils.error(_("An error occurred during preparing collections fot trapper: {0}").format(str(e)))
+app.command(name="pt", hidden=True, help=_("Alias for prepare_for_trapper")) (prepare_for_trapper)
 
 @app.command(
     help=_("Run a pipeline of check collections, check deployments, and prepare for trapper steps."),
