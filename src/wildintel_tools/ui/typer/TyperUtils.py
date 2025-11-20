@@ -86,6 +86,12 @@ class TyperUtils:
         raise typer.Exit(code=1)
 
     @staticmethod
+    def debug(message: str):
+        if TyperUtils.logger.isEnabledFor(logging.DEBUG):
+            TyperUtils.console.print(f"🐞 {message}")
+        TyperUtils.logger.info(message)
+
+    @staticmethod
     def success(message: str):
         TyperUtils.console.print(f"[green]:white_check_mark:[/green] {message}")
         TyperUtils.logger.info(message)

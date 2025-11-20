@@ -559,7 +559,8 @@ def prepare_collections_for_trapper(
             }
 
             date_str_for_name = date_taken.strftime("%Y%m%d") if date_taken else "unknown_date"
-            new_name = f"{col_name}-{dep_name}__{date_str_for_name}_{idx:04d}{img_path.suffix.lower()}"
+            new_name = f"{dep_name}__{date_str_for_name}_{idx}{img_path.suffix.lower()}".upper()
+
             dest_path = trapper_deployment_path / new_name
             shutil.copy2(img_path, dest_path)
             ResourceUtils.add_xmp_metadata([dest_path], tags)

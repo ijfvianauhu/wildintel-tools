@@ -502,6 +502,8 @@ def prepare_for_trapper(
     }
 
     try:
+        TyperUtils.info(_(f"Preparing collections \"{",".join(collections) if collections else "All"}\" in {data_path} for Trapper into {output_path}"))
+
         with Progress(
             TextColumn("[bold blue]{task.description}"),
             BarColumn(),
@@ -552,6 +554,7 @@ def prepare_for_trapper(
                     scale_images=scale,
             )
 
+        TyperUtils.success(_("Preparation for Trapper completed. Collections are available in {0}").format(output_path))
         _show_report(report, output=report_file)
     except Exception as e:
         TyperUtils.error(_("An error occurred during preparing collections fot trapper: {0}").format(str(e)))
@@ -653,7 +656,7 @@ def _show_report(report, success_msg="Validation completed successfully", error_
         Path.mkdir(base_dir, parents=True, exist_ok=True)
         tmp = tempfile.NamedTemporaryFile(delete=False, dir=base_dir, prefix="report_", suffix=".yaml")
         output = Path(tmp.name)
-        TyperUtils.console.print(f"No output file specified. Using temporary file: {output}")
+        TyperUtils.debug(f"No output file specified. Using temporary file: {output}")
     if report.get_status() == "success":
         TyperUtils.success(_(f"{success_msg}. Review the report for details {output}."))
         TyperUtils.console.print(report.summary())
