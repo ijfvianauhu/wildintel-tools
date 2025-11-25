@@ -467,6 +467,7 @@ def prepare_collections_for_trapper(
     max_workers: int = 4,
     xmp_info : dict = None,
     scale_images: bool = True,
+    overwrite: bool = False,
 ) -> Report:
     """
     Prepare validated collections for upload them to Trapper. Each deployment's images are copied and flattened
@@ -493,10 +494,17 @@ def prepare_collections_for_trapper(
     :type max_workers: int, optional
     :param xmp_info: XMP metadata information to be added to each image
     :type xmp_info: dict
+
+    :param scale_images: Whether to scale images to a maximum size.
+    :type scale_images: bool, optional
+
+    :param overwrite: Whether to overwrite existing deployment directories
+                        in the output directory.
+    :type overwrite: bool, optional
+
     :return: A report summarizing the processed collections and deployments.
     :rtype: Report
     """
-    report = Report("Preparing collections for Trapper")
 
     if not data_path.is_dir():
         raise FileNotFoundError(f"Data path not found: {data_path}")
@@ -559,8 +567,10 @@ def prepare_collections_for_trapper(
             }
 
             date_str_for_name = date_taken.strftime("%Y%m%d") if date_taken else "unknown_date"
-            new_name = f"{dep_name}__{date_str_for_name}_{idx}{img_path.suffix.lower()}".upper()
-
+            ext = img_path.suffix.lower()
+            if ext == ".jpg":
+                ext = ".jpeg"
+            new_name = f"{dep_name}__{date_str_for_name}_{idx}{ext}".upper()
             dest_path = trapper_deployment_path / new_name
             shutil.copy2(img_path, dest_path)
             ResourceUtils.add_xmp_metadata([dest_path], tags)
@@ -568,6 +578,8 @@ def prepare_collections_for_trapper(
             return True, None
         except Exception as e:
             return False, f"{img_path}: {e}"
+
+    report = Report(f"Preparing collections {",".join(collections)} for Trapper")
 
     for col in collections:
         col_path = data_path / col
@@ -585,6 +597,17 @@ def prepare_collections_for_trapper(
         for deployment in all_deployments:
             dep_name = slugify(deployment.name)
             trapper_deployment_path = trapper_col_path / dep_name
+
+            if trapper_deployment_path.exists():
+                if not overwrite:
+                    report.add_error(dep_name, "existing deployment",
+                                     f"Trapper deployment path '{trapper_deployment_path}' already exists and overwrite is False.")
+                    if progress_callback:
+                        progress_callback(f"deployment_start:{col}:{dep_name}", 0)
+                        progress_callback(f"deployment_complete:{col}:{dep_name}", 1)
+                    continue
+                else:
+                    shutil.rmtree(trapper_deployment_path)
             trapper_deployment_path.mkdir(exist_ok=True)
 
             image_files = [f for f in deployment.rglob("*") if f.suffix.lower() in valid_extensions]

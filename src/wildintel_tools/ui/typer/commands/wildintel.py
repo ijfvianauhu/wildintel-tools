@@ -448,6 +448,7 @@ def prepare_for_trapper(
     coverage: Annotated[str, typer.Option(help=_("Resource coverage"))] = None,
     rp_name: Annotated[str, typer.Option(help=_("Research project name"))] = None,
     scale: Annotated[bool, typer.Option(help=_("Scale resources"))] = True,
+    overwrite: Annotated[bool, typer.Option(help=_("Overwrite existing deployments directories  in output path"))] = False,
     config: Annotated[
         Path, typer.Option(hidden=True, help=_("File to save the report"), callback=dynamic_dynaconf_callback)
     ] = None,
@@ -481,6 +482,10 @@ def prepare_for_trapper(
     :type coverage: str | None
     :param rp_name: Research project name metadata to embed.
     :type rp_name: str | None
+    :param scale: Whether to scale resources during preparation.
+    :type scale: bool
+    :param overwrite: Whether to overwrite existing output directories.
+    :type overwrite: bool
     :param config: Internal option supplied by Typer config callback.
     :type config: pathlib.Path | None
     :raises typer.BadParameter: If ``data_path`` or ``output_path`` are missing or invalid.
@@ -552,6 +557,7 @@ def prepare_for_trapper(
                     max_workers = 4,
                     xmp_info = xmp_info,
                     scale_images=scale,
+                    overwrite=overwrite,
             )
 
         TyperUtils.success(_("Preparation for Trapper completed. Collections are available in {0}").format(output_path))

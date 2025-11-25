@@ -495,6 +495,21 @@ Similar to the previous commands, we can also specify specific collections to pr
 wildintel-tools wildintel prepare-for-trapper R0033 --data-path $HOME/Descargas/trapper-collections/ --output-path /tmp/trapper/
 ```
 
+Other interesting options include `--overwrite`, which allows overwriting existing deployment directories in the output 
+directory. If they already exist and overwrite is set to False (the default behavior), an error is raised.
+
+```
+wildintel-tools wildintel prepare-for-trapper R0033 --data-path $HOME/Descargas/trapper-collections/ --overwrite --output-path /tmp/trapper/
+```
+
+If we want to process a specific deployment from a collection, then we can use the `--deployments` option:
+
+```
+wildintel-tools wildintel prepare-for-trapper R0033 --deployments R0033_WICP_02 --overwrite --output-path /tmp/trapper/
+```
+
+```python
+
 ## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
@@ -503,7 +518,8 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 This project is licensed under the GNU General Public License v3.0 or later - see the [LICENSE](LICENSE) file for details.
 
-This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License 
+as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 
 
 ## 🏛️ Funding

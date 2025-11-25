@@ -122,7 +122,7 @@ def main_callback(ctx: typer.Context):
     pass
 
 
-@app.command(help=_("Test connection to Trapper server (API)"),
+@app.command(help=_("Test connection to Trapper server (API)") + " (alias: tc)",
              short_help=_("Test connection to Trapper server (API & FTPS)"))
 def test_connection(ctx: typer.Context,
                     url: str = typer.Argument(
@@ -184,8 +184,9 @@ def test_connection(ctx: typer.Context,
     except Exception as e:
         TyperUtils.fatal(_(f"Failed to connect to Trapper API. Check your settings: {str(e)}"))
 
+app.command(name="tc", hidden=True, help=_("Alias for test_connection ")) (test_connection)
 
-@app.command(help=_("Test the availability of FFMPEG & exiftool"),
+@app.command(help=_("Test the availability of FFMPEG & exiftool") + " (alias: tet)",
              short_help=_("Test the availability of FFMPEG & exiftool"))
 def test_external_tools(ctx: typer.Context):
     """
@@ -215,7 +216,9 @@ def test_external_tools(ctx: typer.Context):
     except Exception as e:
         TyperUtils.error(_(f"exiftool test failed: {str(e)}"))
 
-@app.command(help=_("Get classification project info from trapper instance"),
+app.command(name="tet", hidden=True, help=_("Alias for test_external_tools ")) (test_external_tools)
+
+@app.command(help=_("Get classification project info from trapper instance") + " (alias: cp)",
              short_help=_("Get classification project info"))
 def classification_projects(ctx: typer.Context,
         url: str = typer.Argument(
@@ -274,8 +277,9 @@ def classification_projects(ctx: typer.Context,
     except Exception as e:
         TyperUtils.fatal(_(f"Failed getting trapper classification projects: {str(e)}"))
 
+app.command(name="cp", hidden=True, help=_("Alias for classification_projects ")) (classification_projects)
 
-@app.command(help=_("Get research project info from trapper instance"), short_help=_("Get research project info"))
+@app.command(help=_("Get research project info from trapper instance") + " (alias: rp)", short_help=_("Get research project info"))
 def research_projects(ctx: typer.Context,
         url: str = typer.Argument(
             None,
@@ -332,8 +336,9 @@ def research_projects(ctx: typer.Context,
     except Exception as e:
         TyperUtils.fatal(_(f"Failed getting trapper research projects: {str(e)}"))
 
+app.command(name="rp", hidden=True, help=_("Alias for research_projects ")) (research_projects)
 
-@app.command(help=_("Get locations info from trapper instance"), short_help=_("Get locations info"))
+@app.command(help=_("Get locations info from trapper instance") + " (alias: loc)", short_help=_("Get locations info"))
 def locations(ctx: typer.Context,
         url: str = typer.Argument(
             None,
@@ -391,7 +396,9 @@ def locations(ctx: typer.Context,
     except Exception as e:
         TyperUtils.fatal(_(f"Failed getting trapper locations: {str(e)}"))
 
-@app.command(help=_("Get deployments info from trapper instance"), short_help=_("Get deployments info"))
+app.command(name="loc", hidden=True, help=_("Alias for locations ")) (locations)
+
+@app.command(help=_("Get deployments info from trapper instance") + " (alias: dep)", short_help=_("Get deployments info"))
 def deployments(ctx: typer.Context,
         url: str = typer.Argument(
             None,
@@ -448,3 +455,5 @@ def deployments(ctx: typer.Context,
                         fields=["pk", "deployment_id", "research_project", "location", "location_id", "start_date", "end_date"], )
     except Exception as e:
         TyperUtils.fatal(_(f"Failed getting trapper deployments: {str(e)}"))
+
+app.command(name="dep", hidden=True, help=_("Alias for deployments ")) (deployments)
