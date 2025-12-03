@@ -7,7 +7,7 @@ on:
       - main
       - development
     tags:
-      - 'v*'   # Publica para tags tipo v0.1, v0.2
+      - 'v*'   # Publica para tags tipo v0.1.0, v0.2.0
 
 jobs:
   publish:
@@ -45,12 +45,20 @@ jobs:
           echo "TAGS=$TAGS" >> $GITHUB_ENV
           echo "Docker image will be tagged as: $TAGS"
 
-      - name: Build and tag Docker image
+      - name: Build Docker image
         run: |
+          # Build once with the first tag in the list
+          FIRST_TAG=$(echo $TAGS | awk '{print $1}')
+          IMAGE=ghcr.io/${GITHUB_REPOSITORY}/wildintel-tools:$FIRST_TAG
+          echo "Building $IMAGE"
+          docker build -t $IMAGE .
+
+          # Tag the image with the remaining tags
           for TAG in $TAGS; do
-            IMAGE=ghcr.io/${GITHUB_REPOSITORY}/wildintel-tools:$TAG
-            echo "Building $IMAGE"
-            docker build -t $IMAGE .
+            if [ "$TAG" != "$FIRST_TAG" ]; then
+              docker tag $IMAGE ghcr.io/${GITHUB_REPOSITORY}/wildintel-tools:$TAG
+              echo "Tagged $TAG"
+            fi
           done
 
       - name: Push Docker images
