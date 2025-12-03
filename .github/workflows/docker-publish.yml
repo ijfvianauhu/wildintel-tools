@@ -1,10 +1,13 @@
 name: Publish Docker Image
 
 on:
-  workflow_dispatch:       # Se puede ejecutar manualmente
+  workflow_dispatch:
   push:
+    branches:
+      - main
+      - development
     tags:
-      - 'v*'              # Publica solo cuando hay un tag, ej. v1.0.0
+      - 'v*'   # Publica para tags tipo v0.1, v0.2
 
 jobs:
   publish:
@@ -26,12 +29,34 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build Docker image
+      - name: Set Docker image tags
         run: |
-          IMAGE_NAME=ghcr.io/${{ github.repository }}/wildintel-tools:latest
-          docker build -t $IMAGE_NAME .
+          TAGS=""
+          if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            TAGS="main latest"
+          elif [[ "${GITHUB_REF}" == "refs/heads/development" ]]; then
+            TAGS="development"
+          elif [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+            TAGS="$VERSION latest"
+          else
+            TAGS="latest"
+          fi
+          echo "TAGS=$TAGS" >> $GITHUB_ENV
+          echo "Docker image will be tagged as: $TAGS"
 
-      - name: Push Docker image
+      - name: Build and tag Docker image
         run: |
-          IMAGE_NAME=ghcr.io/${{ github.repository }}/wildintel-tools:latest
-          docker push $IMAGE_NAME
+          for TAG in $TAGS; do
+            IMAGE=ghcr.io/${GITHUB_REPOSITORY}/wildintel-tools:$TAG
+            echo "Building $IMAGE"
+            docker build -t $IMAGE .
+          done
+
+      - name: Push Docker images
+        run: |
+          for TAG in $TAGS; do
+            IMAGE=ghcr.io/${GITHUB_REPOSITORY}/wildintel-tools:$TAG
+            echo "Pushing $IMAGE"
+            docker push $IMAGE
+          done
