@@ -27,12 +27,82 @@ Example:
 import os
 import subprocess
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 from dynaconf import Dynaconf
 from dynaconf import loaders
 from dynaconf.validator import Validator
+from pydantic import BaseModel, Field, HttpUrl, EmailStr, FilePath, DirectoryPath
 
+
+class LoggerSettings(BaseModel):
+    loglevel: int = Field(ge=0, le=2)
+    filename: str = Field(
+        default="",
+        description="Empty string or string ending in .log",
+        pattern=r"(^$|^.*\.log$)",
+    )
+
+class GeneralSettings(BaseModel):
+    host: HttpUrl
+    login: EmailStr
+    password: str
+    project_id: int = Field(..., ge=1)
+    verify_ssl: bool
+    ffmpeg: str
+    exiftool: str
+    data_dir: DirectoryPath
+
+class WildIntelSettings(BaseModel):
+    rp_name: str
+    coverage: str
+    publisher: str
+    owner: str
+    tolerance_hours: int
+    resize_img: bool
+    resize_img_size: list[int]
+    #resize_img_width: int
+    #resize_img_height: int
+    overwrite: bool
+    output_dir: DirectoryPath
+
+class EpiCollectSettings(BaseModel):
+    client_id: int
+    client_secret: str
+    app_slug: str
+    site_alias: Dict[str, str] = {}
+    release_alias: Dict[str, str] = {}
+
+    site_field: str = ""
+    release_field: str = ""
+    start_date_field: str = ""
+    end_date_field: str = ""
+    correct_setup_field: str = ""
+    correct_tstamp_field: str = ""
+    view_quality_field: str = ""
+    tags_field: str = ""
+    comments_field: str = ""
+    managers_field: str = ""
+    setup_by_field: str = ""
+    camera_id_field: str = ""
+    camera_model_field: str = ""
+    camera_interval_field: str = ""
+    camera_height_field: str = ""
+    camera_depth_field: str = ""
+    camera_tilt_field: str = ""
+    camera_heading_field: str = ""
+    session_field: str = ""
+    array_field: str = ""
+    feature_type_field: str = ""
+    habitat_field: str = ""
+    capture_method_field: str = ""
+    bait_type_field: str = ""
+
+class Settings(BaseModel):
+    LOGGER: LoggerSettings
+    GENERAL: GeneralSettings
+    WILDINTEL: WildIntelSettings
+    EPICOLLECT: EpiCollectSettings
 
 SETTINGS_ORDER = {
     "LOGGER": ["loglevel", "filename"],
@@ -44,6 +114,19 @@ SETTINGS_ORDER = {
         "rp_name", "coverage", "publisher", "owner", "tolerance_hours",
         "resize_img", "resize_img_size", "overwrite", "output_dir",
     ],
+
+    "EPICOLLECT": [
+    "client_id", "client_secret", "app_slug",
+    "site_alias", "release_alias",
+    "site_field", "release_field", "start_date_field", "end_date_field",
+    "correct_setup_field", "correct_tstamp_field", "view_quality_field",
+    "tags_field", "comments_field", "managers_field", "setup_by_field",
+    "camera_id_field", "camera_model_field", "camera_interval_field",
+    "camera_height_field", "camera_depth_field", "camera_tilt_field",
+    "camera_heading_field", "session_field", "array_field",
+    "feature_type_field", "habitat_field", "capture_method_field",
+    "bait_type_field"
+    ]
 }
 
 class SettingsManager:
@@ -170,6 +253,36 @@ class SettingsManager:
             settings.validators.validate()
 
         return settings
+
+    def load_settings_pydantic(
+        self,
+        project_name: str,
+        validate: bool = True,
+        create: bool = True,
+    ) -> Settings:
+        """
+        Load settings into a Pydantic Settings object.
+
+        This wraps `load_settings()` (Dynaconf) but returns a strongly typed
+        Pydantic model with full validation and autocompletion.
+
+        :param project_name: Name of the project.
+        :param validate: Whether to validate using Pydantic.
+        :param create: Automatically create settings if missing.
+        :return: A Pydantic `Settings` model instance.
+        """
+        dynaconf_settings = self.load_settings(
+            project_name,
+            validate=False,     # Let pydantic validate below
+            create=create
+        )
+
+        data = dynaconf_settings.to_dict()
+
+        # Validate & build pydantic model
+        settings_model = Settings(**data) if validate else Settings.model_validate(data)
+
+        return settings_model
 
     def list_projects(self) -> list[str]:
         """

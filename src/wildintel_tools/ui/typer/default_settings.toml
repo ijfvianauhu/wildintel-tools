@@ -22,3 +22,45 @@ resize_img = false
 resize_img_size = [800, 600]
 overwrite = false
 output_dir = ""
+
+[EPICOLLECT]
+client_id = "mi_client_id"
+client_secret = "mi_client_secret"
+app_slug = "mi_app_slug"
+
+# Diccionarios de alias
+# [EPICOLLECT.site_alias]
+# A01 = "Site Alpha"
+# B02 = "Site Beta"
+# C03 = "Site Charlie"
+
+#[EPICOLLECT.release_alias]
+#R001 = "Release 1"
+#R002 = "Release 2"
+#R003 = "Release 3"
+
+# Campos de tipo string
+site_field = "4_Sitio"
+release_field = "2_Revision"
+start_date_field = "created_at"
+#end_date_field = "finished_at"
+#correct_setup_field = "6_Accion"
+#correct_tstamp_field = "14_Hora"
+#view_quality_field = "11_FechaHoraOK"
+#tags_field = "10_SD"
+#comments_field = "12_Observaciones"
+#managers_field = "1_Tramperos"
+#setup_by_field = "setup_by"
+camera_id_field = "5_Camara"
+#camera_model_field = "camera_model"
+#camera_interval_field = "camera_interval"
+#camera_height_field = "camera_height"
+#camera_depth_field = "camera_depth"
+#camera_tilt_field = "camera_tilt"
+#camera_heading_field = "camera_heading"
+session_field = "2_Sesion"
+#array_field = "array"
+#feature_type_field = "feature_type"
+#habitat_field = "habitat"
+#capture_method_field = "capture_method"
+#bait_type_field = "bait_type"

@@ -1,11 +1,16 @@
+import json
 import os
 from pathlib import Path
-from typing import List, Dict, Any, Callable, Text
+from typing import List, Dict, Any, Callable, Text, Tuple
 
 import yaml
+from docutils.nodes import status
+from pydantic import BaseModel
 from rich import box
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
+from typer_config import conf_callback_factory
+
 from wildintel_tools.ui.typer.i18n import _
 
 import logging
@@ -15,6 +20,8 @@ from rich.table import Table
 
 from rich.progress import Progress, TextColumn, BarColumn, TimeElapsedColumn
 from typing import Callable, Dict, Any
+
+from wildintel_tools.ui.typer.settings import Settings
 
 
 class HierarchicalProgress:
@@ -95,6 +102,142 @@ class TyperUtils:
     def success(message: str):
         TyperUtils.console.print(f"[green]:white_check_mark:[/green] {message}")
         TyperUtils.logger.info(message)
+
+    #
+    # Config methods
+    #
+
+    @staticmethod
+    def generate_pydantic_mapping(model: BaseModel, overrides: Dict[str, Tuple[str, str]] | None = None) -> Dict[str, Tuple[str, str]]:
+        """
+        Generate a mapping {param_name: (section, key)} from a Pydantic model,
+        recursively including nested models.
+
+        :param model: Pydantic model instance
+        :param prefix: Prefix for nested fields
+        :param overrides: Optional dict to override or add mapping
+        :return: Mapping dictionary
+        """
+        mapping = {}
+
+        for section_name, section_field in model.model_fields.items():
+            value = getattr(model, section_name)
+
+            if isinstance(value, BaseModel):
+                for field_name in value.model_fields.keys():
+                    mapping[field_name] = (section_name, field_name)
+            else:
+                # Campos directos en Settings (si hubiera)
+                mapping[section_name] = (section_name, section_name)
+
+        if overrides:
+            mapping.update(overrides)
+
+        return mapping
+
+
+    # 🔹 Loader que recibe la ruta completa del archivo
+    @staticmethod
+    def dynaconf_loader(file_path: str) -> dict:
+        """
+        Load a Dynaconf-compatible configuration from a JSON string.
+
+        Note:
+            Although its name suggests a path loader, this function expects a JSON
+            string and returns a Python ``dict`` usable by ``typer_config`` and Dynaconf.
+
+        :param file_path: JSON string containing the configuration.
+        :type file_path: str
+        :returns: Parsed configuration dictionary.
+        :rtype: dict
+        :raises json.JSONDecodeError: If the input is not valid JSON.
+        """
+
+        try:
+            return json.loads(file_path)
+        except Exception as e:
+            print(f"{e}{file_path}")
+            pass  # Not JSON → try as file path
+
+        path = Path(file_path)
+
+        if path.exists() and path.is_file():
+            settings_dir = path.parent
+            file_name = path.name
+
+            setting_manager = SettingsManager(settings_dir=settings_dir)
+            settings = setting_manager.load_settings(file_name, True, True)
+
+            return settings.as_dict()
+
+        # If path does not exist or is not a file → raise
+        raise FileNotFoundError(f"Path does not exist or is not a file: {file_path}")
+
+    # 🔹 Callback base
+    base_conf_callback = conf_callback_factory(dynaconf_loader)
+
+    # 🔹 Callback dinámico que usa otro parámetro (base_path)
+    @staticmethod
+    def dynamic_dynaconf_callback(
+        ctx,
+        param: typer.CallbackParam,
+        value: Any,
+        override_mapping: dict | None = None,
+    ):
+        """
+        Dynamic callback that injects runtime defaults into Typer parameters.
+
+        Serializes the runtime settings from ``ctx.obj["settings"]`` and delegates
+        loading to the base configuration callback. It also fills CLI parameters
+        when omitted by the user, using project settings.
+
+        :param ctx: Typer/Click context.
+        :type ctx: typer.Context
+        :param param: Parameter associated with the callback.
+        :type param: click.Parameter
+        :param value: Current value of the processed parameter.
+        :type value: Any
+        :returns: Result of the underlying base configuration callback.
+        :rtype: Any
+        """
+
+        # Load Settings
+
+        if "settings" in ctx.obj and ctx.obj["settings"] is not None:
+            # Use settings from context
+            settings_dict = ctx.obj["settings"].as_dict()
+            value = json.dumps(settings_dict, default=str)
+            settings_dict = TyperUtils.base_conf_callback(ctx, param, value)
+        # if value is not None:
+        #    print("por value")
+        # Use the raw value (expected to be a Path)
+        #    settings_dict= base_conf_callback(ctx, param, Path(value))
+        else:
+            base_path = ctx.params.get("settings_dir", ".")
+            file_path = os.path.join(base_path, ctx.params.get("project", "default"))
+            settings_dict = TyperUtils.base_conf_callback(ctx, param, file_path)
+
+        settings = ctx.default_map.copy() if ctx.default_map else {}
+
+        # Validate & build pydantic model
+        settings_model = Settings(**settings)
+        # settings_model = Settings(**data) if validate else Settings.model_validate(data)
+
+        mapping = TyperUtils.generate_pydantic_mapping(settings_model, override_mapping)
+
+        for param_name in ctx.params:
+            if ctx.params[param_name] is None and param_name in mapping:
+                section, key = mapping[param_name]
+                ctx.params[param_name] = settings[section][key]
+
+        if "settings" not in ctx.obj:
+            ctx.obj["settings"] = settings_model.model_dump()
+
+        return settings_dict
+
+    #
+    #
+    #
 
     @staticmethod
     def run_tasks_with_progress(tasks: List[Dict[str, Any]]):

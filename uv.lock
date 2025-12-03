@@ -126,6 +126,15 @@ wheels = [
 ]
 
 [[package]]
+name = "dnspython"
+version = "2.8.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/8c/8b/57666417c0f90f08bcafa776861060426765fdb422eb10212086fb811d26/dnspython-2.8.0.tar.gz", hash = "sha256:181d3c6996452cb1189c4046c61599b84a5a86e099562ffde77d26984ff26d0f", size = 368251, upload-time = "2025-09-07T18:58:00.022Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ba/5a/18ad964b0086c6e62e2e7500f7edc89e3faa45033c71c1893d34eed2b2de/dnspython-2.8.0-py3-none-any.whl", hash = "sha256:01d9bbc4a2d76bf0db7c1f729812ded6d912bd318d3b1cf81d30c0f845dbf3af", size = 331094, upload-time = "2025-09-07T18:57:58.071Z" },
+]
+
+[[package]]
 name = "docutils"
 version = "0.21.2"
 source = { registry = "https://pypi.org/simple" }
@@ -135,12 +144,37 @@ wheels = [
 ]
 
 [[package]]
+name = "docutils-stubs"
+version = "0.0.22"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "docutils" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/31/fb/3eda037eed8b98d6b2169e4198a8f12a03a461c4d4dc44de1a7790d0f7c7/docutils-stubs-0.0.22.tar.gz", hash = "sha256:1736d9650cfc20cff8c72582806c33a5c642694e2df9e430717e7da7e73efbdf", size = 43699, upload-time = "2022-01-02T11:13:17.499Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/59/85/10507e1011d5370b94567e4b57f93086a2476d1da73caf98dc53aa87004b/docutils_stubs-0.0.22-py3-none-any.whl", hash = "sha256:157807309de24e8c96af9a13afe207410f1fc6e5aab5d974fd6b9191f04de327", size = 87506, upload-time = "2022-01-02T11:13:15.94Z" },
+]
+
+[[package]]
 name = "dynaconf"
 version = "3.2.12"
 source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/cd/bd/7a6f84b68268fe1d12e709faec7d293e0c37c9c03bacaf363de41e7e7568/dynaconf-3.2.12.tar.gz", hash = "sha256:29cea583b007d890e6031fa89c0ac489b631c73dbee83bcd5e6f97602c26354e", size = 313801, upload-time = "2025-10-10T19:54:06.164Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/26/68/51adede38ab2ee9ecfddb8b60a80a42b618a72f1018fcf60974e5d852831/dynaconf-3.2.12-py2.py3-none-any.whl", hash = "sha256:eb2a11865917dff8810c6098cd736b8f4d2f4e39ad914500e2dfbe064b82c499", size = 237788, upload-time = "2025-10-10T19:54:03.731Z" },
+]
+
+[[package]]
+name = "email-validator"
+version = "2.3.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "dnspython" },
+    { name = "idna" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/f5/22/900cb125c76b7aaa450ce02fd727f452243f2e91a61af068b40adba60ea9/email_validator-2.3.0.tar.gz", hash = "sha256:9fc05c37f2f6cf439ff414f8fc46d917929974a82244c20eb10231ba60c54426", size = 51238, upload-time = "2025-08-26T13:09:06.831Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/de/15/545e2b6cf2e3be84bc1ed85613edd75b8aea69807a71c26f4ca6a9258e82/email_validator-2.3.0-py3-none-any.whl", hash = "sha256:80f13f623413e6b197ae73bb10bf4eb0908faf509ad8362c5edeb0be7fd450b4", size = 35604, upload-time = "2025-08-26T13:09:05.858Z" },
 ]
 
 [[package]]
@@ -395,6 +429,11 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/82/2f/e68750da9b04856e2a7ec56fc6f034a5a79775e9b9a81882252789873798/pydantic-2.12.4-py3-none-any.whl", hash = "sha256:92d3d202a745d46f9be6df459ac5a064fdaa3c1c4cd8adcfa332ccf3c05f871e", size = 463400, upload-time = "2025-11-05T10:50:06.732Z" },
 ]
 
+[package.optional-dependencies]
+email = [
+    { name = "email-validator" },
+]
+
 [[package]]
 name = "pydantic-core"
 version = "2.41.5"
@@ -465,6 +504,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/6e/0d/e3549b2399f71d56476b77dbf3cf8937cec5cd70536bdc0e374a421d0599/pydantic_core-2.41.5-graalpy312-graalpy250_312_native-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:c007fe8a43d43b3969e8469004e9845944f1a80e6acd47c150856bb87f230c56", size = 1942879, upload-time = "2025-11-04T13:42:56.483Z" },
     { url = "https://files.pythonhosted.org/packages/f7/07/34573da085946b6a313d7c42f82f16e8920bfd730665de2d11c0c37a74b5/pydantic_core-2.41.5-graalpy312-graalpy250_312_native-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:76d0819de158cd855d1cbb8fcafdf6f5cf1eb8e470abe056d5d161106e38062b", size = 2139017, upload-time = "2025-11-04T13:42:59.471Z" },
 ]
+
+[[package]]
+name = "pyepicollect"
+version = "5.1.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "requests" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/2b/bd/e408e7b8b2e0f3dbcfe48fad25110ade8359cb315ab486ee943c62db3169/pyepicollect-5.1.1.tar.gz", hash = "sha256:ae0b45fa6a5fc0aaa001d05c173f96519d31045edc062d991f024fb36105c384", size = 5233, upload-time = "2020-08-07T11:33:11.173Z" }
 
 [[package]]
 name = "pyexiftool"
@@ -770,6 +818,15 @@ wheels = [
 ]
 
 [[package]]
+name = "tenacity"
+version = "9.1.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/0a/d4/2b0cd0fe285e14b36db076e78c93766ff1d529d70408bd1d2a5a84f1d929/tenacity-9.1.2.tar.gz", hash = "sha256:1169d376c297e7de388d18b4481760d478b0e99a777cad3a9c86e556f4b697cb", size = 48036, upload-time = "2025-04-02T08:25:09.966Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e5/30/643397144bfbfec6f6ef821f36f33e57d35946c44a2352d3c9f0ae847619/tenacity-9.1.2-py3-none-any.whl", hash = "sha256:f77bf36710d8b73a50b2dd155c97b870017ad21afe6ab300326b0371b3b05138", size = 28248, upload-time = "2025-04-02T08:25:07.678Z" },
+]
+
+[[package]]
 name = "trapper-client"
 version = "0.1.0"
 source = { git = "https://github.com/ijfvianauhu/trapper-client.git?rev=main#15938d4d38560a7c782a78d6f36a5f1cf90b16b5" }
@@ -809,6 +866,15 @@ wheels = [
 ]
 
 [[package]]
+name = "types-docutils"
+version = "0.22.3.20251115"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/eb/d7/576ec24bf61a280f571e1f22284793adc321610b9bcfba1bf468cf7b334f/types_docutils-0.22.3.20251115.tar.gz", hash = "sha256:0f79ea6a7bd4d12d56c9f824a0090ffae0ea4204203eb0006392906850913e16", size = 56828, upload-time = "2025-11-15T02:59:57.371Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9c/01/61ac9eb38f1f978b47443dc6fd2e0a3b0f647c2da741ddad30771f1b2b6f/types_docutils-0.22.3.20251115-py3-none-any.whl", hash = "sha256:c6e53715b65395d00a75a3a8a74e352c669bc63959e65a207dffaa22f4a2ad6e", size = 91951, upload-time = "2025-11-15T02:59:56.413Z" },
+]
+
+[[package]]
 name = "typing-extensions"
 version = "4.15.0"
 source = { registry = "https://pypi.org/simple" }
@@ -843,15 +909,20 @@ name = "wildintel-tools"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "docutils-stubs" },
     { name = "dynaconf" },
     { name = "filetype" },
     { name = "natsort" },
     { name = "pillow" },
+    { name = "pydantic", extra = ["email"] },
+    { name = "pyepicollect" },
     { name = "pyexiftool" },
     { name = "rich" },
+    { name = "tenacity" },
     { name = "trapper-client" },
     { name = "typer" },
     { name = "typer-config" },
+    { name = "types-docutils" },
 ]
 
 [package.dev-dependencies]
@@ -867,15 +938,20 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "docutils-stubs", specifier = "==0.0.22" },
     { name = "dynaconf", specifier = ">=3.2.12" },
     { name = "filetype", specifier = ">=1.2.0" },
     { name = "natsort", specifier = ">=8.4.0" },
     { name = "pillow", specifier = ">=12.0.0" },
+    { name = "pydantic", extras = ["email"], specifier = ">=2.12.4" },
+    { name = "pyepicollect", specifier = ">=5.1.1" },
     { name = "pyexiftool", specifier = ">=0.5.6" },
     { name = "rich", specifier = ">=14.2.0" },
+    { name = "tenacity", specifier = ">=9.1.2" },
     { name = "trapper-client", git = "https://github.com/ijfvianauhu/trapper-client.git?rev=main" },
     { name = "typer", specifier = ">=0.20.0" },
     { name = "typer-config", specifier = ">=1.4.3" },
+    { name = "types-docutils", specifier = "==0.22.3.20251115" },
 ]
 
 [package.metadata.requires-dev]

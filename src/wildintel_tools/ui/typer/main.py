@@ -46,13 +46,15 @@ from wildintel_tools.ui.typer.commands import reports
 from wildintel_tools.ui.typer.commands import logger
 from wildintel_tools.ui.typer.commands import helpers
 from wildintel_tools.ui.typer.commands import wildintel
+from wildintel_tools.ui.typer.commands import epicollect
+
 
 # --------------------------------------------------------------------------- #
 # App metadata
 # --------------------------------------------------------------------------- #
 
 APP_NAME = "wildintel-tools"
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 # --------------------------------------------------------------------------- #
 # Typer CLI definition
@@ -62,8 +64,9 @@ app = typer.Typer(help="WildINTEL CLI Tool", invoke_without_command=True)
 app.add_typer(config.app, name="config")
 app.add_typer(helpers.app, name="helpers")
 app.add_typer(reports.app, name="reports")
-app.add_typer(logger.app, name="loger")
+app.add_typer(logger.app, name="logger")
 app.add_typer(wildintel.app, name="wildintel")
+app.add_typer(epicollect.app, name="epicollect")
 
 def dynaconf_loader(file_path: str) -> dict:
     """
@@ -106,6 +109,7 @@ def dynamic_dynaconf_callback(ctx: typer.Context, param: typer.CallbackParam, va
     :return: Configuration dictionary from Dynaconf.
     :rtype: dict
     """
+
     base_path = ctx.params.get("settings_dir", ".")
     file_path = os.path.join(base_path, ctx.params.get("project", "default"))
     a= base_conf_callback(ctx, param, file_path)
