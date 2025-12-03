@@ -103,10 +103,14 @@ environment lets you install and run it directly on your system.
 
 ### Install wildintel-tools using `docker`
 
-The easiest way to install wildintel-tools is by using the provided Docker Compose file. Follow the steps below:
+The easiest way to install `wildintel-tools is by using the provided Docker Compose file. Follow the steps below:
 
 #### Step 1: Install Docker
 Follow the instructions for your operating system on the [Docker website](https://docs.docker.com/get-started/).
+
+> ⚠️ Important note
+> If you want, you can run the PowerShell script [install_docker.ps1](https://github.com/ijfvianauhu/wildintel-tools/blob/main/utils/install_docker.ps1) , which installs WSL2 and Docker ready to use.
+> 
 
 #### Step 2: Download docker-compose.yml
 
