@@ -4,9 +4,12 @@ on:
   push:
     branches:
       - main
+      - development
+      - 'v*.*'   # Para tags de release como v0.1, v0.2
   pull_request:
     branches:
       - main
+      - development
 
 jobs:
   build:
@@ -16,11 +19,23 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Build Docker image
+      - name: Set Docker image name
+        id: docker-name
         run: |
-          IMAGE_NAME=wildintel-tools:latest
-          docker build -t $IMAGE_NAME .
-      
+          if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            echo "IMAGE_NAME=wildintel-tools:main" >> $GITHUB_ENV
+          elif [[ "${GITHUB_REF}" == "refs/heads/development" ]]; then
+            echo "IMAGE_NAME=wildintel-tools:development" >> $GITHUB_ENV
+          elif [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            TAG_NAME=${GITHUB_REF#refs/tags/}
+            echo "IMAGE_NAME=wildintel-tools:$TAG_NAME" >> $GITHUB_ENV
+          else
+            echo "IMAGE_NAME=wildintel-tools:latest" >> $GITHUB_ENV
+          fi
+          echo "Docker image will be $IMAGE_NAME"
+
+      - name: Build Docker image
+        run: docker build -t $IMAGE_NAME .
+
       - name: List Docker images
         run: docker images
-
