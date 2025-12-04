@@ -8,12 +8,10 @@ $wildintel_tools_version = "v0.1.0"
 $repo_url = "https://github.com/ijfvianauhu/wildintel-tools.git"
 $repo_dir = "wildintel-tools"
 
-
 Write-Host "-------------------------------------"
 Write-Host " WildIntel Tools Installer"
 Write-Host "-------------------------------------"
 Write-Host ""
-
 
 # -------------------------------------
 # Check dependencies
@@ -34,7 +32,6 @@ function Check-Command {
     return $true
 }
 
-
 Write-Host "Checking dependencies..."
 
 $hasGit = Check-Command -cmd "git" -name "Git"
@@ -49,7 +46,6 @@ if (-not $hasGit -or -not $hasUV) {
 Write-Host ""
 Write-Host "✓ Dependencias mínimas presentes. Continuando..."
 Write-Host ""
-
 
 # -------------------------------------
 # Clone repository
