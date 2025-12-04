@@ -109,8 +109,31 @@ The easiest way to install `wildintel-tools is by using the provided Docker Comp
 Follow the instructions for your operating system on the [Docker website](https://docs.docker.com/get-started/).
 
 > ⚠️ Important note
-> If you want, you can run the PowerShell script [install_docker.ps1](https://github.com/ijfvianauhu/wildintel-tools/blob/main/utils/install_docker.ps1) , which installs WSL2 and Docker ready to use.
-> 
+> If you want, you can run the PowerShell script [install_docker_wsl1.ps1](https://github.com/ijfvianauhu/wildintel-tools/blob/main/utils/install_docker_wsl1.ps1), which installs WSL1 and Docker ready to use.
+>
+> This option is **ideal if Windows is running in a virtualized environment**. If Windows is **not running in a virtual machine**, you can also use [install_docker_wsl1.ps1](https://github.com/ijfvianauhu/wildintel-tools/blob/main/utils/install_docker_wsl1.ps1).
+>
+> In either case, it is necessary to allow the execution of PowerShell scripts. By default, Windows may block script execution for security reasons. To enable it:
+>
+> 1. **Set the execution policy** for your user to allow running scripts:
+>
+> ```powershell
+> Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+> ```
+>
+> 2. **Unblock the downloaded script** so that PowerShell trusts it:
+>
+> - Right-click the `.ps1` file → select **Properties**.
+> - At the bottom of the Properties window, check **“Unblock”** if available, then click **OK**.
+>
+> Alternatively, you can run the script without changing the policy globally using:
+>
+> ```powershell
+> powershell.exe -ExecutionPolicy Bypass -File .\install_docker_wsl1.ps1
+> ```
+>
+> This will execute the script safely for this session only.
+
 
 #### Step 2: Download docker-compose.yml
 
