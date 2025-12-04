@@ -1,6 +1,13 @@
 # PowerShell script to install WSL1, Ubuntu 22.04, and Docker Toolbox
 # Downloads using Start-BitsTransfer
 # Works on systems WITHOUT VirtualMachinePlatform (WSL1 only)
+#
+# Before execute this script, you must: 
+#   * Allow run local scripts:
+#        Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+#   * Unlock the script:
+#        - Right-click on the .ps1 file → select Properties.
+#        - At the bottom of the Properties window, if you see a checkbox or button “Unblock”, check it and click OK.
 
 # ------------------------------
 # Check for Administrator
