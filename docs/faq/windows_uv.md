@@ -132,8 +132,10 @@ uv run wildintel-tools config set GENERAL.data_dir $HOME\Documents\wildintel-dat
 ```
 
 and to set the ready to trapper directory:
+
 ``
- uv run wildintel-tools config set WILDINTEL.output_dir $HOME\Documents\wildintel-data\collections-ready-to-trapper\
-`` 
+
+uv run wildintel-tools config set WILDINTEL.output_dir $HOME\Documents\wildintel-data\collections-ready-to-trapper\
+```
 
 Organize collections (e.g., recording sessions or revisions) as subfolders.
