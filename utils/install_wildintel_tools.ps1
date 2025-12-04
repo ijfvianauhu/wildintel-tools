@@ -39,7 +39,61 @@ Write-Host "Checking dependencies..."
 
 $hasGit = Check-Command -cmd "git" -name "Git"
 $hasUV = Check-Command -cmd "uv" -name "uv"
-$hasWinget = Check-Command -cmd "winget" -name "winget"
 
 if (-not $hasGit -or -not $hasUV) {
-    Write-Hos
+    Write-Host ""
+    Write-Host "✕ No se puede continuar porque faltan dependencias requeridas (Git o UV)." -ForegroundColor Red
+    exit 1
+}
+
+Write-Host ""
+Write-Host "✓ Dependencias mínimas presentes. Continuando..."
+Write-Host ""
+
+
+# -------------------------------------
+# Clone repository
+# -------------------------------------
+
+if (Test-Path $repo_dir) {
+    Write-Host "El directorio '$repo_dir' ya existe. Usaré ese." -ForegroundColor Yellow
+} else {
+    Write-Host "Clonando repositorio..."
+    git clone $repo_url
+
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "✕ Error clonando el repositorio." -ForegroundColor Red
+        exit 1
+    }
+}
+
+Set-Location $repo_dir
+
+Write-Host "Cambiando a la versión $wildintel_tools_version..."
+git checkout $wildintel_tools_version
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "✕ No se pudo cambiar a la versión especificada." -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "✓ Repositorio listo." -ForegroundColor Green
+Write-Host ""
+
+
+# -------------------------------------
+# Run the tool
+# -------------------------------------
+
+Write-Host "Ejecutando wildintel-tools con uv..."
+Write-Host ""
+
+try {
+    uv run wildintel-tools --help
+} catch {
+    Write-Host "✕ Error ejecutando wildintel-tools." -ForegroundColor Red
+    exit 1
+}
+
+Write-Host ""
+Write-Host "✓ Instalación finalizada correctamente!" -ForegroundColor Green
