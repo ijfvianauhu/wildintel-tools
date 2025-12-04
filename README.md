@@ -111,7 +111,7 @@ Follow the instructions for your operating system on the [Docker website](https:
 > ⚠️ Important note
 > If you want, you can run the PowerShell script [install_docker_wsl1.ps1](https://github.com/ijfvianauhu/wildintel-tools/blob/main/utils/install_docker_wsl1.ps1), which installs WSL1 and Docker ready to use.
 >
-> This option is **ideal if Windows is running in a virtualized environment**. If Windows is **not running in a virtual machine**, you can also use [install_docker_wsl1.ps1](https://github.com/ijfvianauhu/wildintel-tools/blob/main/utils/install_docker_wsl1.ps1).
+> This option is **ideal if Windows is running in a virtualized environment**. If Windows is **not running in a virtual machine**, you can also use [install_docker.ps1](https://github.com/ijfvianauhu/wildintel-tools/blob/main/utils/install_docker.ps1).
 >
 > In either case, it is necessary to allow the execution of PowerShell scripts. By default, Windows may block script execution for security reasons. To enable it:
 >
@@ -137,7 +137,7 @@ Follow the instructions for your operating system on the [Docker website](https:
 
 #### Step 2: Download docker-compose.yml
 
-You can download the `docker-compose.yml` file from here or clone this repository:
+You can download the [`docker-compose.yml`](https://github.com/ijfvianauhu/wildintel-tools/blob/main/docker-compose.yml) or clone this repository:
 
 ```
 git clone https://github.com/ijfvianauhu/wildintel-tools.git
