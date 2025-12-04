@@ -43,11 +43,12 @@ if ($oldPath -notlike "*$pythonPath*" -or $oldPath -notlike "*$pipPath*") {
 # ------------------------------
 Write-Host "Installing uv..."
 
-$uvInstaller = "$env:TEMP\install-uv.py"
-Invoke-WebRequest -Uri "https://astral.sh/install-uv.py" -OutFile $uvInstaller
+winget install -e --id astral-sh.uv
+#$uvInstaller = "$env:TEMP\install-uv.py"
+#Invoke-WebRequest -Uri "https://astral.sh/install-uv.py" -OutFile $uvInstaller
 
-$pythonExe = "$pythonPath\python.exe"
-& $pythonExe $uvInstaller
+#$pythonExe = "$pythonPath\python.exe"
+#& $pythonExe $uvInstaller
 
 # Add uv to PATH if needed
 $uvPath = "$env:USERPROFILE\.local\bin"
@@ -73,6 +74,21 @@ if (Test-Path $uvExe) {
 } else {
     Write-Host "`n❌ uv.exe not found in $uvPath" -ForegroundColor Red
 }
+
+#
+# Install git
+# 
+
+Write-Host "Installing git..."
+
+winget install -e --id Git.Git
+
+#
+# Install exiftools
+#
+
+Write-Host "Installing exiftools..."
+winget install -e --id OliverBetz.ExifTool
 
 Write-Host "`nPlease close and reopen your terminal for the PATH changes to take effect."
 Write-Host "If you encounter permission issues, run: Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned -Force"
