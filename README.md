@@ -236,43 +236,61 @@ Usage: wildintel-tools [OPTIONS] COMMAND [ARGS]...
 ### Install wildintel-tools using `uv`
 
 wildintel-tools requires several system utilities to be installed before it can be properly set up using `uv`. These utilities 
-are exiftool and ffmpeg. To install them run:
+are [git](https://git-scm.com/), and [exiftool](https://exiftool.org/). To install them run:
 
 ```bash
 # 
 # Install ExifTool
+#
+
+# Linux (debian)
+sudo yum install git (up to Fedora 21)
 sudo apt install libimage-exiftool-perl
+
+# Linux (redhat)
+sudo dnf install perl-Image-ExifTool
+sudo dnf install git (Fedora 22 and later) 
+
 # MAC
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 brew install exiftool
-# Windows 10/11
-winget install -e --id Git.Git
 
-**Git Bash for Windows**, install using `winget`: 
-```bash
-# Download from https://gitforwindows.org/
-# Or install using winget:
+# Windows 10/11
 winget install -e --id Git.Git
 winget install -e --id OliverBetz.ExifTool
 ```
 
 Alternative manual installation:
-- FFmpeg: Download from [ffmpeg.org/download.html](https://ffmpeg.org/download.html)
+- Git: Download from [git.org/](https://git-scm.com/install/))
 - ExifTool: Download from [exiftool.org](https://exiftool.org)
 
 After installation:
-1. Add FFmpeg's bin directory to your system PATH (typically `C:\Program Files\ffmpeg\bin`)
+1. Add Git's bin directory to your system PATH (typically `C:\Program Files\ffmpeg\bin`)
 2. Add ExifTool to your system PATH (typically `C:\Program Files\exiftool`)
 
 Once the required applications are installed, we can install `uv`:
 
 ```
-# Install uv if not already installed
+# Mac/Linux
 curl -LsSf https://astral.sh/uv/install.sh | sh
+# Windows
+winget install -e --id astral-sh.uv
+```
+
+Then, clone this repository:
+
+```
 git clone https://github.com/ijfvianauhu/wildintel-tools.git
 cd wildintel-tools
+```
+
+You can now run wildintel-tools commands inside the virtual enviroment. Refer to the [Usage section](#-usage) for available commands. For now, 
+let's verify that everything is working by running:
+
+```
 uv run wildintel-tools --help
 ```
+
 You should see the following output:
 
 ```
