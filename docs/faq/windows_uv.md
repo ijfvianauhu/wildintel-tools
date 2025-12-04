@@ -19,6 +19,8 @@ Follow the steps below to correctly install **wildintel-tools** on a Windows sys
 
 Open a **new PowerShell** window (no admin privileges required).
 
+> **Tip:** Navigate to the folder where you want to work (e.g., `Documents`), then **hold the Shift key, right-> click**, and choose **“Open PowerShell window here”**. This ensures you start in the correct folder.
+
 ---
 
 ## **3. Install the required tools using `winget`**
@@ -89,3 +91,30 @@ uv run wildintel-tools
 ```
 ![Run wildintel-tools using uv](faq_install_windows_uv_12.png.png)
 
+## 11. Configure connection with Trapper
+
+1. View all available configuration options:
+
+```
+uv run wildintel-tools config show
+```
+
+2. Set the Trapper login (username):
+
+```
+uv run wildintel-tools config set GENERAL.login your_username
+```
+
+3. Set the Trapper password:
+
+```
+wildintel-tools config set GENERAL.password your_password
+```
+
+4. Test the connection to Trapper:
+
+```
+uv run wildintel-tools helpers test-connection
+```
+
+You should see a confirmation if the connection is successful.
