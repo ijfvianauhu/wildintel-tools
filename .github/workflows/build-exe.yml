@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-and-upload:
     strategy:
       fail-fast: false
       matrix:
@@ -52,12 +52,6 @@ jobs:
       - name: Fix permissions (macOS/Linux)
         if: runner.os != 'Windows'
         run: chmod +x dist/${{ matrix.file_name }}
-
-      - name: Upload binary artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: wildintel-tools-${{ matrix.pyinstaller_os }}
-          path: dist/${{ matrix.file_name }}
 
       - name: Upload executable to GitHub Release
         uses: softprops/action-gh-release@v1
