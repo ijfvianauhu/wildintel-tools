@@ -46,12 +46,6 @@ jobs:
       - name: Install project dependencies
         run: uv sync --all-extras --dev
 
-      - name: Install PyInstaller
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install pyinstaller
-          python -m pip install -e .
-
       - name: Build executable with PyInstaller
         run: |
           uv run pyinstaller --onefile --name ${{ matrix.file_name }} wildintel_tools/ui/typer/main.py
