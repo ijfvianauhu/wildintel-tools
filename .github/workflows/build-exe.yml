@@ -41,10 +41,10 @@ jobs:
           python-version: "3.12"
 
       - name: Install uv
-        run: pip install uv
+        run: pip install --upgrade uv
 
       - name: Install project dependencies
-        run: uv sync --all-extras --dev
+        run: uv sync --all-extras --dev --force
 
       - name: Install PyInstaller
         run: |
@@ -54,7 +54,8 @@ jobs:
 
       - name: Build executable with PyInstaller
         run: |
-          python -m pyinstaller --onefile --name ${{ matrix.file_name }} wildintel_tools/ui/typer/main.py
+#          python -m pyinstaller --onefile --name ${{ matrix.file_name }} wildintel_tools/ui/typer/main.py
+          uv run pyinstaller --onefile --name ${{ matrix.file_name }} wildintel_tools/ui/typer/main.py
 
       - name: Fix permissions (macOS/Linux)
         if: runner.os != 'Windows'
