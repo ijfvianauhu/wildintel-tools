@@ -11,6 +11,9 @@ on:
 
 jobs:
   build-and-upload:
+    env:
+      artifact_name: ${{ format('{0}-{1}{2}', matrix.file_name, matrix.pyinstaller_os, matrix.artifact_ext) }}
+
     strategy:
       fail-fast: false
       matrix:
@@ -51,14 +54,14 @@ jobs:
 
       - name: Build executable with PyInstaller
         run: |
-          uv run pyinstaller --onefile --name ${{ matrix.file_name }} src/wildintel_tools/ui/typer/main.py
+          uv run pyinstaller --onefile --name ${{ env.artifact_name }}  src/wildintel_tools/ui/typer/main.py
 
       - name: Fix permissions (macOS/Linux)
         if: runner.os != 'Windows'
-        run: chmod +x dist/${{ matrix.file_name }}
+        run: chmod +x dist/${{ env.artifact_name }}
 
       - name: Upload executable to existing release
         uses: softprops/action-gh-release@v1
         with:
-          files: dist/${{ matrix.file_name }}
+          files: dist/${{ env.artifact_name }}
           token: ${{ secrets.PAT_TOKEN }}
