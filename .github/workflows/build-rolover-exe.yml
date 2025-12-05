@@ -1,4 +1,4 @@
-name: Build Rolover Executables for All Platforms
+name: Build Rollover Executables for All Platforms
 
 on:
   push:
