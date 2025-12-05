@@ -44,7 +44,7 @@ jobs:
         run: pip install --upgrade uv
 
       - name: Install project dependencies
-        run: uv sync --all-extras --dev --force
+        run: uv sync --all-extras --dev
 
       - name: Install PyInstaller
         run: |
