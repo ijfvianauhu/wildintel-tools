@@ -1,5 +1,8 @@
 name: Build and Upload Executables to Release
 
+permissions:
+  contents: write
+
 on:
   release:
     types:
@@ -58,5 +61,4 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: dist/${{ matrix.file_name }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
+          token: ${{ secrets.PAT_TOKEN }}
