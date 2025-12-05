@@ -50,7 +50,8 @@ jobs:
 
       - name: Install PyInstaller
         run: |
-          uv pip install pyinstaller
+          pip install --upgrade pip
+          pip install pyinstaller
 
       - name: Build executable with PyInstaller
         run: |
