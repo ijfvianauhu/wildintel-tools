@@ -58,3 +58,23 @@ jobs:
         with:
           name: wildintel-tools-${{ matrix.pyinstaller_os }}
           path: dist/${{ matrix.file_name }}
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+      - name: Upload executables to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: dist/${{ matrix.file_name }}
+          asset_name: ${{ matrix.file_name }}
+          asset_content_type: application/octet-stream
