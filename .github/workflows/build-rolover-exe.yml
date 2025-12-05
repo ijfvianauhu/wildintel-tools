@@ -1,0 +1,62 @@
+name: Build Executables for All Platforms
+
+on:
+  push:
+    branches:
+      - main
+      - development
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            pyinstaller_os: linux
+            artifact_ext: ""
+            file_name: wildintel-tools
+          - os: windows-latest
+            pyinstaller_os: windows
+            artifact_ext: ".exe"
+            file_name: wildintel-tools.exe
+          - os: macos-latest
+            pyinstaller_os: macos-x86_64
+            artifact_ext: ""
+            file_name: wildintel-tools
+          - os: macos-14
+            pyinstaller_os: macos-arm64
+            artifact_ext: ""
+            file_name: wildintel-tools
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        run: pip install --upgrade uv
+
+      - name: Install project dependencies
+        run: uv sync --all-extras --dev
+
+      - name: Build executable with PyInstaller
+        run: |
+          uv run pyinstaller --onefile --name ${{ matrix.file_name }} src/wildintel_tools/ui/typer/main.py
+
+      - name: Fix permissions (macOS/Linux)
+        if: runner.os != 'Windows'
+        run: chmod +x dist/${{ matrix.file_name }}
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wildintel-tools-${{ matrix.pyinstaller_os }}
+          path: dist/${{ matrix.file_name }}
