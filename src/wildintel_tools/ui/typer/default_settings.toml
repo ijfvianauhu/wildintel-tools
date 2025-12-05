@@ -24,7 +24,7 @@ overwrite = false
 output_dir = ""
 
 [EPICOLLECT]
-client_id = "mi_client_id"
+client_id = 2345
 client_secret = "mi_client_secret"
 app_slug = "mi_app_slug"
 

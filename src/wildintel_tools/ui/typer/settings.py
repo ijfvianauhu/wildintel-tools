@@ -30,10 +30,11 @@ import subprocess
 from pathlib import Path
 from typing import List, Optional, Dict
 
+import typer
 from dynaconf import Dynaconf
 from dynaconf import loaders
 from dynaconf.validator import Validator
-from pydantic import BaseModel, Field, HttpUrl, EmailStr, FilePath, DirectoryPath
+from pydantic import BaseModel, Field, HttpUrl, EmailStr, FilePath, DirectoryPath, ValidationError
 
 
 class LoggerSettings(BaseModel):
@@ -381,7 +382,7 @@ class SettingsManager:
 
         :param settings_data: Settings data as a nested dictionary.
         :type settings_data: dict
-        :param setting_path: Path to write the TOML file.
+        :param setting_path: Path tosite_alias write the TOML file.
         :type setting_path: str
         :return: None
         :rtype: None
@@ -391,7 +392,8 @@ class SettingsManager:
         for group in SETTINGS_ORDER:
             settings_dict[group] = {}
             for key in SETTINGS_ORDER[group]:
-                settings_dict[group][key] = settings_data[group][key]
+                if key in settings_data[group]:
+                    settings_dict[group][key] = settings_data[group][key]
 
         loaders.toml_loader.write(str(setting_path), settings_dict, merge=False)
 
