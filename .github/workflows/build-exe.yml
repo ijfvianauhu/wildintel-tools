@@ -54,7 +54,7 @@ jobs:
 
       - name: Build executable with PyInstaller
         run: |
-          pyinstaller --onefile --name wildintel-tools wildintel_tools/ui/typer/main.py
+          python -m pyinstaller --onefile --name wildintel-tools wildintel_tools/ui/typer/main.py
 
       - name: Fix permissions (macOS/Linux)
         if: runner.os != 'Windows'
