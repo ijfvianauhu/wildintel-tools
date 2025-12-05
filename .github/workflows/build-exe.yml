@@ -48,7 +48,7 @@ jobs:
 
       - name: Build executable with PyInstaller
         run: |
-          uv run pyinstaller --onefile --name ${{ matrix.file_name }} wildintel_tools/ui/typer/main.py
+          uv run pyinstaller --onefile --name ${{ matrix.file_name }} src/wildintel_tools/ui/typer/main.py
       - name: Fix permissions (macOS/Linux)
         if: runner.os != 'Windows'
         run: chmod +x dist/${{ matrix.file_name }}
