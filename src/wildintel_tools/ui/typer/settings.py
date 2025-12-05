@@ -25,6 +25,7 @@ Example:
 """
 
 import os
+import platform
 import subprocess
 from pathlib import Path
 from typing import List, Optional, Dict
@@ -414,7 +415,15 @@ class SettingsManager:
             raise ValueError(f"Project '{project_name}' not found")
 
         # Get editor command - try EDITOR env var first, then default editor
-        editor = os.environ.get("EDITOR") or editor
+
+        # Detect default editor depending on OS
+
+        if platform.system() == "Windows":
+            default_editor = "notepad"
+        else:
+            default_editor = "nano"
+
+        editor = os.environ.get("EDITOR") or default_editor
 
         # Make a temporary copy of the settings file
         temp_settings_file = settings_file.with_suffix(".tmp")
