@@ -38,6 +38,7 @@ import typer
 from typing_extensions import Annotated
 from typing import Optional, Any
 from pathlib import Path
+import requests
 from wildintel_tools.ui.typer.logger import logger, setup_logging
 from wildintel_tools.ui.typer.settings import SettingsManager
 from wildintel_tools.ui.typer.TyperUtils import TyperUtils
@@ -54,7 +55,7 @@ from wildintel_tools.ui.typer.commands import epicollect
 # --------------------------------------------------------------------------- #
 
 APP_NAME = "wildintel-tools"
-__version__ = "0.2.0"
+__version__ = "0.2.2"
 
 # --------------------------------------------------------------------------- #
 # Typer CLI definition
@@ -67,6 +68,7 @@ app.add_typer(reports.app, name="reports")
 app.add_typer(logger.app, name="logger")
 app.add_typer(wildintel.app, name="wildintel")
 app.add_typer(epicollect.app, name="epicollect")
+
 
 def dynaconf_loader(file_path: str) -> dict:
     """
@@ -131,6 +133,30 @@ def dynamic_dynaconf_callback(ctx: typer.Context, param: typer.CallbackParam, va
     ctx.obj["settings"] = settings
 
     return a
+
+def get_latest_github_release(owner: str, repo: str) -> str:
+    """
+    Returns the tag name of the latest GitHub release.
+    """
+    url = f"https://api.github.com/repos/{owner}/{repo}/releases/latest"
+    response = requests.get(url)
+    if response.status_code != 200:
+        raise RuntimeError(f"GitHub API request failed with status {response.status_code}")
+    data = response.json()
+    return data["tag_name"]
+
+
+def is_newer_version(current_version: str, latest_version: str) -> bool:
+    """
+    Returns True if latest_version is newer than current_version.
+    Assumes versions are in semantic versioning format: vMAJOR.MINOR.PATCH
+    """
+
+    def parse_version(v: str):
+        return tuple(int(x) for x in v.lstrip("v").split("."))
+
+    return parse_version(latest_version) > parse_version(current_version)
+
 
 @app.callback()
 def main_callback(ctx: typer.Context,
@@ -204,6 +230,13 @@ def main_callback(ctx: typer.Context,
         "_":_,
         "project": project
     }
+
+    latest_version = get_latest_github_release("ijfvianauhu", APP_NAME)
+    if is_newer_version(__version__, latest_version):
+        TyperUtils.warning(_(f"A newer version is available: {latest_version}. You can download it from "
+                             f"https://github.com/ijfvianauhu/wildintel-tools"))
+    else:
+        pass
 
 if __name__ == "__main__":
     app()
