@@ -35,32 +35,30 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Python
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
       - name: Install uv
-        run: |
-          pip install uv
+        run: pip install uv
 
       - name: Install project dependencies
-        run: |
-          uv sync --all-extras --dev
+        run: uv sync --all-extras --dev
 
       - name: Install PyInstaller
         run: |
-          pip install --upgrade pip
-          pip install pyinstaller
+          python -m pip install --upgrade pip
+          python -m pip install pyinstaller
+          python -m pip install -e .
 
       - name: Build executable with PyInstaller
         run: |
-          python -m pyinstaller --onefile --name wildintel-tools wildintel_tools/ui/typer/main.py
+          python -m pyinstaller --onefile --name ${{ matrix.file_name }} wildintel_tools/ui/typer/main.py
 
       - name: Fix permissions (macOS/Linux)
         if: runner.os != 'Windows'
-        run: |
-          chmod +x dist/wildintel-tools
+        run: chmod +x dist/${{ matrix.file_name }}
 
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4
