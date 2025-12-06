@@ -16,11 +16,6 @@ for integration with the Trapper platform.
    :maxdepth: 2
    :caption: Contents:
 
-   introduction
    installation
    configuration
-   usage
-   utilities
-   logging
-   contributing
-   funding
+   first_steps
