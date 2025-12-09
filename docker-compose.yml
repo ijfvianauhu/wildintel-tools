@@ -1,5 +1,6 @@
 services:
   wildintel-tools:
+    # Uncomment for local development
     #build:
     #  context: .
     #  dockerfile: Dockerfile
@@ -7,12 +8,13 @@ services:
     image: ghcr.io/ijfvianauhu/wildintel-tools/wildintel-tools:latest
     container_name: wildintel-tools
     restart: unless-stopped
+    user: "1000:1000"  # Run as trapper user (matches Dockerfile)
     volumes:
       # Internal volume for settings persistence
       - wildintel_tools_settings:/home/trapper/.config/wildintel-tools
       # Mount for data directory (user-defined)
+      # Use absolute path or set DATA_PATH in .env file
       - ${DATA_PATH:-./wildintel-tools-data/}:/data
-    # user: "1000:1000"
     env_file:
       - .env
     stdin_open: true
