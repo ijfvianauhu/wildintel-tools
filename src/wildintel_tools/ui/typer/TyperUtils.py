@@ -13,7 +13,6 @@ from typer_config import conf_callback_factory
 
 from wildintel_tools.ui.typer.i18n import _
 
-import logging
 import typer
 from rich.console import Console
 from rich.table import Table
@@ -155,21 +154,23 @@ class TyperUtils:
         :rtype: dict
         :raises json.JSONDecodeError: If the input is not valid JSON.
         """
+
         try:
             return json.loads(file_path)
         except Exception as e:
             pass  # Not JSON → try as file path
 
-        path = Path(file_path + ".toml")
-
-        if path.exists() and path.is_file():
-            settings_dir = path.parent
-            setting_manager = SettingsManager(settings_dir=settings_dir)
-            settings = setting_manager.load_settings(Path(file_path), True, True)
-            return SettingsManager.to_plain_dict(settings)
+        #path = Path(file_path + ".toml")
+        path = Path(file_path)
+        #if path.exists() and path.is_file():
+        logger.debug(f"Loading configuration from {path}")
+        settings_dir = path.parent
+        setting_manager = SettingsManager(settings_dir=settings_dir)
+        settings = setting_manager.load_settings(path.name, True, True)
+        return SettingsManager.to_plain_dict(settings)
 
         # If path does not exist or is not a file → raise
-        raise FileNotFoundError(f"Path does not exist or is not a file: {file_path}")
+        #raise FileNotFoundError(f"Path does not exist or is not a file: {file_path}")
 
     # 🔹 Callback base
     base_conf_callback = conf_callback_factory(dynaconf_loader)
