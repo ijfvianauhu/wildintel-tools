@@ -21,8 +21,11 @@ from rich.table import Table
 from rich.progress import Progress, TextColumn, BarColumn, TimeElapsedColumn
 from typing import Callable, Dict, Any
 
-from wildintel_tools.ui.typer.settings import Settings
+from wildintel_tools.ui.typer.settings import Settings, SettingsManager
 
+import logging
+
+logger = logging.getLogger(__name__)
 
 class HierarchicalProgress:
     def __init__(self, console: Console = None):
@@ -84,12 +87,12 @@ class TyperUtils:
     @staticmethod
     def error(message: str):
         TyperUtils.console.print(f"[red]:cross_mark:[/red] {message}")
-        TyperUtils.logger.error(message)
+        TyperUtils.logger.error(message, exc_info=True)
 
     @staticmethod
     def fatal(message: str):
         TyperUtils.console.print(f"[red]:skull:[/red] {message}")
-        TyperUtils.logger.critical(message)
+        TyperUtils.logger.critical(message, exc_info=True)
         raise typer.Exit(code=1)
 
     @staticmethod
@@ -152,23 +155,18 @@ class TyperUtils:
         :rtype: dict
         :raises json.JSONDecodeError: If the input is not valid JSON.
         """
-
         try:
             return json.loads(file_path)
         except Exception as e:
-            print(f"{e}{file_path}")
             pass  # Not JSON → try as file path
 
-        path = Path(file_path)
+        path = Path(file_path + ".toml")
 
         if path.exists() and path.is_file():
             settings_dir = path.parent
-            file_name = path.name
-
             setting_manager = SettingsManager(settings_dir=settings_dir)
-            settings = setting_manager.load_settings(file_name, True, True)
-
-            return settings.as_dict()
+            settings = setting_manager.load_settings(Path(file_path), True, True)
+            return SettingsManager.to_plain_dict(settings)
 
         # If path does not exist or is not a file → raise
         raise FileNotFoundError(f"Path does not exist or is not a file: {file_path}")
@@ -203,11 +201,11 @@ class TyperUtils:
 
         # Load Settings
 
-        if "settings" in ctx.obj and ctx.obj["settings"] is not None:
+        if ctx.obj and "settings" in ctx.obj and ctx.obj["settings"] is not None:
             # Use settings from context
-            settings_dict = ctx.obj["settings"].as_dict()
+            settings_dict = SettingsManager.to_plain_dict(ctx.obj["settings"])
             value = json.dumps(settings_dict, default=str)
-            settings_dict = TyperUtils.base_conf_callback(ctx, param, value)
+            TyperUtils.base_conf_callback(ctx, param, value)
         # if value is not None:
         #    print("por value")
         # Use the raw value (expected to be a Path)
@@ -215,13 +213,21 @@ class TyperUtils:
         else:
             base_path = ctx.params.get("settings_dir", ".")
             file_path = os.path.join(base_path, ctx.params.get("project", "default"))
-            settings_dict = TyperUtils.base_conf_callback(ctx, param, file_path)
+            TyperUtils.base_conf_callback(ctx, param, file_path)
 
+        # en ctx.default_map tengo las settings leídas por base_conf_callback
         settings = ctx.default_map.copy() if ctx.default_map else {}
-
-        # Validate & build pydantic model
         settings_model = Settings(**settings)
-        # settings_model = Settings(**data) if validate else Settings.model_validate(data)
+
+        # Guardo las settings si aún no están en ctx.obj
+        if not ctx.obj:
+            ctx.obj =  dict()
+
+        if  "settings" not in ctx.obj:
+            ctx.obj["settings"] = settings_model
+
+        # A los parámetros les asigno los valores por defecto definidos en las settings si ya no tienen un valor
+        # asignado
 
         mapping = TyperUtils.generate_pydantic_mapping(settings_model, override_mapping)
 
@@ -230,10 +236,7 @@ class TyperUtils:
                 section, key = mapping[param_name]
                 ctx.params[param_name] = settings[section][key]
 
-        if "settings" not in ctx.obj:
-            ctx.obj["settings"] = settings_model.model_dump()
-
-        return settings_dict
+        return value
 
     #
     #

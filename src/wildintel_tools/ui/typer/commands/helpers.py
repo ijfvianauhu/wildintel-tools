@@ -26,7 +26,7 @@ locations(...)
 """
 import json
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 from typer_config import conf_callback_factory
 from wildintel_tools.ui.typer.i18n import _
 from wildintel_tools.ui.typer.TyperUtils import TyperUtils
@@ -48,64 +48,18 @@ app = typer.Typer(
     short_help=_("Helpers")
 )
 
-def dynaconf_loader(file_path: str) -> dict:
-    """
-    Load configuration from a JSON string.
+def make_dynaconf_callback(override_mapping: dict | None = None):
+    def callback(ctx, param: typer.CallbackParam, value: Any):
+        return TyperUtils.dynamic_dynaconf_callback(ctx, param, value, override_mapping=override_mapping)
+    return callback
 
-    Note:
-        Despite the name, this function calls ``json.loads`` on ``file_path``,
-        so it expects a JSON string containing the configuration, not a file path.
+override_mapping = {
+    "user": ("GENERAL", "login"),
+    "url": ("GENERAL", "host"),
+    "password": ("GENERAL", "password"),
+}
 
-    :param file_path: JSON string with the configuration.
-    :type file_path: str
-    :return: Deserialized configuration dictionary.
-    :rtype: dict
-    :raises json.JSONDecodeError: If the string is not valid JSON.
-    """
-    return json.loads(file_path)
-
-
-# Base callback
-base_conf_callback = conf_callback_factory(dynaconf_loader)
-
-
-def dynamic_dynaconf_callback(ctx, param, value):
-    """
-    Dynamic callback to load configuration values at runtime.
-
-    This callback obtains configuration from ``ctx.obj["settings"]`` and
-    serializes it to pass it to ``base_conf_callback``. It also fills
-    context parameters (``user``, ``url``, ``password``) if they were not
-    provided explicitly.
-
-    :param ctx: Typer/Click context.
-    :type ctx: typer.Context
-    :param param: Parameter associated with the callback.
-    :type param: click.Parameter
-    :param value: Current parameter value.
-    :type value: Any
-    :return: Result of applying ``base_conf_callback``.
-    :rtype: Any
-    """
-    settings = ctx.obj.get("settings", {}).as_dict()
-    settings_manager = ctx.obj.get("setting_manager")
-    json_str = json.dumps(settings, default=str)
-    a = base_conf_callback(ctx, param, json_str)
-
-    for key, value in ctx.params.items():
-        if key == "user":
-            if value is None:
-                ctx.params[key] = settings["GENERAL"]["login"]
-        if key == "url":
-            if value is None:
-                ctx.params[key] = settings["GENERAL"]["host"]
-
-        if key == "password":
-            if value is None:
-                ctx.params[key] = settings["GENERAL"]["password"]
-
-    return a
-
+callback_with_override = make_dynaconf_callback(override_mapping)
 
 @app.callback()
 def main_callback(ctx: typer.Context):
@@ -151,7 +105,7 @@ def test_connection(ctx: typer.Context,
                         typer.Option(
                             hidden=True,
                             help=_("File to save the report"),
-                            callback=dynamic_dynaconf_callback
+                            callback=callback_with_override
                         )
                     ] = None,
     ):
@@ -178,7 +132,7 @@ def test_connection(ctx: typer.Context,
     settings = ctx.obj.get("settings", {})
 
     try:
-        TyperUtils.info(_("Testing Trapper API connection..."))
+        TyperUtils.info(_(f"Testing Trapper API connection {url} {user}..."))
         check_trapper_connection(url, user, password, None)
         TyperUtils.success(_("Trapper API connection successful!"))
     except Exception as e:
@@ -200,18 +154,18 @@ def test_external_tools(ctx: typer.Context):
     """
     project_name = ctx.obj.get("project")
     settings_manager: SettingsManager = ctx.obj.get("setting_manager")
-    settings = settings_manager.load_settings(project_name)
+    settings = ctx.obj.get("settings")
 
     try:
         TyperUtils.logger.info(_("Testing FFMPEG"))
-        check_ffmpeg(settings.general.ffmpeg)
+        check_ffmpeg(settings.GENERAL.ffmpeg)
         TyperUtils.success(_("FFMPEG test successful!"))
     except Exception as e:
         TyperUtils.error(_(f"FFMPEG test failed: {str(e)}"))
 
     try:
         TyperUtils.logger.info(_("Testing exiftool."))
-        check_exiftool(settings.general.exiftool)
+        check_exiftool(settings.GENERAL.exiftool)
         TyperUtils.success(_("exiftool test successful!"))
     except Exception as e:
         TyperUtils.error(_(f"exiftool test failed: {str(e)}"))
@@ -247,7 +201,7 @@ def classification_projects(ctx: typer.Context,
             typer.Option(
                 hidden=True,
                 help=_("File to save the report"),
-                callback=dynamic_dynaconf_callback
+                callback=callback_with_override
             )
         ] = None,
 ):
@@ -306,7 +260,7 @@ def research_projects(ctx: typer.Context,
               typer.Option(
                   hidden=True,
                   help=_("File to save the report"),
-                  callback=dynamic_dynaconf_callback
+                  callback=callback_with_override
               )
           ] = None,
 ):
@@ -365,7 +319,7 @@ def locations(ctx: typer.Context,
               typer.Option(
                   hidden=True,
                   help=_("File to save the report"),
-                  callback=dynamic_dynaconf_callback
+                  callback=callback_with_override
               )
           ] = None,
 ):
@@ -425,7 +379,7 @@ def deployments(ctx: typer.Context,
               typer.Option(
                   hidden=True,
                   help=_("File to save the report"),
-                  callback=dynamic_dynaconf_callback
+                  callback=callback_with_override
               )
           ] = None,
 ):

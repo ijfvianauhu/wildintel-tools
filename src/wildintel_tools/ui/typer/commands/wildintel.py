@@ -37,7 +37,7 @@ from wildintel_tools.ui.typer.TyperUtils import TyperUtils, HierarchicalProgress
 import wildintel_tools.wildintel as wildintel_processing
 from typing_extensions import Annotated
 from pathlib import Path
-from typing import List
+from typing import List, Any
 
 import typer
 
@@ -45,85 +45,26 @@ app = typer.Typer(
     help=_("Includes several utilities to validate and ensure the quality of collections and deployments produced within the WildIntel project"),
     short_help=_("Utilities for managing and validating WildIntel data"))
 
-# 🔹 Loader que recibe la ruta completa del archivo
-def dynaconf_loader(file_path: str) -> dict:
-    """
-    Load a Dynaconf-compatible configuration from a JSON string.
+def make_dynaconf_callback(override_mapping: dict | None = None):
+    def callback(ctx, param: typer.CallbackParam, value: Any):
+        return TyperUtils.dynamic_dynaconf_callback(ctx, param, value, override_mapping=override_mapping)
+    return callback
 
-    Note:
-        Although its name suggests a path loader, this function expects a JSON
-        string and returns a Python ``dict`` usable by ``typer_config`` and Dynaconf.
+override_mapping = {
+    "data_path": ("GENERAL", "data_dir"),
+    "tolerance_hours": ("WILDINTEL", "tolerance_hours"),
+    "output_path": ("WILDINTEL", "output_dir"),
+    "owner": ("WILDINTEL", "owner"),
+    "publisher": ("WILDINTEL", "publisher"),
+    "coverage": ("WILDINTEL", "coverage"),
+    "rp_name": ("WILDINTEL", "rp_name"),
+    "user": ("GENERAL", "login"),
+    "url": ("GENERAL", "host"),
+    "password": ("GENERAL", "password"),
+}
 
-    :param file_path: JSON string containing the configuration.
-    :type file_path: str
-    :returns: Parsed configuration dictionary.
-    :rtype: dict
-    :raises json.JSONDecodeError: If the input is not valid JSON.
-    """
-    return json.loads(file_path)
 
-# 🔹 Callback base
-base_conf_callback = conf_callback_factory(dynaconf_loader)
-
-# 🔹 Callback dinámico que usa otro parámetro (base_path)
-def dynamic_dynaconf_callback(ctx, param, value):
-    """
-    Dynamic callback that injects runtime defaults into Typer parameters.
-
-    Serializes the runtime settings from ``ctx.obj["settings"]`` and delegates
-    loading to the base configuration callback. It also fills CLI parameters
-    when omitted by the user, using project settings:
-    ``data_path``, ``tolerance_hours``, ``output_path``, ``owner``, ``publisher``,
-    ``coverage``, ``rp_name``, ``user``, ``url`` y ``password``.
-
-    :param ctx: Typer/Click context.
-    :type ctx: typer.Context
-    :param param: Parameter associated with the callback.
-    :type param: click.Parameter
-    :param value: Current value of the processed parameter.
-    :type value: Any
-    :returns: Result of the underlying base configuration callback.
-    :rtype: Any
-    """
-    settings : Dynaconf = ctx.obj.get("settings", {}).as_dict()
-    json_str = json.dumps(settings, default=str)
-    a=base_conf_callback(ctx, param, json_str)
-
-    settings = ctx.default_map.copy() if ctx.default_map else {}
-
-    for key, value in ctx.params.items():
-        if key == "data_path":
-            if value is None:
-                ctx.params[key] = settings["GENERAL"]["data_dir"]
-        elif key == "tolerance_hours":
-            if value is None:
-                ctx.params[key] = settings["WILDINTEL"]["tolerance_hours"]
-        elif key == "output_path":
-            if value is None:
-                ctx.params[key] = settings["WILDINTEL"]["output_dir"]
-        elif key == "owner":
-            if value is None:
-                ctx.params[key] = settings["WILDINTEL"]["owner"]
-        elif key == "publisher":
-            if value is None:
-                ctx.params[key] = settings["WILDINTEL"]["publisher"]
-        elif key == "coverage":
-            if value is None:
-                ctx.params[key] = settings["WILDINTEL"]["coverage"]
-        elif key == "rp_name":
-            if value is None:
-                ctx.params[key] = settings["WILDINTEL"]["rp_name"]
-        elif key == "user":
-            if value is None:
-                ctx.params[key] = settings["GENERAL"]["login"]
-        elif key == "url":
-            if value is None:
-                ctx.params[key] = settings["GENERAL"]["host"]
-        elif key == "password":
-            if value is None:
-                ctx.params[key] = settings["GENERAL"]["password"]
-
-    return a
+callback_with_override = make_dynaconf_callback(override_mapping)
 
 @app.callback()
 def main_callback(ctx: typer.Context,
@@ -200,7 +141,7 @@ def check_collections(
      typer.Option(
          hidden=True,
          help=_("File to save the report"),
-         callback=dynamic_dynaconf_callback
+         callback=callback_with_override
      )
     ] = None,
 ):
@@ -236,7 +177,6 @@ def check_collections(
 
     if data_path is None or not data_path.exists() or not data_path.is_dir():
         raise typer.BadParameter(_(f"'--data_path': {data_path} is not a valid directory or does not exist."))
-
 
     TyperUtils.info(_(f"Checking collections in {data_path}"))
 
@@ -333,7 +273,7 @@ def check_deployments(
         typer.Option(
             hidden=True,
             help=_("File to save the report"),
-            callback=dynamic_dynaconf_callback
+            callback=callback_with_override
         )
     ] = None,
 ):
@@ -421,6 +361,7 @@ def check_deployments(
         _show_report(report, output=report_file)
 
     except Exception as e:
+        raise e
         TyperUtils.error(_("An error occurred during deployment checking: {0}").format(str(e)))
 app.command(name="cd", hidden=True, help=_("Alias for check_deployments")) (check_deployments)
 
@@ -450,7 +391,7 @@ def prepare_for_trapper(
     scale: Annotated[bool, typer.Option(help=_("Scale resources"))] = True,
     overwrite: Annotated[bool, typer.Option(help=_("Overwrite existing deployments directories  in output path"))] = False,
     config: Annotated[
-        Path, typer.Option(hidden=True, help=_("File to save the report"), callback=dynamic_dynaconf_callback)
+        Path, typer.Option(hidden=True, help=_("File to save the report"), callback=callback_with_override)
     ] = None,
 ):
     """
@@ -614,7 +555,7 @@ def pipeline(
     typer.Option(
         hidden=True,
         help=_("File to save the report"),
-        callback=dynamic_dynaconf_callback
+        callback=callback_with_override
     )
     ] = None,
 ):
@@ -633,6 +574,7 @@ def pipeline(
             tolerance_hours,
             extensions,
             max_workers,
+            deployments,
             config
     )
 

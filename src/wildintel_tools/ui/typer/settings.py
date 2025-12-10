@@ -2,7 +2,7 @@
 Settings management module.
 
 This module provides functionality to manage project-specific configuration files
-based on the `Dynaconf` library. It includes utilities for:
+based on the `Dynaconf` and "Pydantic" libraries. It includes utilities for:
 
 - Creating new project settings from a default or custom template.
 - Validating settings with type and value constraints.
@@ -28,13 +28,13 @@ import os
 import platform
 import subprocess
 from pathlib import Path
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Type, get_origin, Union, get_args, Any
+import tempfile
 
-import typer
 from dynaconf import Dynaconf
 from dynaconf import loaders
-from dynaconf.validator import Validator
-from pydantic import BaseModel, Field, HttpUrl, EmailStr, FilePath, DirectoryPath, ValidationError
+from pydantic import BaseModel, Field, HttpUrl, EmailStr, FilePath, DirectoryPath, ValidationError, SecretStr, \
+    TypeAdapter
 
 
 class LoggerSettings(BaseModel):
@@ -48,7 +48,7 @@ class LoggerSettings(BaseModel):
 class GeneralSettings(BaseModel):
     host: HttpUrl
     login: EmailStr
-    password: str
+    password: SecretStr
     project_id: int = Field(..., ge=1)
     verify_ssl: bool
     ffmpeg: str
@@ -70,7 +70,7 @@ class WildIntelSettings(BaseModel):
 
 class EpiCollectSettings(BaseModel):
     client_id: int
-    client_secret: str
+    client_secret: SecretStr
     app_slug: str
     site_alias: Dict[str, str] = {}
     release_alias: Dict[str, str] = {}
@@ -106,31 +106,6 @@ class Settings(BaseModel):
     WILDINTEL: WildIntelSettings
     EPICOLLECT: EpiCollectSettings
 
-SETTINGS_ORDER = {
-    "LOGGER": ["loglevel", "filename"],
-    "GENERAL": [
-        "host", "login", "password", "project_id", "verify_ssl",
-        "ffmpeg", "exiftool", "data_dir",
-    ],
-    "WILDINTEL": [
-        "rp_name", "coverage", "publisher", "owner", "tolerance_hours",
-        "resize_img", "resize_img_size", "overwrite", "output_dir",
-    ],
-
-    "EPICOLLECT": [
-    "client_id", "client_secret", "app_slug",
-    "site_alias", "release_alias",
-    "site_field", "release_field", "start_date_field", "end_date_field",
-    "correct_setup_field", "correct_tstamp_field", "view_quality_field",
-    "tags_field", "comments_field", "managers_field", "setup_by_field",
-    "camera_id_field", "camera_model_field", "camera_interval_field",
-    "camera_height_field", "camera_depth_field", "camera_tilt_field",
-    "camera_heading_field", "session_field", "array_field",
-    "feature_type_field", "habitat_field", "capture_method_field",
-    "bait_type_field"
-    ]
-}
-
 class SettingsManager:
     """
     Manages Trapper-Tools configuration files across multiple projects.
@@ -153,20 +128,16 @@ class SettingsManager:
         :param settings_dir: Directory to store settings files. Defaults to ``~/.trapper-tools``.
         :type settings_dir: Optional[Path]
         """
-
-        self.settings_dir = (
-            Path(settings_dir) if settings_dir else Path.home() / ".trapper-tools"
-        )
+        self.settings_dir = Path(settings_dir) if settings_dir else Path.home() / ".trapper-tools"
         self.settings_dir.mkdir(parents=True, exist_ok=True)
-
-        # Path to default settings template in package
-        self.default_template = Path(__file__).parent / "default_settings.toml"
+        self.SETTINGS_ORDER = SettingsManager._generate_settings_order()
 
     def create_project_settings(
         self,
         project_name: str,
         template: Optional[Path] = None,
         env_file: bool = False,
+        validate: bool = True,
     ) -> Path:
         """
         Create a new project configuration file from a TOML template.
@@ -182,7 +153,7 @@ class SettingsManager:
         :rtype: Path
         """
         settings_file = self.settings_dir / f"{project_name}.toml"
-        template = template or self.default_template
+        template = template or self._default_template_file()
 
         if not template.exists():
             raise FileNotFoundError(f"Settings template not found: {template}")
@@ -195,33 +166,17 @@ class SettingsManager:
             validate_on_update="all",
         )
 
-        # Save settings back to file
-        self.export_settings(settings.to_dict(), settings_file)
+        settings_model = SettingsManager.load_from_dict(settings.to_dict(), validate)
+        self.export_settings(settings_model, settings_file)
 
         return settings_file
-
-    @staticmethod
-    def load_from_array(settings:dict) -> Dynaconf:
-        """
-        Load settings from a Python dictionary into a :class:`Dynaconf` object.
-
-        :param settings: Dictionary containing configuration keys and values.
-        :type settings: dict
-        :return: A Dynaconf object populated with the provided settings.
-        :rtype: Dynaconf
-        """
-        settings_dyn = Dynaconf(environments=False, settings_files=None)
-
-        for k, v in settings.items():
-            setattr(settings_dyn, k, v)
-        return settings_dyn
 
     def load_settings(
         self,
         project_name: str,
-        validate: bool = False,
+        validate: bool = True,
         create:bool = True,
-    ) -> Dynaconf:
+    ) -> Settings:
         """
         Load settings for a given project.
 
@@ -236,55 +191,16 @@ class SettingsManager:
         :rtype: Dynaconf
         """
         settings_file = self.settings_dir / f"{project_name}.toml"
+
         if not settings_file.exists() and create:
             settings_file = self.create_project_settings(project_name)
         elif not settings_file.exists():
            raise FileNotFoundError(f"Settings file not found: {settings_file}")
 
-        settings_files = [str(settings_file)]
-        settings = Dynaconf(settings_files=settings_files)
+        settings = Dynaconf(settings_files=[str(settings_file)])
+        raw = settings.to_dict()
 
-        # get validators
-        validators = self.get_validators()
-
-        # Register validators
-        settings.validators.register(*validators)
-
-        if validate:
-            # Validate settings
-            settings.validators.validate()
-
-        return settings
-
-    def load_settings_pydantic(
-        self,
-        project_name: str,
-        validate: bool = True,
-        create: bool = True,
-    ) -> Settings:
-        """
-        Load settings into a Pydantic Settings object.
-
-        This wraps `load_settings()` (Dynaconf) but returns a strongly typed
-        Pydantic model with full validation and autocompletion.
-
-        :param project_name: Name of the project.
-        :param validate: Whether to validate using Pydantic.
-        :param create: Automatically create settings if missing.
-        :return: A Pydantic `Settings` model instance.
-        """
-        dynaconf_settings = self.load_settings(
-            project_name,
-            validate=False,     # Let pydantic validate below
-            create=create
-        )
-
-        data = dynaconf_settings.to_dict()
-
-        # Validate & build pydantic model
-        settings_model = Settings(**data) if validate else Settings.model_validate(data)
-
-        return settings_model
+        return self.load_from_dict(raw, validate)
 
     def list_projects(self) -> list[str]:
         """
@@ -306,77 +222,7 @@ class SettingsManager:
         """
         return self.settings_dir / f"{project_name}.toml"
 
-    def get_validators(self) -> List[Validator]:
-        """
-        Define and return Dynaconf validators for settings integrity checks.
-
-        :return: A list of :class:`dynaconf.validator.Validator` objects.
-        :rtype: List[Validator]
-        """
-        validators = [
-            # LOGGER section
-            Validator(
-                "LOGGER.loglevel",
-                must_exist=True,
-                condition=lambda v: isinstance(v, int) and 0 <= v <= 2,
-                messages={
-                    "condition": "LOGGER.loglevel must be an integer between 0 and 2"
-                },
-            ),
-
-            Validator(
-                "LOGGER.filename",
-                must_exist=True,
-                condition=lambda v: (
-                        isinstance(v, str)
-                        and (
-                                v.strip() == "" or v.strip().endswith(".log")
-                        )
-                ),
-                messages={
-                    "condition": "LOGGER.filename must be an empty string or a non-empty string ending with '.log'",
-                },
-            ),
-
-            # GENERAL section
-            Validator(
-                "GENERAL.host",
-                must_exist=True,
-                cast=str,
-                condition=lambda v: v.startswith("http://") or v.startswith("https://"),
-                messages={"condition": "GENERAL.host must be a valid URL"},
-            ),
-            Validator(
-                "GENERAL.login",  # must be an email-like string
-                must_exist=True,
-                cast=str,
-                condition=lambda v: "@" in v and "." in v.split("@")[-1],
-                messages={"condition": "GENERAL.login must be a valid email address."},
-            ),
-            Validator("GENERAL.project_id", must_exist=True, is_type_of=int, gte=1),
-            Validator("GENERAL.verify_ssl", is_type_of=bool),
-            Validator("GENERAL.ffmpeg", must_exist=True, cast=str, cont="ffmpeg"),
-            Validator("GENERAL.exiftool", must_exist=True, cast=str, cont="exiftool"),
-            Validator(
-                "GENERAL.data_dir",
-                condition=lambda value: not value or Path(value).is_dir(),
-                must_exist=True,
-                messages={
-                    "condition": "The path specified in GENERAL.data_dir must be an existing directory."
-                },
-            ),
-            Validator(
-                "WILDINTEL.output_dir",
-                condition=lambda value: Path(value).is_dir(),
-                must_exist=True,
-                messages={
-                    "condition": "The path specified in WILDINTEL.output_dir must be an existing directory."
-                },
-            ),
-        ]
-        return validators
-
-    def export_settings(self, settings_data: dict, setting_path: str) -> None:
+    def export_settings(self, settings_data: Settings, setting_path: Path) -> None:
         """
         Export the given settings dictionary to a TOML file, preserving key order.
 
@@ -387,15 +233,61 @@ class SettingsManager:
         :return: None
         :rtype: None
         """
-        # Restore the original settings order as Dynaconf does not guarantee order
-        settings_dict = {}
-        for group in SETTINGS_ORDER:
-            settings_dict[group] = {}
-            for key in SETTINGS_ORDER[group]:
-                if key in settings_data[group]:
-                    settings_dict[group][key] = settings_data[group][key]
 
-        loaders.toml_loader.write(str(setting_path), settings_dict, merge=False)
+        path = Path(setting_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        current = SettingsManager.to_plain_dict(settings_data)
+        ordered: dict = {}
+
+        for group in self.SETTINGS_ORDER:
+            ordered[group] = {}
+            for key in self.SETTINGS_ORDER[group]:
+                if group in current and key in current[group]:
+                    ordered[group][key] = current[group][key]
+
+        #unknown keys (not in SETTINGS_ORDER) are appended at the end
+        for g, kv in current.items():
+            if g not in ordered:
+                ordered[g] = {}
+            for k, v in kv.items():
+                if k not in ordered[g]:
+                    ordered[g][k] = v
+
+        loaders.toml_loader.write(str(setting_path), ordered, merge=False)
+
+    def settings_to_string(self, settings_data: Settings) -> str:
+        """
+        Convert settings to a TOML-like string, preserving order and formatting cleanly.
+        """
+        settings_dict = settings_data.model_dump()
+        ordered_settings = {}
+
+        for group in self.SETTINGS_ORDER:
+            ordered_settings[group] = {}
+            for key in self.SETTINGS_ORDER[group]:
+                if key in settings_dict.get(group, {}):
+                    ordered_settings[group][key] = settings_dict[group][key]
+
+        def format_value(value):
+            if isinstance(value, Path):
+                return f'"{value}"'
+            if isinstance(value, SecretStr):
+                return '"**********"'
+            if isinstance(value, str):
+                return f'"{value}"'
+            if isinstance(value, bool):
+                return str(value).lower()
+            return value
+
+        lines = []
+        for group, values in ordered_settings.items():
+            lines.append(f"[{group}]")
+            for key, value in values.items():
+                value = format_value(value)
+                lines.append(f"{key} = {value}")
+            lines.append("")
+
+        return "\n".join(lines)
 
     def edit_settings(self, project_name: str, editor="nano") -> None:
         """
@@ -471,11 +363,22 @@ class SettingsManager:
         :rtype: Any
         """
         settings = self.load_settings(project_name)
-        # Usamos getattr de Dynaconf
-        value = settings.get(param)
-        if value is None:
-            raise KeyError(f"Parameter '{param}' not found in project '{project_name}'")
-        return value
+
+        try:
+            section, key = param.split(".", 1)
+        except ValueError:
+            raise ValueError("Parameter must have format SECTION.KEY (e.g., GENERAL.host)")
+
+        if not hasattr(settings, section):
+            raise ValueError(f"Invalid section: {section}")
+
+        section_model = getattr(settings, section)
+
+        if not hasattr(section_model, key):
+            raise ValueError(f"Invalid parameter: {param}")
+
+        data = settings.model_dump()
+        return (data[section][key])
 
     def set_param(self, project_name: str, param: str, value, validate: bool = True):
         """
@@ -491,14 +394,228 @@ class SettingsManager:
         :type validate: bool
         :raises ValueError: If settings validation fails.
         """
-        settings_file = self.get_settings_path(project_name)
-        settings = self.load_settings(project_name)
 
-        # Actualizamos el valor
-        settings.update({param: value}, validate=False)  # no validar aún
-        # Guardamos cambios en el fichero
-        self.export_settings(settings.to_dict(), settings_file)
+        settings_file = self.get_settings_path(project_name)
+        settings: Settings = self.load_settings(project_name)
+
+        try:
+            section, key = param.split(".", 1)
+        except ValueError:
+            raise ValueError("Parameter must have format SECTION.KEY (e.g., GENERAL.host)")
+
+        if not hasattr(settings, section):
+            raise ValueError(f"Invalid section: {section}")
+
+        section_model = getattr(settings, section)
+
+        if key not in section_model.model_fields:
+            raise ValueError(f"Invalid parameter: {param}")
+
+        field_info = section_model.model_fields[key]
+        adapter = TypeAdapter(field_info.annotation)
+
+        try:
+            parsed_value = adapter.validate_python(value)
+        except ValidationError as e:
+            raise ValueError(f"Invalid value for {param}: {e}")
+
+        new_section = section_model.model_copy(update={key: parsed_value})
+        new_settings = settings.model_copy(update={section: new_section})
 
         if validate:
-            # Validamos usando los validators registrados
-            settings.validators.validate()
+            try:
+                new_settings = Settings.model_validate(new_settings.model_dump())
+            except ValidationError as e:
+                raise ValueError(f"Settings validation failed:\n{e}")
+
+        # Guardamos en fichero
+        self.export_settings(new_settings, settings_file)
+
+        return new_settings
+
+    @staticmethod
+    def load_from_dict(settings: dict, validate: bool = True) -> Settings:
+        """
+        Load settings from a Python dictionary into a :class:`Settings` object.
+
+        :param settings: Dictionary containing configuration keys and values.
+        :type settings: dict
+        :param validate: Whether to validate settings upon loading.
+        :type validate: bool
+        :return: A Seettings object populated with the provided settings.
+        :rtype: Settings
+        """
+
+        return Settings.model_validate(settings) if validate else SettingsManager._construct_recursive(Settings,settings)
+
+    @staticmethod
+    def from_dict(data: dict, validate: bool = True) -> Settings:
+        """
+        Construye un Settings desde dict:
+        - Si validate True usa model_validate (pydantic v2).
+        - Si validate False usa model_construct (sin validar).
+        """
+        return SettingsManager.load_from_dict(data, validate)
+
+    @staticmethod
+    def to_plain_dict(settings: Settings, plain_secrets: bool = True) -> Any:
+        """
+        Convierte recursivamente BaseModel/SecretStr/Path/HttpUrl a tipos serializables (python).
+        Usa model_dump(mode="python") para pydantic v2.
+        """
+        if isinstance(settings, SecretStr):
+            return settings.get_secret_value() if plain_secrets else "**********"
+        if isinstance(settings, (Path,)):
+            return str(settings)
+        if isinstance(settings, HttpUrl):
+            return str(settings)
+        if isinstance(settings, BaseModel):
+            raw = settings.model_dump(mode="python")
+            return {k: SettingsManager.to_plain_dict(v) for k, v in raw.items()}
+        if isinstance(settings, dict):
+            return {k: SettingsManager.to_plain_dict(v) for k, v in settings.items()}
+        if isinstance(settings, list):
+            return [SettingsManager.to_plain_dict(v) for v in settings]
+
+        return settings
+
+    @staticmethod
+    def _generate_settings_order() -> Dict[str, List[str]]:
+        """
+        Generate settings order dictionary rely on root_model definition. This inspects the Settings model and its
+        submodels to extract field order.
+        """
+
+        def _unwrap_model_from_annotation(ann):
+            if ann is None:
+                return None
+            origin = get_origin(ann)
+            if origin is Union:
+                for a in get_args(ann):
+                    if isinstance(a, type) and issubclass(a, BaseModel):
+                        return a
+            if isinstance(ann, type) and issubclass(ann, BaseModel):
+                return ann
+            return None
+
+        order: Dict[str, List[str]] = {}
+        annotations = getattr(Settings, "__annotations__", {})
+
+        for top_name in list(annotations.keys()):
+            ann = annotations.get(top_name)
+            submodel = _unwrap_model_from_annotation(ann)
+            if not submodel:
+                # intentar fallback por atributos de Pydantic (por si no hay __annotations__)
+                try:
+                    # v2: model_fields preserves order
+                    mf = getattr(Settings, "model_fields", None)
+                    if mf and top_name in mf:
+                        ann = mf[top_name].annotation if hasattr(mf[top_name], "annotation") else None
+                        submodel = _unwrap_model_from_annotation(ann)
+                except Exception:
+                    pass
+
+            if not submodel:
+                continue
+
+            # Obtener campos en orden según versión de Pydantic
+            if hasattr(submodel, "model_fields"):  # Pydantic v2
+                sub_keys = list(submodel.model_fields.keys())
+            else:  # Pydantic v1
+                sub_keys = list(getattr(submodel, "__fields__", {}).keys())
+
+            order[top_name] = sub_keys
+
+        return order
+
+    def _default_template_file(self) -> Path:
+        """
+        Create a temporary TOML file with default settings.
+
+        Returns
+        -------
+
+        """
+        default_settings = Settings(
+            LOGGER=LoggerSettings(
+                loglevel=1,
+                filename="",
+            ),
+            GENERAL=GeneralSettings(
+                host=HttpUrl("https://wildintel-trap.uhu.es/"),
+                login="user@example.com",
+                password=SecretStr("secret"),
+                project_id=123,
+                verify_ssl=True,
+                ffmpeg="ffmpeg",
+                exiftool="exiftool",
+                data_dir=Path.home(),
+            ),
+            WILDINTEL=WildIntelSettings(
+                rp_name="WildINTEL",
+                coverage="Doñana National Park",
+                publisher="University of Huelva",
+                owner="University of Huelva",
+                tolerance_hours=1,
+                resize_img=False,
+                resize_img_size=[1024, 768],
+                overwrite=False,
+                output_dir=Path.home(),
+            ),
+            EPICOLLECT=EpiCollectSettings(
+                client_id=0,
+                client_secret="secret",
+                app_slug="default",
+            ),
+        )
+
+        with tempfile.NamedTemporaryFile("w+", delete=False, suffix=".toml") as tmp:
+            tmp_path = Path(tmp.name)
+            self.export_settings(default_settings, tmp_path)
+
+        return tmp_path
+
+    @staticmethod
+    def _construct_recursive(model_cls: type[BaseModel], data: dict) -> BaseModel:
+        """
+        Construye un modelo usando model_construct() y aplicándolo recursivamente
+        a submodelos (y listas de submodelos).
+        """
+        if data is None:
+            return model_cls.model_construct()
+        converted = {}
+        mf = getattr(model_cls, "model_fields", {})
+        for name, value in (data.items() if isinstance(data, dict) else []):
+            field_info = mf.get(name)
+            if field_info is None:
+                converted[name] = value
+                continue
+
+            ann = getattr(field_info, "annotation", None)
+            # detectar submodel directo
+            sub = None
+            origin = get_origin(ann)
+            if origin is Union:
+                for a in get_args(ann):
+                    if isinstance(a, type) and issubclass(a, BaseModel):
+                        sub = a
+                        break
+            elif isinstance(ann, type) and issubclass(ann, BaseModel):
+                sub = ann
+
+            # lista de submodelos: List[SubModel] or list[SubModel]
+            if origin in (list, list.__class__) or getattr(ann, "__origin__", None) in (list,):
+                args = get_args(ann)
+                if args:
+                    elem = args[0]
+                    if isinstance(elem, type) and issubclass(elem, BaseModel) and isinstance(value, list):
+                        converted[name] = [construct_recursive(elem, v) if isinstance(v, dict) else v for v in value]
+                        continue
+
+            if sub and isinstance(value, dict):
+                converted[name] = construct_recursive(sub, value)
+            else:
+                converted[name] = value
+
+        # pasar el resto de campos no presentes en data (si hace falta)
+        return model_cls.model_construct(**converted)

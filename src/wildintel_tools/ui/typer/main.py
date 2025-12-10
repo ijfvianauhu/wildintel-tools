@@ -55,7 +55,7 @@ from wildintel_tools.ui.typer.commands import epicollect
 # --------------------------------------------------------------------------- #
 
 APP_NAME = "wildintel-tools"
-__version__ = "0.2.2"
+__version__ = "0.2.3"
 
 # --------------------------------------------------------------------------- #
 # Typer CLI definition
@@ -68,6 +68,18 @@ app.add_typer(reports.app, name="reports")
 app.add_typer(logger.app, name="logger")
 app.add_typer(wildintel.app, name="wildintel")
 app.add_typer(epicollect.app, name="epicollect")
+
+def make_dynaconf_callback(override_mapping: dict | None = None):
+    def callback(ctx, param: typer.CallbackParam, value: Any):
+        return TyperUtils.dynamic_dynaconf_callback(ctx, param, value, override_mapping=override_mapping)
+    return callback
+
+override_mapping = {
+    "verbosity": ("LOGGER", "loglevel"),
+    "log_file": ("LOGGER", "filename"),
+}
+
+callback_with_override = make_dynaconf_callback(override_mapping)
 
 
 def dynaconf_loader(file_path: str) -> dict:
@@ -183,7 +195,7 @@ def main_callback(ctx: typer.Context,
       Path,
       typer.Option(
           hidden=True,
-          callback=dynamic_dynaconf_callback
+          callback=callback_with_override
       )
     ] = None,
 
@@ -220,14 +232,13 @@ def main_callback(ctx: typer.Context,
 
     ## Load settings --> in project param callback
     settings = ctx.obj["settings"]
-    settings_dyn=SettingsManager.load_from_array(settings)
     setup_logging(APP_NAME,verbosity, log_file)
 
     TyperUtils.home = Path(typer.get_app_dir(APP_NAME))
 
     ctx.obj = {
         "setting_manager": SettingsManager(settings_dir=Path(settings_dir)),
-        "settings": settings_dyn,
+        "settings": settings,
         "logger": logger,
         "_":_,
         "project": project

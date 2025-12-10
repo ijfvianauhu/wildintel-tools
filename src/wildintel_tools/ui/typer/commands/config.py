@@ -31,7 +31,7 @@ from typing import Optional
 from pathlib import Path
 from wildintel_tools.ui.typer.i18n import _
 from wildintel_tools.ui.typer.TyperUtils import TyperUtils
-from wildintel_tools.ui.typer.settings import SettingsManager, SETTINGS_ORDER
+from wildintel_tools.ui.typer.settings import SettingsManager
 
 app = typer.Typer(
     help=_("Manage project configurations"),
@@ -116,15 +116,19 @@ def show(
 
     TyperUtils.console.print(f"\nSettings for project '{project_name}':")
 
-    for group in SETTINGS_ORDER:
+    #settings = settings.model_dump()
+
+    """for group in settings_manager.SETTINGS_ORDER:
         if hasattr(settings, group):
             TyperUtils.console.print(f"\n[{group}]")
-            for key in SETTINGS_ORDER[group]:
+            for key in settings_manager.SETTINGS_ORDER[group]:
                 if key == "password":
                     TyperUtils.console.print(f"{key} = [hidden]")
                 else:
                     variable = f"{group}.{key}"
                     TyperUtils.console.print(f"{key} = {getattr(settings, variable, '')}")
+    """
+    TyperUtils.console.print(settings_manager.settings_to_string(settings))
 
 @app.command(help=_("List all available project configurations"), short_help=_("List all available project configurations"))
 def list(ctx: typer.Context):
@@ -246,14 +250,14 @@ def set_param(
     :param param_value: New value for the parameter.
     :type param_value: str
     """
+
     settings_manager: SettingsManager = ctx.obj.get("setting_manager")
     project_name = ctx.obj.get("project", project_name)
-
     try:
         settings_manager.set_param(project_name, param_name, param_value)
         settings = settings_manager.load_settings(project_name, validate=True)
         TyperUtils.success(f"Settings {param_name} updated successfully to {param_value} for project '{project_name}'")
-    except ValidationError as e:
+    except Exception as e:
         TyperUtils.fatal(f"Settings validation error: {e}")
 
 if __name__ == "__main__":
