@@ -6,7 +6,9 @@ import tempfile
 from datetime import datetime
 from enum import unique, Enum
 from pathlib import Path
-from typing import List
+from typing import List, Dict, Optional
+from zoneinfo import ZoneInfo
+from datetime import timezone as datetime_timezone
 
 import exiftool
 import filetype
@@ -98,6 +100,7 @@ class ResourceUtils:
         """
         image = Image.open(io.BytesIO(image_bytes))
         exif_data = image.getexif()
+        print(exif_data)
         return {
             ExifTags.TAGS.get(tag_id, tag_id): value
             for tag_id, value in exif_data.items()
@@ -131,28 +134,65 @@ class ResourceUtils:
         pass
 
     @staticmethod
-    def add_xmp_metadata(images: List[Path], xmp_info:dict) -> bytes:
-        """Adds metadata to an image file using ExifTool.
+    def get_exif_from_path(
+            file_path: Path,
+            tags: Optional[List[str]] = None,
+            all_tags: bool = False,
+            extra_args: Optional[List[str]] = None,
+    ) -> Dict:
+        """Extract metadata from a local image/video file using the python-exiftool wrapper.
 
         Args:
-            image_bytes: Original image in bytes format
-            resource: Resource object containing metadata to add
+            file_path: Path object pointing to a local file.
+            tags: List of specific tags to extract. If None and all_tags=False, returns basic metadata.
+            all_tags: If True, extract ALL available tags (slower).
+            extra_args: Additional raw ExifTool arguments (e.g. ["-G1"])
 
         Returns:
-            New image bytes with added metadata
+            Dict containing metadata from ExifTool.
+
+        Raises:
+            ExifToolError: If exiftool fails or returns invalid data.
+            ValueError: If the file does not exist or path is invalid.
         """
 
+        # Validate path
+        if not isinstance(file_path, Path):
+            raise ValueError(f"Unsupported file type: {type(file_path)}")
+
+        if not file_path.is_file():
+            raise ValueError(f"File does not exist: {file_path}")
 
         try:
+            # Build parameters
+            params = ["-n"]  # numeric values
 
-            # Escribir metadatos con ExifTool
+            if all_tags:
+                params.append("-a")  # allow duplicate tags
+            elif tags:
+                # Convert ["DateTimeOriginal", "Model"] → ["-DateTimeOriginal", "-Model"]
+                params.extend([f"-{t}" for t in tags])
+
+            # Extra arguments
+            if extra_args:
+                params.extend(extra_args)
+
+            # Extract metadata
             with exiftool.ExifToolHelper() as et:
-                et.set_tags(images, tags=xmp_info, params=["-overwrite_original"])
+                results = et.get_metadata(str(file_path), params=params)
 
+            if not results or not isinstance(results, list):
+                raise Exception("ExifTool returned empty or invalid metadata structure")
+
+            metadata = results[0].copy()
+
+            # Clean up internal fields
+            metadata.pop("SourceFile", None)
+            metadata.pop("ExifToolVersion", None)
+
+            return metadata
         except Exception as e:
-            raise e
-
-        return None
+            raise Exception(f"Metadata extraction failed for {file_path}: {e}")
 
     @staticmethod
     def add_metadata(image_bytes: bytes, resource) -> bytes:
@@ -286,3 +326,143 @@ class ResourceUtils:
             detected_type = kind.mime
 
         return detected_type
+
+    @staticmethod
+    def file_to_bytes(img_path: Path, valid_types: Enum = None) -> io.BytesIO:
+        return (io.BytesIO(img_path.read_bytes()))
+
+    @staticmethod
+    def file_to_image(img_path: Path, valid_types: Enum = None) -> Image:
+        return Image.open(io.BytesIO(img_path.read_bytes()))
+
+    @staticmethod
+    def image_to_bytes(pil_image: Image.Image, format: str = "JPEG") -> bytes:
+        """
+        Convert a PIL image to raw bytes.
+
+        :param pil_image: The PIL Image object to convert.
+        :type pil_image: Image.Image
+        :param format: The output image format (e.g. "JPEG", "PNG").
+                       Defaults to "JPEG".
+        :type format: str
+        :return: The image encoded as bytes.
+        :rtype: bytes
+        """
+        buffer = io.BytesIO()
+        pil_image.save(buffer, format=format)
+        buffer.seek(0)
+        return buffer.getvalue()
+
+    @staticmethod
+    def get_camera_model(metadata: Dict[str, str]) -> str:
+        """Get deployment camera model based on extracted metadata."""
+        camera_model = ""
+        make = metadata.get("Make")
+        model = metadata.get("Model")
+        if make:
+            make = make.strip().lower()
+            if not model:
+                model = "(unknown)"
+            else:
+                model = model.strip().lower()
+            # Remove redundant make from model if present
+            if model.startswith(make):
+                camera_model = model
+            else:
+                camera_model = f"{make} {model}"
+        return camera_model
+
+    @staticmethod
+    def parse_date_recorded(
+            metadata: Dict,
+            timezone: ZoneInfo,
+            fallback: bool = True,
+            ignore_dst: bool = False,
+            convert_to_utc: bool = True,
+    ) -> datetime:
+        """
+        Parse date recorded from metadata.
+        Args:
+            metadata: Metadata dictionary extracted from the resource
+            fallback: Fallback to the last modified time if no valid date recorded found.
+        Returns:
+            Parsed date recorded as a naive datetime object in UTC timezone
+        Raises:
+            ValueError: If no valid date recorded found and no fallback provided
+        """
+        nodata_values = ["0000:00:00 00:00:00"]
+
+        def localize_datetime_dst(
+                dt: datetime, timezone: ZoneInfo, ignore_dst: bool = False
+        ) -> datetime:
+            """Convert naive datetime to a specific timezone optionally ignoring DST transitions.
+
+            Args:
+                dt: A naive or aware datetime object
+                timezone: The target timezone as a ZoneInfo object
+
+            Returns:
+                datetime: A timezone-aware datetime in the target timezone,
+                        using the standard (non-DST) offset
+            """
+            if not isinstance(timezone, ZoneInfo):
+                raise TypeError(f"timezone must be a ZoneInfo object, got {type(timezone)}")
+
+            if ignore_dst:
+                # Get the total UTC offset and DST offset
+                utc_offset = timezone.utcoffset(dt)
+                dst_offset = timezone.dst(dt)
+
+                if utc_offset is None or dst_offset is None:
+                    raise ValueError(f"Invalid timezone information for {timezone}")
+
+                # Calculate the standard offset by subtracting DST
+                standard_offset = utc_offset - dst_offset
+
+                # Attach the standard offset
+                dt = dt.replace(tzinfo=datetime_timezone(standard_offset))
+            else:
+                dt = dt.replace(tzinfo=timezone)
+
+            return dt
+
+        UTC = ZoneInfo("UTC")
+        # first try to get "DateTimeOriginal" and parse it
+        date_recorded = metadata.get("DateTimeOriginal")
+        if not date_recorded or date_recorded in nodata_values:
+            # if not found, try "CreateDate"
+            date_recorded = metadata.get("CreateDate")
+            if not date_recorded or date_recorded in nodata_values:
+                if fallback:
+                    date_recorded = metadata.get("FileModifyDate")
+                else:
+                    # can not find any date recorded tag
+                    raise ValueError(
+                        "No valid date recorded found in metadata and no fallback provided"
+                    )
+
+        # parse date_recorded to datetime
+        # Try multiple possible datetime formats
+        formats = [
+            "%Y:%m:%d %H:%M:%S",  # EXIF standard
+            "%Y:%m:%d %H:%M:%S%z",  # EXIF standard with timezone
+        ]
+        for fmt in formats:
+            try:
+                date_recorded = datetime.strptime(date_recorded, fmt)
+                break
+            except ValueError:
+                continue
+        else:
+            raise ValueError(f"Invalid date recorded format: {date_recorded}")
+
+        # If the datetime is naive (no timezone info), attach the specified timezone
+        if date_recorded.tzinfo is None:
+            date_recorded = localize_datetime_dst(
+                date_recorded, timezone=timezone, ignore_dst=ignore_dst
+            )
+
+        if convert_to_utc:
+            date_recorded = date_recorded.astimezone(UTC)
+
+        return date_recorded

@@ -9,12 +9,29 @@ from io import BytesIO
 from pathlib import Path
 
 from typing import List, Callable, Dict
+from zoneinfo import ZoneInfo
 
 from wildintel_tools.helpers import (
         get_trapper_locations
     )
 
 from PIL import Image
+
+
+METADATA_EXIF_TAGS = [
+    "DateTimeOriginal",
+    "CreateDate",
+    "FileModifyDate",
+    "MIMEType",
+    "ImageWidth",
+    "ImageHeight",
+    "ModifyDate",
+    "Duration",
+    "VideoFrameRate",
+    "Make",
+    "Model",
+]
+
 
 from wildintel_tools.reports import Report
 from wildintel_tools.resouceutils import ResourceExtensionDTO, ResourceUtils
@@ -468,6 +485,7 @@ def prepare_collections_for_trapper(
     xmp_info : dict = None,
     scale_images: bool = True,
     overwrite: bool = False,
+    create_depployment_table: bool = False,
 ) -> Report:
     """
     Prepare validated collections for upload them to Trapper. Each deployment's images are copied and flattened
@@ -524,16 +542,26 @@ def prepare_collections_for_trapper(
         """
         try:
             sha1_hash, _ = ResourceUtils.calculate_hash(img_path.read_bytes())
-            date_taken = None
+            #date_taken = None
             mime = ResourceUtils.get_mime_type(img_path.read_bytes())
-            exif = ResourceUtils.get_exif_from_bytes(img_path.read_bytes())
+            exif = ResourceUtils.get_exif_from_path(img_path, tags=METADATA_EXIF_TAGS)
+            #exif = ResourceUtils.get_exif_from_bytes(img_path.read_bytes())
 
-            date_str = exif.get("DateTimeOriginal") or exif.get("DateTime")
-            if date_str:
-                try:
-                    date_taken = datetime.strptime(date_str, "%Y:%m:%d %H:%M:%S")
-                except Exception:
-                    pass
+            print(exif)
+            date_taken : datetime = ResourceUtils.parse_date_recorded(exif,timezone=ZoneInfo("UTC"), fallback= True,
+                                                                     ignore_dst=True, convert_to_utc= True)
+
+            #print("La fecha es ")
+            #print(date_taken)
+
+            if not date_taken:
+                raise Exception(f"No valid date found in EXIF metadata {exif}")
+            #date_str = exif.get("DateTimeOriginal") or exif.get("DateTime")
+            #if date_str:
+            #    try:
+            #        date_taken = datetime.strptime(date_str, "%Y:%m:%d %H:%M:%S")
+            #    except Exception:
+            #        pass
 
             # Placeholder info
             make = exif.get("Make", "Unknown")
@@ -575,9 +603,9 @@ def prepare_collections_for_trapper(
             shutil.copy2(img_path, dest_path)
             ResourceUtils.add_xmp_metadata([dest_path], tags)
 
-            return True, None
+            return True, None, date_taken
         except Exception as e:
-            return False, f"{img_path}: {e}"
+            return False, f"{img_path}: {e}", None
 
     report = Report(f"Preparing collections {",".join(collections)} for Trapper")
 
@@ -593,6 +621,11 @@ def prepare_collections_for_trapper(
 
         if progress_callback:
             progress_callback(f"collection_start:{col}", len(all_deployments))
+
+        # Prepare CSV if requested
+        if create_depployment_table:
+            csv_file = trapper_col_path / f"{col}_deployments.csv"
+            csv_rows = []
 
         for deployment in all_deployments:
             dep_name = slugify(deployment.name)
@@ -617,25 +650,41 @@ def prepare_collections_for_trapper(
                 progress_callback(f"deployment_start:{col}:{dep_name}", len(image_files))
 
             copied_count = 0
+            deployment_dates = []
             futures = []
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 for idx, img_path in enumerate(image_files, start=1):
                     futures.append(executor.submit(process_file, col, dep_name, idx, img_path, trapper_deployment_path, scale_images))
 
                 for future in as_completed(futures):
-                    success, error_msg = future.result()
+                    success, error_msg, date_taken = future.result()
                     if success:
                         copied_count += 1
+                        if date_taken:
+                            deployment_dates.append(date_taken)
                     else:
                         report.add_error(dep_name, "copy error", error_msg)
                     if progress_callback:
                         progress_callback(f"file_progress:{col}:{dep_name}:{img_path}", 1)
+
+            # Save deployment info for CSV
+            if create_depployment_table and deployment_dates:
+                min_date = min(deployment_dates).strftime("%Y-%m-%dT%H:%M:%S%z")
+                max_date = max(deployment_dates).strftime("%Y-%m-%dT%H:%M:%S%z")
+                csv_rows.append([dep_name, min_date, max_date])
 
             if copied_count:
                 report.add_success(dep_name, "deployment exported")
 
             if progress_callback:
                 progress_callback(f"deployment_complete:{col}:{dep_name}", 1)
+
+        # Write CSV for the collection
+        if create_depployment_table and csv_rows:
+            with csv_file.open("w", newline="", encoding="utf-8") as f:
+                writer = csv.writer(f)
+                writer.writerow(["deploymentID", "deploymentStart", "deploymentEnd"])
+                writer.writerows(csv_rows)
 
     report.finish()
     return report
