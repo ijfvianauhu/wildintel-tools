@@ -6,10 +6,17 @@ Follow the steps below to correctly install **wildintel-tools** on a Windows sys
 
 ## 1. Download wildintel-tools for windows
 
-1. Visit the official [wildintel-tool website](https://github.com/ijfvianauhu/wildintel-tools)   
+1. Visit the official [wildintel-tool website](https://github.com/ijfvianauhu/wildintel-tools)
+![wildintel-tools homepage](img/wildintel-tools-homepage.png)
+
 2. Download the Windows version of wildintel-tools from the [releases section](https://github.com/ijfvianauhu/wildintel-tools/releases).
+
+![wildintel-tools releases](img/wildintel-tools-releases.png)
+
 3. In the Downloads folder, there should be a file with a name similar to wildintel-tools.exe. If it is not named exactly `wildintel-tools.exe`, rename it.
- 
+
+![wildintel-tools releases](img/download_folder_windows_exe.png)
+
 ---
 
 ## 2. Run wildintel-tools
@@ -35,7 +42,7 @@ Follow the steps below to correctly install **wildintel-tools** on a Windows sys
 ![Available configuration options](faq_install_windows_uv_13.png)
 
 > **Warning:** If you had a previous version of wildintel-tools installed, you may encounter an error when it tries to read the
-> old configuration files. If this happens, delete the configuration file located at `C:\Users\<your user>\AppData\Roaming\wildintel-tools`.”
+> old configuration files. If this happens, delete the configuration file located at `C:\Users\<your user>\AppData\Roaming\wildintel-tools`.
 
 2. Set the Trapper login (username):
 
@@ -125,7 +132,7 @@ the collection name followed by `_FileTimestampLog.csv`.
 
 ![Filetimestamp](faq_install_windows_uv_17.png)
 
-Following our example, as collection `R0033` has two deployments, the metadata file should contain two entries. 
+Following our example, as collection `R0033` has one deployments, the metadata file should contain only one entry. 
 
 ![Filetimestamp](faq_install_windows_uv_19.png)
 
