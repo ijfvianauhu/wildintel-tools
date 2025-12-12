@@ -7,7 +7,7 @@ import shutil
 from datetime import datetime, timedelta
 from io import BytesIO
 from pathlib import Path
-
+import logging
 from typing import List, Callable, Dict
 from zoneinfo import ZoneInfo
 
@@ -16,6 +16,7 @@ from wildintel_tools.helpers import (
     )
 
 from PIL import Image
+logger = logging.getLogger(__name__)
 
 
 METADATA_EXIF_TAGS = [
@@ -485,7 +486,11 @@ def prepare_collections_for_trapper(
     xmp_info : dict = None,
     scale_images: bool = True,
     overwrite: bool = False,
-    create_depployment_table: bool = False,
+    create_deployment_table: bool = True,
+    timezone: ZoneInfo = ZoneInfo("UTC"),
+    ignore_dst=True,
+    convert_to_utc= True
+
 ) -> Report:
     """
     Prepare validated collections for upload them to Trapper. Each deployment's images are copied and flattened
@@ -542,30 +547,17 @@ def prepare_collections_for_trapper(
         """
         try:
             sha1_hash, _ = ResourceUtils.calculate_hash(img_path.read_bytes())
-            #date_taken = None
             mime = ResourceUtils.get_mime_type(img_path.read_bytes())
             exif = ResourceUtils.get_exif_from_path(img_path, tags=METADATA_EXIF_TAGS)
-            #exif = ResourceUtils.get_exif_from_bytes(img_path.read_bytes())
 
-            print(exif)
-            date_taken : datetime = ResourceUtils.parse_date_recorded(exif,timezone=ZoneInfo("UTC"), fallback= True,
-                                                                     ignore_dst=True, convert_to_utc= True)
-
-            #print("La fecha es ")
-            #print(date_taken)
+            date_taken : datetime = ResourceUtils.parse_date_recorded(exif,timezone=timezone, fallback= True,
+                                                                     ignore_dst=ignore_dst, convert_to_utc= convert_to_utc)
 
             if not date_taken:
                 raise Exception(f"No valid date found in EXIF metadata {exif}")
-            #date_str = exif.get("DateTimeOriginal") or exif.get("DateTime")
-            #if date_str:
-            #    try:
-            #        date_taken = datetime.strptime(date_str, "%Y:%m:%d %H:%M:%S")
-            #    except Exception:
-            #        pass
 
             # Placeholder info
-            make = exif.get("Make", "Unknown")
-            model = exif.get("Model", "Unknown")
+            camera = ResourceUtils.get_camera_model(exif)
             rp_name =  xmp_info.get("rp_name", "Unknown")
             coverage =   xmp_info.get("coverage", "")
             publisher =   xmp_info.get("publisher", "Unknown")
@@ -580,7 +572,7 @@ def prepare_collections_for_trapper(
             new_hash, _ = ResourceUtils.calculate_hash(_pil_to_bytes(new_image))
 
             tags = {
-                "XMP-dc:Creator": f"CT ({make} {model} {rp_name})",
+                "XMP-dc:Creator": f"CT ({camera} {rp_name})",
                 "XMP-dc:Date": date_taken.isoformat() if date_taken else "",
                 "XMP-dc:Format": mime,
                 "XMP-dc:Identifier": f"WildINTEL:{new_hash}",
@@ -601,11 +593,11 @@ def prepare_collections_for_trapper(
             new_name = f"{dep_name}__{date_str_for_name}_{idx}{ext}".upper()
             dest_path = trapper_deployment_path / new_name
             shutil.copy2(img_path, dest_path)
-            ResourceUtils.add_xmp_metadata([dest_path], tags)
+            ResourceUtils.add_metadata([dest_path], tags)
 
-            return True, None, date_taken
+            return True, None, date_taken, camera
         except Exception as e:
-            return False, f"{img_path}: {e}", None
+            return False, f"{img_path}: {e}", None, None
 
     report = Report(f"Preparing collections {",".join(collections)} for Trapper")
 
@@ -623,7 +615,7 @@ def prepare_collections_for_trapper(
             progress_callback(f"collection_start:{col}", len(all_deployments))
 
         # Prepare CSV if requested
-        if create_depployment_table:
+        if create_deployment_table:
             csv_file = trapper_col_path / f"{col}_deployments.csv"
             csv_rows = []
 
@@ -652,26 +644,35 @@ def prepare_collections_for_trapper(
             copied_count = 0
             deployment_dates = []
             futures = []
+            cameras = []
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 for idx, img_path in enumerate(image_files, start=1):
                     futures.append(executor.submit(process_file, col, dep_name, idx, img_path, trapper_deployment_path, scale_images))
 
                 for future in as_completed(futures):
-                    success, error_msg, date_taken = future.result()
+                    success, error_msg, date_taken, camera = future.result()
                     if success:
                         copied_count += 1
                         if date_taken:
                             deployment_dates.append(date_taken)
+                        if camera:
+                            cameras.append(camera)
                     else:
                         report.add_error(dep_name, "copy error", error_msg)
                     if progress_callback:
                         progress_callback(f"file_progress:{col}:{dep_name}:{img_path}", 1)
 
             # Save deployment info for CSV
-            if create_depployment_table and deployment_dates:
+            if create_deployment_table and deployment_dates:
                 min_date = min(deployment_dates).strftime("%Y-%m-%dT%H:%M:%S%z")
                 max_date = max(deployment_dates).strftime("%Y-%m-%dT%H:%M:%S%z")
-                csv_rows.append([dep_name, min_date, max_date])
+
+                try:
+                    loc_id = dep_name.split("-", 1)[1]
+                except (ValueError, IndexError):
+                    loc_id = ""
+
+                csv_rows.append([dep_name, loc_id,min_date, max_date, cameras[0]])
 
             if copied_count:
                 report.add_success(dep_name, "deployment exported")
@@ -680,10 +681,10 @@ def prepare_collections_for_trapper(
                 progress_callback(f"deployment_complete:{col}:{dep_name}", 1)
 
         # Write CSV for the collection
-        if create_depployment_table and csv_rows:
+        if create_deployment_table and csv_rows:
             with csv_file.open("w", newline="", encoding="utf-8") as f:
                 writer = csv.writer(f)
-                writer.writerow(["deploymentID", "deploymentStart", "deploymentEnd"])
+                writer.writerow(["deploymentID", "locationID", "deploymentStart", "deploymentEnd", "cameraModel"])
                 writer.writerows(csv_rows)
 
     report.finish()

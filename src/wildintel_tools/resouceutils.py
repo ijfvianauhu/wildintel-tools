@@ -100,7 +100,7 @@ class ResourceUtils:
         """
         image = Image.open(io.BytesIO(image_bytes))
         exif_data = image.getexif()
-        print(exif_data)
+
         return {
             ExifTags.TAGS.get(tag_id, tag_id): value
             for tag_id, value in exif_data.items()
@@ -165,7 +165,7 @@ class ResourceUtils:
 
         try:
             # Build parameters
-            params = ["-n"]  # numeric values
+            params = ["-n", "-j"]  # numeric values
 
             if all_tags:
                 params.append("-a")  # allow duplicate tags
@@ -195,7 +195,29 @@ class ResourceUtils:
             raise Exception(f"Metadata extraction failed for {file_path}: {e}")
 
     @staticmethod
-    def add_metadata(image_bytes: bytes, resource) -> bytes:
+    def add_metadata(images: List[Path], xmp_info: dict) -> bytes:
+        """Adds metadata to an image file using ExifTool.
+
+        Args:
+            image_bytes: Original image in bytes format
+            resource: Resource object containing metadata to add
+
+        Returns:
+            New image bytes with added metadata
+        """
+
+        try:
+            # Escribir metadatos con ExifTool
+            with exiftool.ExifToolHelper() as et:
+                et.set_tags(images, tags=xmp_info, params=["-overwrite_original"])
+
+        except Exception as e:
+            raise e
+
+        return None
+
+    @staticmethod
+    def add_xmp_metadata(image_bytes: bytes, resource) -> bytes:
         """Adds metadata to an image file using ExifTool.
 
         Args:
@@ -295,15 +317,6 @@ class ResourceUtils:
         except Exception:
             return (True, None)
 
-    @staticmethod
-    # def validate_mime_type(image_bytes: bytes) -> tuple[bool, str]:
-    #    mime = magic.Magic(mime=True)
-    #    detected_type = mime.from_buffer(image_bytes)
-
-    # Verificar si el tipo detectado es permitido
-    #    if detected_type not in {mime.value for mime in ResourceMymeTypeDTO}:
-    #        return False, detected_type
-    #    return True, detected_type
 
     @staticmethod
     def validate_mime_type(image_bytes: bytes, valid_types: Enum = None) -> tuple[bool, str]:
@@ -357,8 +370,8 @@ class ResourceUtils:
     def get_camera_model(metadata: Dict[str, str]) -> str:
         """Get deployment camera model based on extracted metadata."""
         camera_model = ""
-        make = metadata.get("Make")
-        model = metadata.get("Model")
+        make = metadata.get("EXIF:Make")
+        model = metadata.get("EXIF:Model")
         if make:
             make = make.strip().lower()
             if not model:
@@ -428,13 +441,13 @@ class ResourceUtils:
 
         UTC = ZoneInfo("UTC")
         # first try to get "DateTimeOriginal" and parse it
-        date_recorded = metadata.get("DateTimeOriginal")
+        date_recorded = metadata.get("EXIF:DateTimeOriginal")
         if not date_recorded or date_recorded in nodata_values:
             # if not found, try "CreateDate"
-            date_recorded = metadata.get("CreateDate")
+            date_recorded = metadata.get("EXIF:CreateDate")
             if not date_recorded or date_recorded in nodata_values:
                 if fallback:
-                    date_recorded = metadata.get("FileModifyDate")
+                    date_recorded = metadata.get("EXIF:FileModifyDate")
                 else:
                     # can not find any date recorded tag
                     raise ValueError(

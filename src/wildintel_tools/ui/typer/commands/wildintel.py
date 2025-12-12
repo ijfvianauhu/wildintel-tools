@@ -26,6 +26,7 @@ _show_report(report, success_msg, error_msg, output)
 
 import json
 import tempfile
+from zoneinfo import ZoneInfo
 
 from dynaconf import Dynaconf
 from rich.progress import Progress, TextColumn, BarColumn, TimeElapsedColumn
@@ -61,6 +62,9 @@ override_mapping = {
     "user": ("GENERAL", "login"),
     "url": ("GENERAL", "host"),
     "password": ("GENERAL", "password"),
+    "timezone": ("WILDINTEL","timezone"),
+    "ignore_dst": ("WILDINTEL","ignore_dst"),
+    "convert_to_utc": ("WILDINTEL","convert_to_utc"),
 }
 
 
@@ -390,6 +394,11 @@ def prepare_for_trapper(
     rp_name: Annotated[str, typer.Option(help=_("Research project name"))] = None,
     scale: Annotated[bool, typer.Option(help=_("Scale resources"))] = True,
     overwrite: Annotated[bool, typer.Option(help=_("Overwrite existing deployments directories  in output path"))] = False,
+    timezone :  Annotated[  str, typer.Option( help=_("Timezone to use for timestamp normalization (default: 'UTC')") ) ] = "UTC",
+    ignore_dst: Annotated[ bool, typer.Option( help=_("Whether to ignore daylight saving time adjustments (default: True)") ) ] = True,
+    convert_to_utc: Annotated[ bool, typer.Option( help=_("Whether to convert all timestamps to UTC (default: True)") ) ] = True,
+    create_deployment_table: Annotated[ bool, typer.Option( help=_("Generate deployment table") )] = True,
+
     config: Annotated[
         Path, typer.Option(hidden=True, help=_("File to save the report"), callback=callback_with_override)
     ] = None,
@@ -499,6 +508,10 @@ def prepare_for_trapper(
                     xmp_info = xmp_info,
                     scale_images=scale,
                     overwrite=overwrite,
+                    timezone=ZoneInfo(timezone),
+                    ignore_dst=ignore_dst,
+                    convert_to_utc=convert_to_utc,
+                    create_deployment_table=create_deployment_table,
             )
 
         TyperUtils.success(_("Preparation for Trapper completed. Collections are available in {0}").format(output_path))
@@ -549,6 +562,10 @@ def pipeline(
 
     validate_locations: Annotated[bool, typer.Option(help=_("Check if locations are created in Trapper."))] = True,
     max_workers: Annotated[int, typer.Option(help=_("Number of parallel threads to use ."))] = 4,
+    timezone :  Annotated[  str, typer.Option( help=_("Timezone to use for timestamp normalization (default: 'UTC')") ) ] = "UTC",
+    ignore_dst: Annotated[ bool, typer.Option( help=_("Whether to ignore daylight saving time adjustments (default: True)") ) ] = True,
+    convert_to_utc: Annotated[ bool, typer.Option( help=_("Whether to convert all timestamps to UTC (default: True)") ) ] = True,
+    create_deployment_table: Annotated[ bool, typer.Option( help=_("Generate deployment table") )] = True,
 
     config: Annotated[
     Path,
@@ -578,8 +595,22 @@ def pipeline(
             config
     )
 
-    prepare_for_trapper(ctx,data_path, output_path, collections, report_file, deployments, extensions,owner,publisher, coverage,
-    rp_name, config)
+    prepare_for_trapper(ctx=ctx,
+                        data_path=data_path,
+                        output_path=output_path,
+                        collections=collections,
+                        report_file=report_file,
+                        deployments=deployments,
+                        extensions=extensions,
+                        owner=owner,
+                        publisher=publisher,
+                        coverage=coverage,
+                        rp_name=rp_name,
+                        timezone=timezone,
+                        ignore_dst=ignore_dst,
+                        convert_to_utc=convert_to_utc,
+                        create_deployment_table=create_deployment_table,
+                        config=config)
 
 def _show_report(report, success_msg="Validation completed successfully", error_msg ="There were errors during the validation", output = None):
     """

@@ -30,11 +30,12 @@ import subprocess
 from pathlib import Path
 from typing import List, Optional, Dict, Type, get_origin, Union, get_args, Any
 import tempfile
+from zoneinfo import ZoneInfo
 
 from dynaconf import Dynaconf
 from dynaconf import loaders
 from pydantic import BaseModel, Field, HttpUrl, EmailStr, FilePath, DirectoryPath, ValidationError, SecretStr, \
-    TypeAdapter
+    TypeAdapter, field_validator
 
 
 class LoggerSettings(BaseModel):
@@ -66,7 +67,19 @@ class WildIntelSettings(BaseModel):
     #resize_img_width: int
     #resize_img_height: int
     overwrite: bool
+    timezone: str | None = "UTC"
+    ignore_dst: bool | None = True
+    convert_to_utc: bool | None = True
+
     output_dir: DirectoryPath
+
+    @field_validator("timezone")
+    def validate_timezone(cls, v):
+        try:
+            ZoneInfo(v)
+        except Exception:
+            raise ValueError(f"Invalid timezone: {v}")
+        return v
 
 class EpiCollectSettings(BaseModel):
     client_id: int
