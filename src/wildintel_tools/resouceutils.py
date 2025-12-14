@@ -369,7 +369,7 @@ class ResourceUtils:
     @staticmethod
     def get_camera_model(metadata: Dict[str, str]) -> str:
         """Get deployment camera model based on extracted metadata."""
-        camera_model = ""
+        camera_model = "(unknown) (unknown)"
         make = metadata.get("EXIF:Make")
         model = metadata.get("EXIF:Model")
         if make:
