@@ -70,7 +70,8 @@ class WildIntelSettings(BaseModel):
     timezone: str | None = "UTC"
     ignore_dst: bool | None = True
     convert_to_utc: bool | None = True
-
+    remove_zip: bool | None = True
+    trigger: bool | None = True
     output_dir: DirectoryPath
 
     @field_validator("timezone")

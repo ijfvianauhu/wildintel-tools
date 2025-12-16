@@ -57,6 +57,20 @@ class ResourceEntityDTO():
 
 
 class ResourceUtils:
+    METADATA_EXIF_TAGS = [
+        "DateTimeOriginal",
+        "CreateDate",
+        "FileModifyDate",
+        "MIMEType",
+        "ImageWidth",
+        "ImageHeight",
+        "ModifyDate",
+        "Duration",
+        "VideoFrameRate",
+        "Make",
+        "Model",
+    ]
+
     @staticmethod
     def calculate_hash(content: bytes) -> tuple[str, str]:
         """Calculates the SHA-1 hash of the given content and returns the hash and its path.

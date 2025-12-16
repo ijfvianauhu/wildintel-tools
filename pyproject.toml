@@ -19,6 +19,10 @@ dependencies = [
     "pydantic[email]>=2.12.4",
     "docutils-stubs==0.0.22",
     "types-docutils==0.22.3.20251115",
+    "aiofiles>=25.1.0",
+    "httpx>=0.28.1",
+    "blake3>=1.0.8",
+    "tqdm>=4.67.1",
 ]
 
 [dependency-groups]

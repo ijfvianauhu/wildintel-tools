@@ -2,20 +2,27 @@ import csv
 import hashlib
 import re
 import unicodedata
+from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import shutil
 from datetime import datetime, timedelta
 from io import BytesIO
 from pathlib import Path
 import logging
-from typing import List, Callable, Dict
+from typing import List, Callable, Dict, Iterable
 from zoneinfo import ZoneInfo
+
+from trapper_client.TrapperClient import TrapperClient
 
 from wildintel_tools.helpers import (
         get_trapper_locations
     )
 
 from PIL import Image
+
+from wildintel_tools.http_uploader import HTTPUploader
+from wildintel_tools.trapper_package import DataPackageGeneratorParallel
+
 logger = logging.getLogger(__name__)
 
 
@@ -689,3 +696,145 @@ def prepare_collections_for_trapper(
 
     report.finish()
     return report
+
+def create_trapper_package(
+    data_path: Path,
+    output_path: Path,
+    collections: List[str],
+    deployments: List[str],
+    extensions: List[ResourceExtensionDTO],
+    project_id: int,
+    overwrite: bool,
+    timezone: str = "UTC",
+    ignore_dst: bool = True,
+    max_workers: int = 4,
+    max_zip_size: int = 500,
+    progress_callback: Callable[[str, int], None] = None,
+):
+    dpg = DataPackageGeneratorParallel(
+        data_path=output_path,
+        project_id=project_id,
+        timezone=timezone,
+        output_path=None,
+        collections=collections,
+        timezone_ignore_dst=ignore_dst,
+        image_ext=extensions,
+        video_ext=None,
+        package_name=None,
+        max_workers=max_workers,
+        max_zip_size=max_zip_size * 1024 * 1024,
+    )
+    # report = dpg.run(max_workers = 4, progress_callback=on_progress)
+    return  dpg.run(progress_callback)
+
+async def upload_trapper_package(
+    output_path: Path,
+    collections: list[str],
+    deployments: list[str],
+    trapper_client: TrapperClient,
+    trigger: bool = True,
+    remove_zip: bool = True,
+    progress_callback: Callable[[str, int], None] = None,
+) -> Report:
+    logger.debug("Uploading collections %s to Trapper", ','.join([c for c in collections]))
+    report = Report(f"Uploading collections {','.join([c for c in collections])} to Trapper")
+
+    def _notify(event: str, count: int):
+        if progress_callback:
+            progress_callback(event, count)
+
+    uploader: HTTPUploader = trapper_client.uploaders
+    await uploader._login()
+
+    for col in collections:
+        col_path = output_path / col
+
+        pairs = _collect_package_pairs(
+            col_path,
+            deployments=deployments,
+        )
+        print(type(col))
+        print(col)
+        _notify(f"collection_start:{str(col)}", len(pairs))
+
+        for dep_name, file_yaml, file_zip in pairs:
+            total_bytes = file_yaml.stat().st_size + file_zip.stat().st_size
+
+            _notify(f"deployment_start:{col}:{dep_name}",total_bytes)
+
+            def uploader_progress_adapter(event: str, info: dict):
+                if event == "chunk_progress":
+                    _notify(
+                        f"file_progress:{col}:{dep_name}",
+                        info["bytes"],
+                    )
+
+            uploader.progress_callback = uploader_progress_adapter
+
+            try:
+                await uploader.upload_file(
+                    file_zip, f"/collections/{file_zip.name}"
+                )
+                await uploader.upload_file(
+                    file_yaml, f"/collections/{file_yaml.name}"
+                )
+
+                report.add_success(f"{col}:{dep_name}", "deployment uploaded")
+
+                if trigger:
+                    payload = {
+                        "yaml_file": file_yaml.name,
+                        "zip_file": file_zip.name,
+                        "remove_zip": remove_zip,
+                    }
+                    trapper_client.collections.trigger_collection(
+                        payload=payload,
+                        raise_on_error=True,
+                    )
+
+            except Exception as e:
+                report.add_error(f"{col}:{dep_name}", "upload failed", str(e))
+
+            finally:
+                _notify(f"deployment_complete:{col}:{dep_name}", 1)
+
+    report.finish()
+    return report
+
+def _collect_package_pairs(
+    collection_dir: Path,
+    deployments: Iterable[str] | None = None,
+) -> list[tuple[str, Path, Path]]:
+    """
+    Returns a list of (deployment_name, yaml_path, zip_path)
+    """
+    groups = defaultdict(dict)
+
+    for f in collection_dir.iterdir():
+        if f.suffix not in {".yaml", ".zip"}:
+            continue
+
+        # package_123_20251215002603_R0001_r0001-wicp_0001_part001.yaml
+        stem = f.stem  # without extension
+        parts = stem.split("_")
+
+        if len(parts) < 6:
+            continue  # not a valid package name
+
+        # deployment is always just before 'partXXX'
+        deployment = parts[-2]
+
+        if deployments and deployment not in deployments:
+            continue
+
+        part = parts[-1]  # part001
+
+        key = (deployment, part)
+        groups[key][f.suffix] = f
+
+    results = []
+    for (deployment, _), files in groups.items():
+        if ".yaml" in files and ".zip" in files:
+            results.append((deployment, files[".yaml"], files[".zip"]))
+
+    return results

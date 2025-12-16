@@ -23,22 +23,27 @@ prepare_for_trapper(...)
 _show_report(report, success_msg, error_msg, output)
     Render and persist a report in YAML format.
 """
-
+import asyncio
 import json
 import tempfile
+from collections import defaultdict
 from zoneinfo import ZoneInfo
 
 from dynaconf import Dynaconf
 from rich.progress import Progress, TextColumn, BarColumn, TimeElapsedColumn
+from trapper_client.TrapperClient import TrapperClient
 from typer_config import conf_callback_factory
 import logging
+
+from wildintel_tools.http_uploader import HTTPUploader
 from wildintel_tools.resouceutils import ResourceExtensionDTO
+from wildintel_tools.trapper_package import DataPackageGeneratorParallel
 from wildintel_tools.ui.typer.i18n import _
 from wildintel_tools.ui.typer.TyperUtils import TyperUtils, HierarchicalProgress
 import wildintel_tools.wildintel as wildintel_processing
 from typing_extensions import Annotated
 from pathlib import Path
-from typing import List, Any
+from typing import List, Any, Iterable
 
 import typer
 
@@ -519,6 +524,197 @@ def prepare_for_trapper(
     except Exception as e:
         TyperUtils.error(_("An error occurred during preparing collections fot trapper: {0}").format(str(e)))
 app.command(name="pt", hidden=True, help=_("Alias for prepare_for_trapper")) (prepare_for_trapper)
+
+@app.command(
+    help=_("Generate trapper package."),
+    short_help=_("Generate trapper package. (alias: ctp)"))
+def create_trapper_package(
+    ctx: typer.Context,
+    data_path: Annotated[
+        Path, typer.Option(help=_("Root data path"), exists=True, file_okay=False, dir_okay=True)
+    ] = None,
+    output_path: Annotated[
+        Path, typer.Option(help=_("Root output path"), exists=True, file_okay=False, dir_okay=True)
+    ] = None,
+    collections: Annotated[
+        List[str], typer.Argument(help=_("Collections to process (sub-dirs in root data path)"))
+    ] = None,
+    report_file: Annotated[Path, typer.Option(help=_("File to save the report"))] = None,
+    deployments: Annotated[
+        List[str], typer.Option(help=_("Deployments to process (sub-dirs in collections path)"))
+    ] = None,
+    extensions: Annotated[List[ResourceExtensionDTO], typer.Option(help=_("File extension to process"))] = None,
+    project_id: Annotated[int, typer.Option(help=_("Classification project id"))] = None,
+    overwrite: Annotated[
+        bool, typer.Option(help=_("Overwrite existing deployments directories  in output path"))
+    ] = False,
+    timezone: Annotated[
+        str, typer.Option(help=_("Timezone to use for timestamp normalization (default: 'UTC')"))
+    ] = "UTC",
+    ignore_dst: Annotated[
+        bool, typer.Option(help=_("Whether to ignore daylight saving time adjustments (default: True)"))
+    ] = True,
+
+    max_workers: Annotated[int, typer.Option(help=_("Number of parallel threads to use ."))] = 4,
+    max_zip_size: Annotated[int, typer.Option(help=_("Maximum size (in MB) for each zip file."))] = 500,
+
+    config: Annotated[
+        Path, typer.Option(hidden=True, help=_("File to save the report"), callback=callback_with_override)
+    ] = None,
+):
+    """
+    Prepare collections for ingestion into Trapper.
+
+    Verifies and normalizes collection and deployment structure, writes XMP
+    metadata when required, and exports prepared artifacts into ``output_path``.
+    Progress is reported via a callback.
+
+    :param ctx: Typer context (expects ``settings`` and ``logger`` in ``ctx.obj``).
+    :type ctx: typer.Context
+    :param data_path: Root directory that contains collections (must exist).
+    :type data_path: pathlib.Path
+    :param output_path: Destination directory for prepared outputs (must exist).
+    :type output_path: pathlib.Path
+    :param collections: Optional list of collections to process.
+    :type collections: list[str] | None
+    :param report_file: Path to write the preparation report (YAML).
+    :type report_file: pathlib.Path | None
+    :param deployments: Optional list of deployment names to process.
+    :type deployments: list[str] | None
+    :param extensions: Optional list of file extensions to include.
+    :type extensions: list[ResourceExtensionDTO] | None
+    :param owner: Resource owner metadata to embed.
+    :type owner: str | None
+    :param publisher: Resource publisher metadata to embed.
+    :type publisher: str | None
+    :param coverage: Coverage metadata to embed.
+    :type coverage: str | None
+    :param rp_name: Research project name metadata to embed.
+    :type rp_name: str | None
+    :param scale: Whether to scale resources during preparation.
+    :type scale: bool
+    :param overwrite: Whether to overwrite existing output directories.
+    :type overwrite: bool
+    :param config: Internal option supplied by Typer config callback.
+    :type config: pathlib.Path | None
+    :raises typer.BadParameter: If ``data_path`` or ``output_path`` are missing or invalid.
+    :returns: None
+    """
+    settings = ctx.obj.get("settings", {})
+    logger = ctx.obj.get("logger", logging.getLogger(__name__))
+
+    if data_path is None or not data_path.exists() or not data_path.is_dir():
+        raise typer.BadParameter(_(f"'--data_path' is not a valid directory or does not exist."))
+    if output_path is None or not output_path.exists() or not output_path.is_dir():
+        raise typer.BadParameter(_(f"'--output_path' is not a valid directory or does not exist."))
+
+    TyperUtils.debug(f"Creating trapper package with parameters: {output_path} {data_path} {collections} {extensions} {project_id} {timezone} {ignore_dst}")
+
+    try:
+        TyperUtils.info(_(f"Creating packages with collections \"{",".join(collections) if collections else "All"}\" in {output_path} for Trapper into {output_path}"))
+        import wildintel_tools.ui.typer.wildintel
+
+        report = wildintel_tools.ui.typer.wildintel.create_trapper_package(
+            data_path = data_path,
+            output_path = output_path,
+            collections = collections,
+            extensions = extensions,
+            project_id = project_id,
+            timezone = timezone,
+            ignore_dst = ignore_dst,
+            max_workers= max_workers,
+            max_zip_size = max_zip_size,
+            deployments = deployments,
+            overwrite = overwrite,
+        )
+
+        TyperUtils.success(_("Trapper packages creation completed. Packages are available in {0}").format(output_path))
+        _show_report(report, output=report_file)
+    except Exception as e:
+        TyperUtils.error(_("An error occurred during Trapper package creation: {0}").format(str(e)))
+app.command(name="ctp", hidden=True, help=_("Alias for create_trapper_package")) (create_trapper_package)
+
+@app.command(
+    help=_("Generate trapper package. (alias: utp)"),
+    short_help=_("Generate trapper package. (alias: utp)"))
+def upload_trapper_package(
+    ctx: typer.Context,
+    output_path: Annotated[
+        Path, typer.Option(help=_("Root output path"), exists=True, file_okay=False, dir_okay=True)
+    ] = None,
+    collections: Annotated[
+        List[str], typer.Argument(help=_("Collections to process (sub-dirs in root data path)"))
+    ] = None,
+    report_file: Annotated[Path, typer.Option(help=_("File to save the report"))] = None,
+    deployments: Annotated[
+        List[str], typer.Option(help=_("Deployments to process (sub-dirs in collections path)"))
+    ] = None,
+
+    url: str = typer.Option(
+        None,
+        help=_("Base URL of the Trapper server (e.g., https://trapper.example.org)"),
+    ),
+    user: str = typer.Option(
+        None,
+        help=_("Username to authenticate with the Trapper server")
+    ),
+    password: str = typer.Option(
+        None,
+        "--password",
+        "-p",
+        help=_("Password for the specified user (use only if no access token is provided)")
+    ),
+    token: str = typer.Option(
+        None,
+        "--token",
+        "-t",
+        help=_("Access token for the Trapper API (alternative to using a password)"),
+    ),
+
+    trigger: bool = typer.Option(
+        True,
+        help=_("Whether to trigger collection processing after upload")),
+
+    remove_zip: bool = typer.Option(
+        True,
+        help=_("Whether to remove the uploaded zip file after processing")),
+
+    config: Annotated[
+        Path, typer.Option(hidden=True, help=_("File to save the report"), callback=callback_with_override)
+    ] = None,
+):
+    settings = ctx.obj.get("settings", {})
+    logger = ctx.obj.get("logger", logging.getLogger(__name__))
+
+    if output_path is None or not output_path.exists() or not output_path.is_dir():
+        raise typer.BadParameter(_(f"'--output_path' is not a valid directory or does not exist."))
+    if collections is None:
+        collections = [ col.name for col in output_path.iterdir() if col.is_dir() ]
+
+    TyperUtils.debug(f"Uploading trapper package with parameters: {output_path}  {collections} ")
+
+    try:
+        TyperUtils.info(_(f"Uploading packages for collections {",".join(collections)} to Trapper"))
+
+        trapper_client = TrapperClient(
+            base_url=url, user_name=user, user_password=password, access_token=None
+        )
+        import wildintel_tools.ui.typer.wildintel
+        report = wildintel_tools.ui.typer.wildintel.upload_trapper_package(
+            trapper_client=trapper_client,
+            output_path=output_path,
+            collections=collections,
+            deployments=deployments,
+            trigger=trigger,
+            remove_zip=remove_zip,
+        )
+
+        TyperUtils.success(_(f"Uploading packages to Trapper completed. Collections are available in {url}/storage/collection/list/"))
+        _show_report(report, output=report_file)
+    except Exception as e:
+        TyperUtils.error(_("An error occurred during uploading collections fot trapper: {0}").format(str(e)))
+app.command(name="utp", hidden=True, help=_("Alias for upload_trapper_package")) (upload_trapper_package)
+
 
 @app.command(
     help=_("Run a pipeline of check collections, check deployments, and prepare for trapper steps."),

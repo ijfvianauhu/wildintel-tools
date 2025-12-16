@@ -100,6 +100,13 @@ def test_connection(ctx: typer.Context,
                         help=_("Access token for the Trapper API (alternative to using a password)"),
                     ),
 
+                    project_id : Annotated[
+                        int,
+                        typer.Option(
+                            help=_("Classification project ID to test the connection against")
+                        )
+                    ] = None,
+
                     config: Annotated[
                         Path,
                         typer.Option(
@@ -132,8 +139,8 @@ def test_connection(ctx: typer.Context,
     settings = ctx.obj.get("settings", {})
 
     try:
-        TyperUtils.info(_(f"Testing Trapper API connection {url} {user}..."))
-        check_trapper_connection(url, user, password, None)
+        TyperUtils.info(_(f"Testing Trapper API connection {url} {user} {project_id}..."))
+        check_trapper_connection(url, user, password, None, project_id)
         TyperUtils.success(_("Trapper API connection successful!"))
     except Exception as e:
         TyperUtils.fatal(_(f"Failed to connect to Trapper API. Check your settings: {str(e)}"))

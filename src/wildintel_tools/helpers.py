@@ -35,10 +35,12 @@ Example:
         )
         print(projects)
 """
-
+import asyncio
 import logging
 import subprocess
 from trapper_client.TrapperClient import TrapperClient
+
+from wildintel_tools.http_uploader import HTTPUploader
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +90,8 @@ def check_exiftool(exiftool_path: str):
         logger.warning(f"exiftool not available: {e}")
         raise e
 
-def check_trapper_connection(base_url:str, user_name:str, user_password: str, access_token: str):
+def check_trapper_connection(base_url:str, user_name:str, user_password: str, access_token: str,
+                             classification_project_id: int = None):
     """
     Verifies the connection to the Trapper API using the provided credentials.
 
@@ -113,6 +116,12 @@ def check_trapper_connection(base_url:str, user_name:str, user_password: str, ac
         )
 
         trapper_client.classification_projects.get_all()
+        uploader : HTTPUploader = trapper_client.uploaders
+
+        asyncio.run(uploader._login())
+
+        trapper_client.classification_projects.get_by_id(classification_project_id)
+
     except Exception as e:
         msg = f"Failed to connect to Trapper API. Check your settings: {str(e)}"
         logger.error(msg)
