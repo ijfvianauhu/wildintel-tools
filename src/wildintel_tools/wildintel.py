@@ -753,8 +753,6 @@ async def upload_trapper_package(
             col_path,
             deployments=deployments,
         )
-        print(type(col))
-        print(col)
         _notify(f"collection_start:{str(col)}", len(pairs))
 
         for dep_name, file_yaml, file_zip in pairs:
@@ -781,25 +779,35 @@ async def upload_trapper_package(
 
                 report.add_success(f"{col}:{dep_name}", "deployment uploaded")
 
-                if trigger:
-                    payload = {
-                        "yaml_file": file_yaml.name,
-                        "zip_file": file_zip.name,
-                        "remove_zip": remove_zip,
-                    }
-                    trapper_client.collections.trigger_collection(
-                        payload=payload,
-                        raise_on_error=True,
-                    )
+                try:
+                    if trigger:
+                        payload = {
+                            "yaml_file": file_yaml.name,
+                            "zip_file": file_zip.name,
+                            "remove_zip": remove_zip,
+                        }
+                        trapper_client.collections.trigger_collection(
+                            payload=payload,
+                            raise_on_error=True,
+                        )
+
+                        report.add_success(f"{col}:{dep_name}", "process package")
+
+                except Exception as e:
+                    report.add_error(f"{col}:{dep_name}", "process package", str(e))
 
             except Exception as e:
-                report.add_error(f"{col}:{dep_name}", "upload failed", str(e))
+                report.add_error(f"{col}:{dep_name}", "deployment uploaded", str(e))
 
             finally:
                 _notify(f"deployment_complete:{col}:{dep_name}", 1)
 
     report.finish()
     return report
+
+from collections import defaultdict
+from pathlib import Path
+from typing import Iterable
 
 def _collect_package_pairs(
     collection_dir: Path,
@@ -814,20 +822,27 @@ def _collect_package_pairs(
         if f.suffix not in {".yaml", ".zip"}:
             continue
 
-        # package_123_20251215002603_R0001_r0001-wicp_0001_part001.yaml
         stem = f.stem  # without extension
-        parts = stem.split("_")
 
-        if len(parts) < 6:
-            continue  # not a valid package name
+        # Must end with _partXXX
+        if "_part" not in stem:
+            continue
 
-        # deployment is always just before 'partXXX'
-        deployment = parts[-2]
+        # Split only once from the right
+        base, part = stem.rsplit("_part", 1)
+
+        # base example:
+        # package_123_20251215002603_R0001_r0001-wicp_0001
+        parts = base.split("_", 4)
+
+        if len(parts) < 5:
+            continue  # invalid format
+
+        # Everything after the 4th "_" is the deployment
+        deployment = parts[4]
 
         if deployments and deployment not in deployments:
             continue
-
-        part = parts[-1]  # part001
 
         key = (deployment, part)
         groups[key][f.suffix] = f

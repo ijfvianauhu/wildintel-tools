@@ -376,7 +376,7 @@ app.command(name="cd", hidden=True, help=_("Alias for check_deployments")) (chec
 
 @app.command(
     help=_("Validate the internal structure of a collection by checking that all its deployments are correctly named, contain the expected files, and match their associated metadata. The validation also ensures that deployment folders correspond to the entries defined in the collection's CSV log and that image timestamps fall within the expected date ranges."),
-    short_help=_("Validate the integrity and metadata of deployments in a collection."))
+    short_help=_("Validate the integrity and metadata of deployments in a collection.") + " (alias: pt)")
 def prepare_for_trapper(
     ctx: typer.Context,
     data_path: Annotated[
@@ -520,6 +520,8 @@ def prepare_for_trapper(
             )
 
         TyperUtils.success(_("Preparation for Trapper completed. Collections are available in {0}").format(output_path))
+        url = f"{str(settings.GENERAL.host)}geomap/deployment/import/"
+        TyperUtils.info(_(f"Before continuing, import the deployments table file that was created per collection into {url}."))
         _show_report(report, output=report_file)
     except Exception as e:
         TyperUtils.error(_("An error occurred during preparing collections fot trapper: {0}").format(str(e)))
@@ -553,7 +555,7 @@ def create_trapper_package(
     ] = "UTC",
     ignore_dst: Annotated[
         bool, typer.Option(help=_("Whether to ignore daylight saving time adjustments (default: True)"))
-    ] = True,
+    ] = False,
 
     max_workers: Annotated[int, typer.Option(help=_("Number of parallel threads to use ."))] = 4,
     max_zip_size: Annotated[int, typer.Option(help=_("Maximum size (in MB) for each zip file."))] = 500,
@@ -709,7 +711,7 @@ def upload_trapper_package(
             remove_zip=remove_zip,
         )
 
-        TyperUtils.success(_(f"Uploading packages to Trapper completed. Collections are available in {url}/storage/collection/list/"))
+        TyperUtils.success(_(f"Uploading packages to Trapper completed. Collections are available in {url}storage/collection/list/"))
         _show_report(report, output=report_file)
     except Exception as e:
         TyperUtils.error(_("An error occurred during uploading collections fot trapper: {0}").format(str(e)))
@@ -834,8 +836,8 @@ def _show_report(report, success_msg="Validation completed successfully", error_
         TyperUtils.debug(f"No output file specified. Using temporary file: {output}")
     if report.get_status() == "success":
         TyperUtils.success(_(f"{success_msg}. Review the report for details {output}."))
-        TyperUtils.console.print(report.summary())
     else:
-        TyperUtils.error(_(f"{error_msg}. Please check the report {output}."))
+        TyperUtils.console.print(report.summary())
+        TyperUtils.error(_(f"{error_msg}. Review the report for details {output}."))
 
     report.to_yaml(output)

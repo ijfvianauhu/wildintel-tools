@@ -68,7 +68,7 @@ class WildIntelSettings(BaseModel):
     #resize_img_height: int
     overwrite: bool
     timezone: str | None = "UTC"
-    ignore_dst: bool | None = True
+    ignore_dst: bool | None = False
     convert_to_utc: bool | None = True
     remove_zip: bool | None = True
     trigger: bool | None = True
@@ -623,11 +623,11 @@ class SettingsManager:
                 if args:
                     elem = args[0]
                     if isinstance(elem, type) and issubclass(elem, BaseModel) and isinstance(value, list):
-                        converted[name] = [construct_recursive(elem, v) if isinstance(v, dict) else v for v in value]
+                        converted[name] = [SettingsManager._construct_recursive(elem, v) if isinstance(v, dict) else v for v in value]
                         continue
 
             if sub and isinstance(value, dict):
-                converted[name] = construct_recursive(sub, value)
+                converted[name] = SettingsManager._construct_recursive(sub, value)
             else:
                 converted[name] = value
 
