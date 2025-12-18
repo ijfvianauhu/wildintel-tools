@@ -775,11 +775,11 @@ def pipeline(
     ] = None,
 ):
     check_collections(ctx, collections,data_path, report_file, url, user,
-            password,
-            token,
-            validate_locations,
-            max_workers,
-            config)
+                password,
+                token,
+                validate_locations,
+                max_workers,
+                config)
 
     check_deployments(
             ctx,
