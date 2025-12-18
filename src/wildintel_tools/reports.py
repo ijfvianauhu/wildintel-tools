@@ -258,3 +258,24 @@ class Report:
                 f.write(yaml_str)
 
         return yaml_str
+
+    def extend(self, other: "Report") -> None:
+        """
+        Fusiona en el informe actual los resultados de otro informe.
+
+        :param other: Reporte cuyos registros se agregarán al actual.
+        :raises TypeError: Si ``other`` no es una instancia de ``Report``.
+        """
+        if not isinstance(other, Report):
+            raise TypeError("other must be an instance of Report")
+
+        for attr in ("errors", "successes"):
+            target = getattr(self, attr)
+            source = getattr(other, attr)
+            for identifier, entries in source.items():
+                target.setdefault(identifier, []).extend(entries)
+
+        if other.start_time and other.start_time < self.start_time:
+            self.start_time = other.start_time
+        if other.end_time and (self.end_time is None or other.end_time > self.end_time):
+            self.end_time = other.end_time

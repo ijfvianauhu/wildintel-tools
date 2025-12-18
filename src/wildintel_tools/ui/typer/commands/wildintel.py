@@ -190,63 +190,20 @@ def check_collections(
     TyperUtils.info(_(f"Checking collections in {data_path}"))
 
     try:
+        import wildintel_tools.ui.typer.wildintel
 
-        with Progress(
-            TextColumn("[bold blue]{task.description}"),
-            BarColumn(),
-            "[progress.percentage]{task.percentage:>3.0f}%",
-            TimeElapsedColumn(),
-        ) as progress:
-            collection_tasks = {}
-
-            # Callback que la función llamará
-            def on_progress(event: str, count: int):
-                """
-                Progress callback used to render nested progress bars.
-
-                The event string indicates the stage:
-                ``collection_start:<COLLECTION>``, ``deployment_start:<COLLECTION>:<DEPLOYMENT>:<TOTAL>``,
-                ``file_progress:<COLLECTION>:<DEPLOYMENT>``.
-
-                :param event: Event identifier with context tokens.
-                :type event: str
-                :param count: Amount of progress to advance.
-                :type count: int
-                :returns: None
-                """
-                nonlocal collection_tasks
-                if event.startswith("collection_start:"):
-                    _, col_name = event.split(":", 1)
-                    collection_tasks[col_name] = {
-                        "task_collection": progress.add_task(f"Collection {col_name}", total=count),
-                        "deployments": {}
-                    }
-                elif event.startswith("deployment_start:"):
-                    _, col_name, dep_name = event.split(":", 2)
-                    collection_tasks[col_name]["deployments"][dep_name] = progress.add_task(
-                        f"  Deployment {dep_name}", total=count
-                    )
-                elif event.startswith("file_progress:"):
-                    _, col_name, dep_name, filename = event.split(":", 3)
-                    task_dep = collection_tasks[col_name]["deployments"][dep_name]
-                    progress.advance(task_dep, count)
-                    progress.advance(collection_tasks[col_name]["task_collection"], count)
-                elif event.startswith("deployment_complete:"):
-                    _,col_name, dep_name = event.split(":", 2)
-                    progress.advance(collection_tasks[col_name]["task_collection"], 1)
-
-            report = wildintel_processing.check_collections(
-                    data_path=Path(data_path),
-                    collections=collections,
-                    url = url,
-                    user = user,
-                    password = password,
-                    validate_locations = validate_locations,
-                    max_workers=max_workers,
-                    progress_callback=on_progress,
-            )
+        report = wildintel_tools.ui.typer.wildintel.check_collections(
+                data_path=Path(data_path),
+                collections=collections,
+                url = url,
+                user = user,
+                password = password,
+                validate_locations = validate_locations,
+                max_workers=max_workers
+        )
 
         _show_report(report, output=report_file)
+
     except Exception as e:
         TyperUtils.error(_("An error occurred during collection checking: {0}").format(str(e)))
 
@@ -318,60 +275,22 @@ def check_deployments(
     TyperUtils.info(_(f"Checking deployments in {data_path} using tolerance hours {tolerance_hours}"))
 
     try:
-        with Progress(
-            TextColumn("[bold blue]{task.description}"),
-            BarColumn(),
-            "[progress.percentage]{task.percentage:>3.0f}%",
-            TimeElapsedColumn(),
-        ) as progress:
+        import wildintel_tools.ui.typer.wildintel
 
-            # Mapa para almacenar tareas de colecciones y deployments
-            collection_tasks = {}
+        report = wildintel_tools.ui.typer.wildintel.check_deployments(
+            data_path=Path(data_path),
+            collections=collections,
+            deployments=deployments,
+            extensions=extensions,
+            tolerance_hours=tolerance_hours,
+            max_workers=max_workers,
+        )
 
-            # Callback que la función llamará
-            def on_progress(event: str, count: int):
-                """
-                Progress callback used to render nested progress bars.
-
-                Event forms:
-                ``collection_start:<COLLECTION>``, ``deployment_start:<COLLECTION>:<DEPLOYMENT>:<TOTAL>``,
-                ``file_progress:<COLLECTION>:<DEPLOYMENT>``, ``deployment_complete:<COLLECTION>:<DEPLOYMENT>``.
-                """
-                nonlocal collection_tasks
-                if event.startswith("collection_start:"):
-                    _, col_name = event.split(":", 1)
-                    if col_name not in collection_tasks:
-                        collection_tasks[col_name] = {
-                            "task_collection": progress.add_task(f"Collection {col_name}", total=count),
-                            "deployments": {}
-                        }
-                elif event.startswith("deployment_start:"):
-                    _, col_name, dep_name  = event.split(":", 2)
-                    collection_tasks[col_name]["deployments"][dep_name] = progress.add_task(
-                        f"  Deployment {dep_name}", total=count
-                    )
-                elif event.startswith("file_progress:"):
-                    _, col_name, dep_name, file_name = event.split(":", 3)
-                    task_dep = collection_tasks[col_name]["deployments"][dep_name]
-                    progress.advance(task_dep, count)
-                elif event.startswith("deployment_complete:"):
-                    _, col_name, dep_name = event.split(":",2)
-                    progress.advance(collection_tasks[col_name]["task_collection"], 1)
-
-            report = wildintel_processing.check_deployments(
-                    data_path=Path(data_path),
-                    collections=collections,
-                    extensions=extensions,
-                    progress_callback=on_progress,
-                    max_workers=max_workers,
-                    tolerance_hours=tolerance_hours,
-                    deployments=deployments
-            )
         _show_report(report, output=report_file)
 
     except Exception as e:
-        raise e
         TyperUtils.error(_("An error occurred during deployment checking: {0}").format(str(e)))
+
 app.command(name="cd", hidden=True, help=_("Alias for check_deployments")) (check_deployments)
 
 @app.command(
@@ -403,8 +322,9 @@ def prepare_for_trapper(
     ignore_dst: Annotated[ bool, typer.Option( help=_("Whether to ignore daylight saving time adjustments (default: True)") ) ] = True,
     convert_to_utc: Annotated[ bool, typer.Option( help=_("Whether to convert all timestamps to UTC (default: True)") ) ] = True,
     create_deployment_table: Annotated[ bool, typer.Option( help=_("Generate deployment table") )] = True,
+    max_workers: Annotated[int, typer.Option(help=_("Number of parallel threads to use ."))] = 4,
 
-    config: Annotated[
+        config: Annotated[
         Path, typer.Option(hidden=True, help=_("File to save the report"), callback=callback_with_override)
     ] = None,
 ):
@@ -464,67 +384,30 @@ def prepare_for_trapper(
     try:
         TyperUtils.info(_(f"Preparing collections \"{",".join(collections) if collections else "All"}\" in {data_path} for Trapper into {output_path}"))
 
-        with Progress(
-            TextColumn("[bold blue]{task.description}"),
-            BarColumn(),
-            "[progress.percentage]{task.percentage:>3.0f}%",
-            TimeElapsedColumn(),
-        ) as progress:
+        import wildintel_tools.ui.typer.wildintel
 
-            # Mapa para almacenar tareas de colecciones y deployments
-            collection_tasks = {}
-
-            def on_progress(event: str, count: int):
-                """
-                Progress callback used to render nested progress bars.
-
-                Event forms:
-                ``collection_start:<COLLECTION>``, ``deployment_start:<COLLECTION>:<DEPLOYMENT>:<TOTAL>``,
-                ``file_progress:<COLLECTION>:<DEPLOYMENT>``, ``deployment_complete:<COLLECTION>:<DEPLOYMENT>``.
-                """
-                nonlocal collection_tasks
-                if event.startswith("collection_start:"):
-                    _,col_name = event.split(":", 1)
-                    collection_tasks[col_name] = {
-                        "task_collection": progress.add_task(f"Collection {col_name}", total=count),
-                        "deployments": {}
-                    }
-                elif event.startswith("deployment_start:"):
-                    _, col_name, dep_name = event.split(":", 2)
-                    collection_tasks[col_name]["deployments"][dep_name] = progress.add_task(
-                        f"  Deployment {dep_name}", total=count
-                    )
-                elif event.startswith("file_progress:"):
-                    _, col_name, dep_name, file_name = event.split(":", 3)
-                    task_dep = collection_tasks[col_name]["deployments"][dep_name]
-                    progress.advance(task_dep, count)
-                elif event.startswith("deployment_complete:"):
-                    _, col_name, dep_name = event.split(":", 2)
-                    progress.advance(collection_tasks[col_name]["task_collection"], 1)
-
-            report = wildintel_processing.prepare_collections_for_trapper(
-                    data_path=data_path,
-                    output_dir=output_path,
-                    collections=collections,
-                    extensions=extensions,
-                    deployments=deployments,
-                    progress_callback=on_progress,
-                    max_workers = 4,
-                    xmp_info = xmp_info,
-                    scale_images=scale,
-                    overwrite=overwrite,
-                    timezone=ZoneInfo(timezone),
-                    ignore_dst=ignore_dst,
-                    convert_to_utc=convert_to_utc,
-                    create_deployment_table=create_deployment_table,
-            )
+        report = wildintel_tools.ui.typer.wildintel.prepare_collections_for_trapper(
+            data_path = data_path,
+            output_dir = output_path,
+            collections = collections,
+            deployments = deployments,
+            extensions = extensions,
+            max_workers = max_workers,
+            xmp_info = xmp_info,
+            scale_images = scale,
+            overwrite = overwrite,
+            create_deployment_table=create_deployment_table,
+            timezone = ZoneInfo(timezone),
+            ignore_dst= ignore_dst,
+            convert_to_utc= convert_to_utc
+        )
 
         TyperUtils.success(_("Preparation for Trapper completed. Collections are available in {0}").format(output_path))
         url = f"{str(settings.GENERAL.host)}geomap/deployment/import/"
         TyperUtils.info(_(f"Before continuing, import the deployments table file that was created per collection into {url}."))
         _show_report(report, output=report_file)
     except Exception as e:
-        TyperUtils.error(_("An error occurred during preparing collections fot trapper: {0}").format(str(e)))
+        TyperUtils.error(_("An error occurred during preparing collections for trapper: {0}").format(str(e)))
 app.command(name="pt", hidden=True, help=_("Alias for prepare_for_trapper")) (prepare_for_trapper)
 
 @app.command(
@@ -774,24 +657,86 @@ def pipeline(
     )
     ] = None,
 ):
-    check_collections(ctx, collections,data_path, report_file, url, user,
-                password,
-                token,
-                validate_locations,
-                max_workers,
-                config)
+    if not collections:
+        collections = [entry.name for entry in data_path.iterdir() if entry.is_dir()]
+    else:
+        collections = [entry.name for entry in data_path.iterdir() if entry.is_dir() and entry.name in collections]
 
-    check_deployments(
-            ctx,
-            collections,
-            data_path,
-            report_file,
-            tolerance_hours,
-            extensions,
-            max_workers,
-            deployments,
-            config
-    )
+    for col in collections:
+        TyperUtils.info(_(f"Processing collection: {col}"))
+
+        import wildintel_tools.ui.typer.wildintel
+
+        report = wildintel_tools.ui.typer.wildintel.check_collections(
+            data_path=Path(data_path),
+            url = url,
+            user = user,
+            password = password,
+            collections = [col],
+            validate_locations = validate_locations,
+            max_workers = max_workers)
+
+        if report.is_success():
+            TyperUtils.success(_(f"Collection {col} passed validation. Proceeding to deployment checks."))
+            _show_report(report)
+            col_path = data_path / col
+            log_file = col_path / f"{col}_FileTimestampLog.csv"
+
+            if log_file.exists():
+                TyperUtils.success(_(f"Read FileTimestampLog fom collection {col}."))
+
+                import wildintel_tools.wildintel
+                deployments_csv = wildintel_tools.wildintel._read_field_notes_log(log_file)
+
+                if deployments:
+                    deployments_csv = [d for d in deployments_csv if d["name"] in deployments]
+
+                for deployment in deployments_csv:
+                    TyperUtils.info(_(f"Processing deployment: {deployment['name']}"))
+                    report_deplo = wildintel_tools.ui.typer.wildintel.check_deployments(
+                        data_path=Path(data_path),
+                        collections=collections,
+                        deployments=deployments,
+                        extensions=extensions,
+                        tolerance_hours=tolerance_hours,
+                        max_workers=max_workers,
+                    )
+                    print(report_deplo)
+                    if report_deplo.is_success():
+
+                        TyperUtils.success(_(f"Deployment {deployment['name']} in collection {col} passed validation. Proceeding to prepare for Trapper."))
+
+                        report_prep = wildintel_processing.prepare_collections_for_trapper(
+                            data_path=data_path,
+                            output_dir=output_path,
+                            collections=[col],
+                            deployments=[deployment['name']],
+                            extensions=extensions,
+                            max_workers = max_workers,
+                            xmp_info = {
+                                "rp_name" : rp_name,
+                                "coverage": coverage,
+                                "publisher" : publisher,
+                                "owner" : owner,
+                            },
+                            scale_images=True,
+                            overwrite=True,
+                            create_deployment_table=create_deployment_table,
+                            timezone=ZoneInfo(timezone),
+                            ignore_dst=ignore_dst,
+                            convert_to_utc=convert_to_utc,
+                        )
+
+                        if report_prep.is_success():
+                            TyperUtils.success(_(f"Deployment {deployment['name']} in collection {col} prepared successfully for Trapper."))
+                        else:
+                            TyperUtils.error(_(f"Deployment {deployment['name']} in collection {col} failed preparation for Trapper. Check the report for details."))
+                        _show_report(report_prep)
+            else:
+                TyperUtils.error(_(f"Log file {log_file} not found in collection {col}. Skipping deployment checks."))
+        else:
+            TyperUtils.error(_(f"Collection {col} failed validation. Check the report for details. Skipping deployment checks."))
+            _show_report(report)
 
     prepare_for_trapper(ctx=ctx,
                         data_path=data_path,
@@ -810,7 +755,7 @@ def pipeline(
                         create_deployment_table=create_deployment_table,
                         config=config)
 
-def _show_report(report, success_msg="Validation completed successfully", error_msg ="There were errors during the validation", output = None):
+def _show_report(report:"Report", success_msg="Validation completed successfully", error_msg ="There were errors during the validation", output = None):
     """
     Render a report result to console and optionally save it to a YAML file.
 

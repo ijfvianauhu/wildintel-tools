@@ -20,30 +20,126 @@ def check_collections(
     password:str,
     collections: List[str] = [],
     validate_locations: bool = True,
-    max_workers: int = 4,
-    progress_callback: Callable[[str,int], None] = None,
-
+    max_workers: int = 4
 ) -> Report:
-    return(wildintel_tools.wildintel.check_collections(data_path, url, user, password, collections, validate_locations, max_workers, progress_callback))
+
+    with Progress(
+        TextColumn("[bold blue]{task.description}"),
+        BarColumn(),
+        "[progress.percentage]{task.percentage:>3.0f}%",
+        TimeElapsedColumn(),
+    ) as progress:
+        collection_tasks = {}
+
+        # Callback que la función llamará
+        def on_progress(event: str, count: int):
+            """
+            Progress callback used to render nested progress bars.
+
+            The event string indicates the stage:
+            ``collection_start:<COLLECTION>``, ``deployment_start:<COLLECTION>:<DEPLOYMENT>:<TOTAL>``,
+            ``file_progress:<COLLECTION>:<DEPLOYMENT>``.
+
+            :param event: Event identifier with context tokens.
+            :type event: str
+            :param count: Amount of progress to advance.
+            :type count: int
+            :returns: None
+            """
+            nonlocal collection_tasks
+            if event.startswith("collection_start:"):
+                _, col_name = event.split(":", 1)
+                collection_tasks[col_name] = {
+                    "task_collection": progress.add_task(f"Collection {col_name}", total=count),
+                    "deployments": {}
+                }
+            elif event.startswith("deployment_start:"):
+                _, col_name, dep_name = event.split(":", 2)
+                collection_tasks[col_name]["deployments"][dep_name] = progress.add_task(
+                    f"  Deployment {dep_name}", total=count
+                )
+            elif event.startswith("file_progress:"):
+                _, col_name, dep_name, filename = event.split(":", 3)
+                task_dep = collection_tasks[col_name]["deployments"][dep_name]
+                progress.advance(task_dep, count)
+                progress.advance(collection_tasks[col_name]["task_collection"], count)
+            elif event.startswith("deployment_complete:"):
+                _,col_name, dep_name = event.split(":", 2)
+                progress.advance(collection_tasks[col_name]["task_collection"], 1)
+
+
+        report = wildintel_tools.wildintel.check_collections(
+                data_path=Path(data_path),
+                collections=collections,
+                url = url,
+                user = user,
+                password = password,
+                validate_locations = validate_locations,
+                max_workers=max_workers,
+                progress_callback=on_progress,
+        )
+
+    return report
 
 def check_deployments(
         data_path: Path,
         collections: List[str] = None,
         deployments: List[str] = None,
         extensions: List[ResourceExtensionDTO] = None,
-        progress_callback: Callable[[str,int], None] = None,
         tolerance_hours: int = 1,
         max_workers:int =4
 ) -> Report:
-    return(wildintel_tools.wildintel.check_deployments(
-        data_path,
-        collections,
-        deployments,
-        extensions,
-        progress_callback,
-        tolerance_hours,
-        max_workers
-    ))
+    with Progress(
+            TextColumn("[bold blue]{task.description}"),
+            BarColumn(),
+            "[progress.percentage]{task.percentage:>3.0f}%",
+            TimeElapsedColumn(),
+    ) as progress:
+
+        # Mapa para almacenar tareas de colecciones y deployments
+        collection_tasks = {}
+
+        # Callback que la función llamará
+        def on_progress(event: str, count: int):
+            """
+            Progress callback used to render nested progress bars.
+
+            Event forms:
+            ``collection_start:<COLLECTION>``, ``deployment_start:<COLLECTION>:<DEPLOYMENT>:<TOTAL>``,
+            ``file_progress:<COLLECTION>:<DEPLOYMENT>``, ``deployment_complete:<COLLECTION>:<DEPLOYMENT>``.
+            """
+            nonlocal collection_tasks
+            if event.startswith("collection_start:"):
+                _, col_name = event.split(":", 1)
+                if col_name not in collection_tasks:
+                    collection_tasks[col_name] = {
+                        "task_collection": progress.add_task(f"Collection {col_name}", total=count),
+                        "deployments": {}
+                    }
+            elif event.startswith("deployment_start:"):
+                _, col_name, dep_name = event.split(":", 2)
+                collection_tasks[col_name]["deployments"][dep_name] = progress.add_task(
+                    f"  Deployment {dep_name}", total=count
+                )
+            elif event.startswith("file_progress:"):
+                _, col_name, dep_name, file_name = event.split(":", 3)
+                task_dep = collection_tasks[col_name]["deployments"][dep_name]
+                progress.advance(task_dep, count)
+            elif event.startswith("deployment_complete:"):
+                _, col_name, dep_name = event.split(":", 2)
+                progress.advance(collection_tasks[col_name]["task_collection"], 1)
+
+        report = wildintel_tools.wildintel.check_deployments(
+            data_path=Path(data_path),
+            collections=collections,
+            extensions=extensions,
+            progress_callback=on_progress,
+            max_workers=max_workers,
+            tolerance_hours=tolerance_hours,
+            deployments=deployments
+        )
+
+    return report
 
 def prepare_collections_for_trapper(
     data_path: Path,
@@ -51,7 +147,6 @@ def prepare_collections_for_trapper(
     collections: list[str] = None,
     deployments: list[str] = None,
     extensions: list[ResourceExtensionDTO] = None,
-    progress_callback: Callable[[str,int], None] = None,
     max_workers: int = 4,
     xmp_info : dict = None,
     scale_images: bool = True,
@@ -62,10 +157,50 @@ def prepare_collections_for_trapper(
     convert_to_utc= True
 
 ) -> Report:
-    return wildintel_tools.wildintel.prepare_collections_for_trapper(data_path, output_dir, collections, deployments,
-            extensions, progress_callback, max_workers, xmp_info, scale_images, overwrite, create_deployment_table,
-            timezone, ignore_dst, convert_to_utc)
+    with Progress(
+            TextColumn("[bold blue]{task.description}"),
+            BarColumn(),
+            "[progress.percentage]{task.percentage:>3.0f}%",
+            TimeElapsedColumn(),
+    ) as progress:
 
+        # Mapa para almacenar tareas de colecciones y deployments
+        collection_tasks = {}
+
+        def on_progress(event: str, count: int):
+            """
+            Progress callback used to render nested progress bars.
+
+            Event forms:
+            ``collection_start:<COLLECTION>``, ``deployment_start:<COLLECTION>:<DEPLOYMENT>:<TOTAL>``,
+            ``file_progress:<COLLECTION>:<DEPLOYMENT>``, ``deployment_complete:<COLLECTION>:<DEPLOYMENT>``.
+            """
+            nonlocal collection_tasks
+            if event.startswith("collection_start:"):
+                _, col_name = event.split(":", 1)
+                collection_tasks[col_name] = {
+                    "task_collection": progress.add_task(f"Collection {col_name}", total=count),
+                    "deployments": {}
+                }
+            elif event.startswith("deployment_start:"):
+                _, col_name, dep_name = event.split(":", 2)
+                collection_tasks[col_name]["deployments"][dep_name] = progress.add_task(
+                    f"  Deployment {dep_name}", total=count
+                )
+            elif event.startswith("file_progress:"):
+                _, col_name, dep_name, file_name = event.split(":", 3)
+                task_dep = collection_tasks[col_name]["deployments"][dep_name]
+                progress.advance(task_dep, count)
+            elif event.startswith("deployment_complete:"):
+                _, col_name, dep_name = event.split(":", 2)
+                progress.advance(collection_tasks[col_name]["task_collection"], 1)
+
+        return wildintel_tools.wildintel.prepare_collections_for_trapper(data_path, output_dir, collections,
+                                                                         deployments,
+                                                                         extensions, on_progress, max_workers,
+                                                                         xmp_info, scale_images, overwrite,
+                                                                         create_deployment_table,
+                                                                         timezone, ignore_dst, convert_to_utc)
 
 def create_trapper_package(
     data_path : Path,
