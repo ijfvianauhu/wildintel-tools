@@ -676,9 +676,11 @@ def pipeline(
             validate_locations = validate_locations,
             max_workers = max_workers)
 
+        _show_report(success_msg=f"Collection {col} passed validation. Proceeding to deployment checks.",
+                     error_msg=f"Collection {col} failed validation. Check the report for details. Skipping deployment checks.",
+                     report=report)
+
         if report.is_success():
-            TyperUtils.success(_(f"Collection {col} passed validation. Proceeding to deployment checks."))
-            _show_report(report)
             col_path = data_path / col
             log_file = col_path / f"{col}_FileTimestampLog.csv"
 
@@ -695,16 +697,19 @@ def pipeline(
                     TyperUtils.info(_(f"Processing deployment: {deployment['name']}"))
                     report_deplo = wildintel_tools.ui.typer.wildintel.check_deployments(
                         data_path=Path(data_path),
-                        collections=collections,
-                        deployments=deployments,
+                        collections=[col],
+                        deployments=deployment['name'],
                         extensions=extensions,
                         tolerance_hours=tolerance_hours,
                         max_workers=max_workers,
                     )
-                    print(report_deplo)
+                    _show_report(
+                        success_msg=_(f"Deployment {deployment['name']} in collection {col} passed validation"),
+                        error_msg=_(f"Deployment {deployment['name']} in collection {col} failed preparation for Trapper. Check the report for details."),
+                        report=report_deplo,
+                    )
                     if report_deplo.is_success():
-
-                        TyperUtils.success(_(f"Deployment {deployment['name']} in collection {col} passed validation. Proceeding to prepare for Trapper."))
+                        TyperUtils.info(_(f"Processing to prepare Deployment {deployment['name']} in collection {col} for trapper."))
 
                         report_prep = wildintel_processing.prepare_collections_for_trapper(
                             data_path=data_path,
@@ -726,12 +731,10 @@ def pipeline(
                             ignore_dst=ignore_dst,
                             convert_to_utc=convert_to_utc,
                         )
-
-                        if report_prep.is_success():
-                            TyperUtils.success(_(f"Deployment {deployment['name']} in collection {col} prepared successfully for Trapper."))
-                        else:
-                            TyperUtils.error(_(f"Deployment {deployment['name']} in collection {col} failed preparation for Trapper. Check the report for details."))
-                        _show_report(report_prep)
+                        _show_report(
+                            success_msg=_(f"Deployment {deployment['name']} in collection {col} prepared successfully for Trapper."),
+                            error_msg=_(f"Deployment {deployment['name']} in collection {col} failed preparation for Trapper. Check the report for details."),
+                            report=report_prep)
             else:
                 TyperUtils.error(_(f"Log file {log_file} not found in collection {col}. Skipping deployment checks."))
         else:

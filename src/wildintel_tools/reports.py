@@ -104,8 +104,8 @@ class Report:
         :return: One of ``"success"``, ``"failed"``, ``"partial"`` or ``"empty"``.
         :rtype: str
         """
-        has_errors = any(self.errors.values())
-        has_successes = any(self.successes.values())
+        has_errors = bool(self.errors)
+        has_successes = bool(self.successes)
 
         if has_successes and not has_errors:
             return ReportStatus.SUCCESS
