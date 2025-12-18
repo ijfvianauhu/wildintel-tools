@@ -629,8 +629,9 @@ def prepare_collections_for_trapper(
         for deployment in all_deployments:
             dep_name = slugify(deployment.name)
             trapper_deployment_path = trapper_col_path / dep_name
+            has_content = trapper_deployment_path.exists() and any(trapper_deployment_path.iterdir())
 
-            if trapper_deployment_path.exists():
+            if has_content:
                 if not overwrite:
                     report.add_error(dep_name, "existing deployment",
                                      f"Trapper deployment path '{trapper_deployment_path}' already exists and overwrite is False.")

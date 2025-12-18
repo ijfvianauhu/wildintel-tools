@@ -97,7 +97,7 @@ def main_callback(ctx: typer.Context,
         "use the '<COLLECTION>-<LOCATION>_<SUFFIX>' pattern. "
         "Reports errors and successes for each validation step."
     ),
-    short_help=_("Validate collection and deployment folder naming conventions")
+    short_help=_("Validate collection and deployment folder naming conventions" + " (alias: cc)")
 )
 def check_collections(
     ctx: typer.Context,
@@ -216,7 +216,7 @@ app.command(name="cc", hidden=True, help=_("Alias for check_collections")) (chec
         "timestamps are within the expected start and end ranges. Also generates a '.validated' "
         "file for successfully verified deployments."
     ),
-    short_help=_("Validate deployment folders and image timestamp consistency")
+    short_help=_("Validate deployment folders and image timestamp consistency" + " (alias: cd)")
 )
 def check_deployments(
     ctx: typer.Context,
@@ -441,7 +441,7 @@ def create_trapper_package(
     ] = False,
 
     max_workers: Annotated[int, typer.Option(help=_("Number of parallel threads to use ."))] = 4,
-    max_zip_size: Annotated[int, typer.Option(help=_("Maximum size (in MB) for each zip file."))] = 500,
+    max_zip_size: Annotated[int, typer.Option(help=_("Maximum size (in MB) for each zip file."))] = 2000,
 
     config: Annotated[
         Path, typer.Option(hidden=True, help=_("File to save the report"), callback=callback_with_override)
@@ -609,7 +609,6 @@ def pipeline(
     data_path: Annotated[ Path, typer.Option( help=_("Root data path"), exists=True,  file_okay=False,  dir_okay=True ) ]=None,
     output_path: Annotated[ Path,typer.Option(help=_("Root output path"),exists=True,file_okay=False,  dir_okay=True)] = None,
     collections: Annotated[ List[str], typer.Argument(help=_("Collections to process (sub-dirs in root data path)"))] = None,
-    report_file: Annotated[Path, typer.Option(help=_("File to save the report"))] = None,
     deployments: Annotated[List[str], typer.Option( help=_("Deployments to process (sub-dirs in collections path)"))] = None,
     extensions: Annotated[List[ResourceExtensionDTO], typer.Option(help=_("File extension to process"))] = None,
     owner: Annotated[str, typer.Option(help=_("Resource owner"))] = None,
@@ -705,13 +704,13 @@ def pipeline(
                     )
                     _show_report(
                         success_msg=_(f"Deployment {deployment['name']} in collection {col} passed validation"),
-                        error_msg=_(f"Deployment {deployment['name']} in collection {col} failed preparation for Trapper. Check the report for details."),
+                        error_msg=_(f"Deployment {deployment['name']} in collection {col} failed preparation for Trapper. Skipping prepare deployment for trapper"),
                         report=report_deplo,
                     )
                     if report_deplo.is_success():
                         TyperUtils.info(_(f"Processing to prepare Deployment {deployment['name']} in collection {col} for trapper."))
 
-                        report_prep = wildintel_processing.prepare_collections_for_trapper(
+                        report_prep = wildintel_tools.ui.typer.wildintel.prepare_collections_for_trapper(
                             data_path=data_path,
                             output_dir=output_path,
                             collections=[col],
@@ -732,31 +731,11 @@ def pipeline(
                             convert_to_utc=convert_to_utc,
                         )
                         _show_report(
-                            success_msg=_(f"Deployment {deployment['name']} in collection {col} prepared successfully for Trapper."),
-                            error_msg=_(f"Deployment {deployment['name']} in collection {col} failed preparation for Trapper. Check the report for details."),
+                            success_msg=_(f"Deployment {deployment['name']} in collection {col} prepared successfully for Trapper"),
+                            error_msg=_(f"Deployment {deployment['name']} in collection {col} failed preparation for Trapper"),
                             report=report_prep)
             else:
                 TyperUtils.error(_(f"Log file {log_file} not found in collection {col}. Skipping deployment checks."))
-        else:
-            TyperUtils.error(_(f"Collection {col} failed validation. Check the report for details. Skipping deployment checks."))
-            _show_report(report)
-
-    prepare_for_trapper(ctx=ctx,
-                        data_path=data_path,
-                        output_path=output_path,
-                        collections=collections,
-                        report_file=report_file,
-                        deployments=deployments,
-                        extensions=extensions,
-                        owner=owner,
-                        publisher=publisher,
-                        coverage=coverage,
-                        rp_name=rp_name,
-                        timezone=timezone,
-                        ignore_dst=ignore_dst,
-                        convert_to_utc=convert_to_utc,
-                        create_deployment_table=create_deployment_table,
-                        config=config)
 
 def _show_report(report:"Report", success_msg="Validation completed successfully", error_msg ="There were errors during the validation", output = None):
     """

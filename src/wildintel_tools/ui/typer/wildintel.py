@@ -20,7 +20,8 @@ def check_collections(
     password:str,
     collections: List[str] = [],
     validate_locations: bool = True,
-    max_workers: int = 4
+    max_workers: int = 4,
+    show_progress: bool = True,
 ) -> Report:
 
     with Progress(
@@ -67,7 +68,6 @@ def check_collections(
                 _,col_name, dep_name = event.split(":", 2)
                 progress.advance(collection_tasks[col_name]["task_collection"], 1)
 
-
         report = wildintel_tools.wildintel.check_collections(
                 data_path=Path(data_path),
                 collections=collections,
@@ -76,7 +76,7 @@ def check_collections(
                 password = password,
                 validate_locations = validate_locations,
                 max_workers=max_workers,
-                progress_callback=on_progress,
+                progress_callback=on_progress if show_progress else None,
         )
 
     return report
@@ -87,7 +87,8 @@ def check_deployments(
         deployments: List[str] = None,
         extensions: List[ResourceExtensionDTO] = None,
         tolerance_hours: int = 1,
-        max_workers:int =4
+        max_workers:int =4,
+        show_progress: bool = True,
 ) -> Report:
     with Progress(
             TextColumn("[bold blue]{task.description}"),
@@ -133,7 +134,7 @@ def check_deployments(
             data_path=Path(data_path),
             collections=collections,
             extensions=extensions,
-            progress_callback=on_progress,
+            progress_callback=on_progress if show_progress else None,
             max_workers=max_workers,
             tolerance_hours=tolerance_hours,
             deployments=deployments
@@ -154,7 +155,8 @@ def prepare_collections_for_trapper(
     create_deployment_table: bool = True,
     timezone: ZoneInfo = ZoneInfo("UTC"),
     ignore_dst=True,
-    convert_to_utc= True
+    convert_to_utc= True,
+    show_progress: bool = True,
 
 ) -> Report:
     with Progress(
@@ -195,12 +197,22 @@ def prepare_collections_for_trapper(
                 _, col_name, dep_name = event.split(":", 2)
                 progress.advance(collection_tasks[col_name]["task_collection"], 1)
 
-        return wildintel_tools.wildintel.prepare_collections_for_trapper(data_path, output_dir, collections,
-                                                                         deployments,
-                                                                         extensions, on_progress, max_workers,
-                                                                         xmp_info, scale_images, overwrite,
-                                                                         create_deployment_table,
-                                                                         timezone, ignore_dst, convert_to_utc)
+        return wildintel_tools.wildintel.prepare_collections_for_trapper(
+                data_path=data_path,
+                output_dir=output_dir,
+                collections=collections,
+                deployments=deployments,
+                extensions=extensions,
+                progress_callback=on_progress if show_progress else None,
+                max_workers=max_workers,
+                xmp_info=xmp_info,
+                scale_images=scale_images,
+                overwrite=overwrite,
+                create_deployment_table=create_deployment_table,
+                timezone=timezone,
+                ignore_dst=ignore_dst,
+                convert_to_utc=convert_to_utc
+        )
 
 def create_trapper_package(
     data_path : Path,
