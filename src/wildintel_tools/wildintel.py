@@ -1,6 +1,8 @@
 import csv
 import hashlib
+import random
 import re
+import time
 import unicodedata
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -624,24 +626,36 @@ def prepare_collections_for_trapper(
         # Prepare CSV if requested
         if create_deployment_table:
             csv_file = trapper_col_path / f"{col}_deployments.csv"
+            existing_rows = {}
+            if csv_file.exists():
+                with csv_file.open("r", newline="", encoding="utf-8") as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        dep_id = row.get("deploymentID")
+                        if dep_id:
+                            existing_rows[dep_id] = row
             csv_rows = []
 
         for deployment in all_deployments:
             dep_name = slugify(deployment.name)
             trapper_deployment_path = trapper_col_path / dep_name
-            has_content = trapper_deployment_path.exists() and any(trapper_deployment_path.iterdir())
 
-            if has_content:
-                if not overwrite:
+            if trapper_deployment_path.exists():
+                is_empty = not any(trapper_deployment_path.iterdir())
+                if not is_empty and not overwrite:
                     report.add_error(dep_name, "existing deployment",
                                      f"Trapper deployment path '{trapper_deployment_path}' already exists and overwrite is False.")
                     if progress_callback:
                         progress_callback(f"deployment_start:{col}:{dep_name}", 0)
                         progress_callback(f"deployment_complete:{col}:{dep_name}", 1)
                     continue
-                else:
+                if not is_empty and overwrite:
                     shutil.rmtree(trapper_deployment_path)
-            trapper_deployment_path.mkdir(exist_ok=True)
+                    trapper_deployment_path.mkdir(exist_ok=True)
+                elif is_empty:
+                    trapper_deployment_path.mkdir(exist_ok=True)
+            else:
+                trapper_deployment_path.mkdir(exist_ok=True)
 
             image_files = [f for f in deployment.rglob("*") if f.suffix.lower() in valid_extensions]
             image_files = natsorted(image_files)
@@ -680,7 +694,14 @@ def prepare_collections_for_trapper(
                 except (ValueError, IndexError):
                     loc_id = ""
 
-                csv_rows.append([dep_name, loc_id,min_date, max_date, cameras[0]])
+                camera_model = cameras[0] if cameras else ""
+                existing_rows[dep_name] = {
+                    "deploymentID": dep_name,
+                    "locationID": loc_id,
+                    "deploymentStart": min_date,
+                    "deploymentEnd": max_date,
+                    "cameraModel": camera_model,
+                }
 
             if copied_count:
                 report.add_success(dep_name, "deployment exported")
@@ -689,11 +710,13 @@ def prepare_collections_for_trapper(
                 progress_callback(f"deployment_complete:{col}:{dep_name}", 1)
 
         # Write CSV for the collection
-        if create_deployment_table and csv_rows:
+        if create_deployment_table and existing_rows:
             with csv_file.open("w", newline="", encoding="utf-8") as f:
-                writer = csv.writer(f)
-                writer.writerow(["deploymentID", "locationID", "deploymentStart", "deploymentEnd", "cameraModel"])
-                writer.writerows(csv_rows)
+                fieldnames = ["deploymentID", "locationID", "deploymentStart", "deploymentEnd", "cameraModel"]
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
+                for dep_id in sorted(existing_rows):
+                    writer.writerow(existing_rows[dep_id])
 
     report.finish()
     return report
@@ -782,6 +805,10 @@ async def upload_trapper_package(
 
                 try:
                     if trigger:
+                        # Random delay between 6 and 60 seconds to avoid overloading the server
+                        delay = random.uniform(6.01, 59.99)
+                        time.sleep(delay)
+
                         payload = {
                             "yaml_file": file_yaml.name,
                             "zip_file": file_zip.name,

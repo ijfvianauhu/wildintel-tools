@@ -12,6 +12,7 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Any, Optional
+import json
 import yaml
 from wildintel_tools.ui.typer.i18n import _
 
@@ -269,11 +270,24 @@ class Report:
         if not isinstance(other, Report):
             raise TypeError("other must be an instance of Report")
 
-        for attr in ("errors", "successes"):
-            target = getattr(self, attr)
-            source = getattr(other, attr)
+        def _entry_key(entry: Dict[str, Any]) -> str:
+            return json.dumps(entry, sort_keys=True, default=str)
+
+        def _merge_entries(attr_name: str) -> None:
+            target = getattr(self, attr_name)
+            source = getattr(other, attr_name)
             for identifier, entries in source.items():
-                target.setdefault(identifier, []).extend(entries)
+                bucket = target.setdefault(identifier, [])
+                seen = {_entry_key(existing) for existing in bucket}
+                for entry in entries:
+                    key = _entry_key(entry)
+                    if key in seen:
+                        continue
+                    bucket.append(entry.copy())
+                    seen.add(key)
+
+        _merge_entries("errors")
+        _merge_entries("successes")
 
         if other.start_time and other.start_time < self.start_time:
             self.start_time = other.start_time
