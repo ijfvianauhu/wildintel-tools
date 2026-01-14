@@ -618,7 +618,8 @@ def prepare_collections_for_trapper(
         if not deployments:
             all_deployments = [d for d in col_path.iterdir() if d.is_dir()]
         else:
-            all_deployments = [d for d in col_path.iterdir() if d.is_dir() and d.name in deployments]
+            all_deployments = [d for d in col_path.iterdir()
+                               if d.is_dir() and d.name.lower() in [dep.lower() for dep in deployments]]
 
         if progress_callback:
             progress_callback(f"collection_start:{col}", len(all_deployments))
@@ -805,9 +806,6 @@ async def upload_trapper_package(
 
                 try:
                     if trigger:
-                        # Random delay between 6 and 60 seconds to avoid overloading the server
-                        delay = random.uniform(6.01, 59.99)
-                        time.sleep(delay)
 
                         payload = {
                             "yaml_file": file_yaml.name,
@@ -820,6 +818,19 @@ async def upload_trapper_package(
                         )
 
                         report.add_success(f"{col}:{dep_name}", "process package")
+
+                        # Wait until collection is created bur never more than 2 minutes
+                        collection_created = trapper_client.collections.get_by_name(col)
+                        print(collection_created)
+                        start_time = time.time()
+                        while len(collection_created.results) == 0:
+                            elapsed_time = time.time() - start_time
+                            if elapsed_time > 120:
+                                raise TimeoutError(f"Tiempo de espera agotado para {col}:{dep_name}")
+
+                            # Revisa periódicamente (puedes ajustar el intervalo de tiempo)
+                            time.sleep(5)  # Revisa cada 5 segundos
+                            collection_created = trapper_client.collections.get_by_name(col)
 
                 except Exception as e:
                     report.add_error(f"{col}:{dep_name}", "process package", str(e))
