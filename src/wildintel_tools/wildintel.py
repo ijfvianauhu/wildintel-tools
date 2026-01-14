@@ -821,7 +821,6 @@ async def upload_trapper_package(
 
                         # Wait until collection is created bur never more than 2 minutes
                         collection_created = trapper_client.collections.get_by_name(col)
-                        print(collection_created)
                         start_time = time.time()
                         while len(collection_created.results) == 0:
                             elapsed_time = time.time() - start_time
