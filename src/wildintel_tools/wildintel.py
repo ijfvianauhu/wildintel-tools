@@ -819,12 +819,12 @@ async def upload_trapper_package(
 
                         report.add_success(f"{col}:{dep_name}", "process package")
 
-                        # Wait until collection is created bur never more than 2 minutes
+                        # Wait until collection is created bur never more than 15 minutes
                         collection_created = trapper_client.collections.get_by_name(col)
                         start_time = time.time()
                         while len(collection_created.results) == 0:
                             elapsed_time = time.time() - start_time
-                            if elapsed_time > 120:
+                            if elapsed_time > 900:
                                 raise TimeoutError(f"Tiempo de espera agotado para {col}:{dep_name}")
 
                             # Revisa periódicamente (puedes ajustar el intervalo de tiempo)
