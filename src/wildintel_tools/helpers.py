@@ -114,13 +114,12 @@ def check_trapper_connection(base_url:str, user_name:str, user_password: str, ac
             user_password=user_password,
             access_token=access_token
         )
-
         trapper_client.classification_projects.get_all()
         uploader : HTTPUploader = trapper_client.uploaders
 
         asyncio.run(uploader._login())
 
-        trapper_client.classification_projects.get_by_id(classification_project_id)
+        trapper_client.classification_projects.get(query={"pk": classification_project_id} if classification_project_id else None)
 
     except Exception as e:
         msg = f"Failed to connect to Trapper API. Check your settings: {str(e)}"

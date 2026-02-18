@@ -55,7 +55,7 @@ from wildintel_tools.ui.typer.commands import epicollect
 # --------------------------------------------------------------------------- #
 
 APP_NAME = "wildintel-tools"
-__version__ = "0.2.5"
+__version__ = "0.2.6"
 
 # --------------------------------------------------------------------------- #
 # Typer CLI definition

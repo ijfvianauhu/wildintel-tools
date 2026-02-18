@@ -85,7 +85,7 @@ def _read_field_notes_log(filepath: Path) -> List[Dict]:
     required_fields = {"Deployment", "StartDate", "StartTime", "EndDate", "EndTime"}
     deployments = []
 
-    with open(filepath, newline="", encoding="utf-8") as f:
+    with open(filepath, newline="", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
 
         # --- 1. Validate header ---
@@ -102,6 +102,7 @@ def _read_field_notes_log(filepath: Path) -> List[Dict]:
         header_set = set(header_fields)
         missing = required_fields - header_set
         if missing:
+            print(header_fields)
             raise ValueError(
                 f"Missing required columns in {filepath.name}: {', '.join(missing)}"
             )
@@ -572,7 +573,6 @@ def prepare_collections_for_trapper(
             publisher =   xmp_info.get("publisher", "Unknown")
             owner =   xmp_info.get("owner", "Unknown")
             year = datetime.now().year
-
             if scale_image:
                 _, new_image = ResourceUtils.resize(Image.open(BytesIO(img_path.read_bytes())))
             else:
