@@ -706,13 +706,25 @@ Where:
 * `--rp` → Trapper Research Project ID
 * `--cp` → Trapper Classification Project ID
 
-You must provide both `--rp` and `--cp` for the command to work correctly.
-
-If you don’t know these IDs, you can retrieve them using:
+You must provide both `--rp` and `--cp` for the command to work correctly. If you don’t know these IDs, you can retrieve them using:
 
 ```
 wildintel-tools helpers --help
 ```
+
+If the collection has many images, the process requires too many resources and may never finish. In these cases, we can 
+use the `--deployments` option, which allows us to specify that only the images from a collection taken during a specific 
+deployment are uploaded.
+
+```
+wildintel-tools zooniverse import 15 --rp 10 --cp 20 --deployments 235
+```
+
+> Important note 
+> 
+> In Trapper, a collection is made up of a set of images, not a set of deployments. If no deployments are specified, 
+> the application will upload the images that belong to the collection and were taken in deployments whose prefix 
+> matches the collection name..
 
 #### Use the interactive wizard (recommended)
 

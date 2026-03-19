@@ -515,7 +515,8 @@ class TyperUtils:
             success_msg: str = "Selected item",
             id_attr: str = "pk",
             name_attr: str = "name",
-            prompt_msg: str = "Enter the number of the item you want to select"
+            prompt_msg: str = "Enter the index of the item you want to select",
+            multi_select: bool = False
     ) -> Any:
         """
         Allows the user to select an item from a list. If only one item exists, it is automatically selected.
@@ -563,12 +564,46 @@ class TyperUtils:
             table.add_row(*row)
         TyperUtils.console.print(table)
 
+        if multi_select:
+            prompt_msg = f"{prompt_msg} (e.g. 1,3,5 or 2-6)"
+        else:
+            prompt_msg = f"{prompt_msg} (choose one number)"
+
+        choice = Prompt.ask(prompt_msg)
+
+        def parse_selection(choice_str: str) -> List[int]:
+            result = set()
+
+            parts = choice_str.split(",")
+            for part in parts:
+                part = part.strip()
+
+                if "-" in part:
+                    start, end = part.split("-")
+                    result.update(range(int(start), int(end) + 1))
+                else:
+                    result.add(int(part))
+
+            # Filtrar índices válidos
+            return [i for i in sorted(result) if 1 <= i <= len(items)]
+
+        indices = parse_selection(choice)
+
+        if not indices:
+            TyperUtils.error("Invalid selection.")
+            return None
+
+        if not multi_select:
+            return items[indices[0] - 1], indices[0] - 1
+
+        return [items[i - 1] for i in indices],  [i-1 for i in indices]
+
         # Pedir al usuario que elija
-        choice = Prompt.ask(
+        """choice = Prompt.ask(
             prompt_msg,
             choices=[str(i) for i in range(1, len(items) + 1)],
             show_choices=False
         )
-
-        return items[int(choice) - 1], int(choice) - 1
+        
+        return items[int(choice) - 1], int(choice) - 1"""
 

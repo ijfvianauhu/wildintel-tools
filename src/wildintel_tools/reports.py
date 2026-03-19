@@ -6,7 +6,8 @@ Defines:
     - Report: Dataclass for recording detailed results (successes and errors)
       and exporting them to YAML.
 """
-
+import os
+import tempfile
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
 from enum import Enum
@@ -29,7 +30,19 @@ class ReportWriter:
         :param report: The Report object to serialize.
         :param path: Destination path for the YAML file.
         """
+
+        def convert_paths(obj):
+            if isinstance(obj, dict):
+                return {k: convert_paths(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [convert_paths(v) for v in obj]
+            elif isinstance(obj, Path):
+                return str(obj)
+            else:
+                return obj
+
         data = asdict(report)
+        data = convert_paths(data)
         yaml_str = yaml.safe_dump(data, sort_keys=False, allow_unicode=True)
 
         if path is not None:
@@ -99,9 +112,17 @@ class Report:
     type: str = "generic"
     start_time: datetime = field(default_factory=datetime.now)
     end_time: Optional[datetime] = None
+    autosave_path: Optional[Path] = None
 
     errors: Dict[str, List[Dict[str, Any]]] = field(default_factory=dict)
     successes: Dict[str, List[Dict[str, Any]]] = field(default_factory=dict)
+
+    def __post_init__(self):
+        if self.autosave_path is None:
+            # Crear fichero temporal
+            tmp = tempfile.NamedTemporaryFile(delete=False, prefix="report_", suffix=".yaml")
+            self.autosave_path = Path(tmp.name)
+            tmp.close()  # Cerramos el handle, solo queremos la ruta
 
     def add_error(self, identifier: str, action: str, message: str, **extra: Any) -> None:
         """
@@ -118,6 +139,7 @@ class Report:
         """
         entry = {"action": action, "message": message, **extra}
         self.errors.setdefault(identifier, []).append(entry)
+        self._autosave()
 
     def add_success(self, identifier: str, action: str, message: str = None, **extra: Any) -> None:
         """
@@ -134,10 +156,12 @@ class Report:
         """
         entry = {"action": action, "message": message, **extra}
         self.successes.setdefault(identifier, []).append(entry)
+        self._autosave()
 
     def finish(self) -> None:
         """Marks the report as finished by setting the end time."""
         self.end_time = datetime.now()
+        self._autosave()
 
     def get_status(self) -> ReportStatus:
         """
@@ -290,7 +314,22 @@ class Report:
            - Preserves Unicode and does not sort keys.
            - :class:`datetime` objects are serialized using PyYAML's default ISO format.
         """
-        return ReportWriter.to_yaml(self, filepath)
+        save_path = filepath or self.autosave_path
+
+        #if save_path is None:
+        #    raise ValueError("No path provided for saving the report")
+
+        yaml_str =  ReportWriter.to_yaml(self, filepath)
+
+        # Si guardamos en un archivo definitivo, borrar el tmp file
+        if filepath and self.autosave_path and self.autosave_path != filepath:
+            try:
+                os.remove(self.autosave_path)
+            except FileNotFoundError:
+                pass
+            self.autosave_path = None
+
+        return yaml_str
 
     def extend(self, other: "Report") -> None:
         """
@@ -325,3 +364,7 @@ class Report:
             self.start_time = other.start_time
         if other.end_time and (self.end_time is None or other.end_time > self.end_time):
             self.end_time = other.end_time
+
+    def _autosave(self) -> None:
+        if self.autosave_path:
+            self.to_yaml(self.autosave_path)

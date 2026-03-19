@@ -5,6 +5,7 @@ from typing import Annotated, Optional, Any, List
 
 import typer
 from panoptes_client.panoptes import PanoptesAPIException
+from trapper_client.Schemas import TrapperDeploymentList
 from trapper_client.TrapperClient import TrapperClient
 
 from wildintel_tools.ui.typer.ZooUtils import ZooUtils
@@ -495,7 +496,6 @@ def importation(
         ctx (typer.Context): The Typer context object, used to share information across commands.
 
     """
-
     settings: Settings = ctx.obj.get("settings", Settings())
     zooniverse_client = ZooniverseClient(
         project_id=settings.ZOONIVERSE.zooniverse_project_id,
@@ -588,7 +588,6 @@ def wizard_command(
     config: Annotated[Path, typer.Option(hidden=True, callback=callback_with_override)] = None,
 ) -> None:
     settings: Settings = ctx.obj.get("settings", Settings())
-
     trapper_client = TrapperClient(
         base_url=str(settings.GENERAL.host),
         user_name=settings.GENERAL.login,
@@ -609,17 +608,44 @@ def wizard_command(
             cp_selected, key = TyperUtils.select_from_list(cp.results, title="Select a classification project")
             # select collection
             collections = trapper_client.collections.get_by_classification_project(cp_selected.pk)
-            collection_selected, key = TyperUtils.select_from_list(collections.results, id_attr="collection", title="Select a collection")
+            collection_selected, key = TyperUtils.select_from_list(collections.results, id_attr="collection_pk", title="Select a collection")
+            # select deployments
+            deployments : TrapperDeploymentList = trapper_client.deployments.get_all(query={"research_project": rp_selected.pk})
+
+            prefixes = f"{collection_selected.name}-".lower()
+
+            filtered = [
+                d for d in deployments.results if d.deployment_id.lower().startswith(prefixes)
+            ]
+            deployment_selected, key = TyperUtils.select_from_list(filtered,name_attr="deployment_id",title="Select a deployment", multi_select=True)
+
+            if not deployment_selected:
+                TyperUtils.fatal(f"No deployment selected.")
+
+            deployment_pks = [str(d.pk) for d in deployment_selected]
+            deployments_str = ",".join(deployment_pks)
+            deployments_info = ", ".join(
+                [f"{d.deployment_id} ({d.pk})" for d in deployment_selected]
+            )
 
             msg = (
-                f"We are going to import the images from collection {collection_selected.pk}-{collection_selected.name} "
-                f"into Zooniverse, taking into account the detection data from classification project {cp_selected.pk}-{cp_selected.name} "
-                f"within research project {rp_selected.pk}-{rp_selected.name}. Are you sure?")
+                f"We are going to import the images taken during deployments {deployments_info} "
+                f"from collection {collection_selected.name} ({collection_selected.collection_pk}) "
+                f"into Zooniverse, using detection data from classification project "
+                f"{cp_selected.name} ({cp_selected.pk}) "
+                f"within research project {rp_selected.name} ({rp_selected.pk}). "
+                f"Are you sure?"
+            )
+
             if typer.confirm(msg):
                 importation(ctx,
-                            collection=collection_selected.pk,
+                            collection=collection_selected.collection_pk,
                             research_project=rp_selected.pk,
-                            classification_project=cp_selected.pk)
+                            classification_project=cp_selected.pk,
+                            deployments_input=deployments_str,
+                            n_images_seq=settings.ZOONIVERSE_CONNECTOR.upload_collection_n_images_seq,
+                            max_interval=settings.ZOONIVERSE_CONNECTOR.upload_collection_max_interval,
+                )
 
                 typer.echo("Continuing...")
             else:
