@@ -16,6 +16,46 @@ import json
 import yaml
 from wildintel_tools.ui.typer.i18n import _
 
+class ReportWriter:
+    """
+    Utility class to export Report instances to YAML files.
+    """
+
+    @staticmethod
+    def to_yaml(report: "Report", path: Path) -> str:
+        """
+        Writes the given Report instance to a YAML file.
+
+        :param report: The Report object to serialize.
+        :param path: Destination path for the YAML file.
+        """
+        data = asdict(report)
+        yaml_str = yaml.safe_dump(data, sort_keys=False, allow_unicode=True)
+
+        if path is not None:
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(yaml_str)
+
+        return yaml_str
+
+class ReportReader:
+    """
+    Utility class to load Report instances from YAML files.
+    """
+
+    @classmethod
+    def from_yaml(cls, path: Path) -> "Report":
+        """
+        Loads a Report instance from a YAML file.
+
+        :param path: Path to the YAML file.
+        :return: A Report instance populated with the file content.
+        """
+        with open(path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+
+        return Report(**data)
+
 class ReportStatus(str, Enum):
     """
     Enumeration of possible states of a report.
@@ -56,6 +96,7 @@ class Report:
     :vartype successes: Dict[str, List[Dict[str, Any]]]
     """
     title: str
+    type: str = "generic"
     start_time: datetime = field(default_factory=datetime.now)
     end_time: Optional[datetime] = None
 
@@ -232,9 +273,7 @@ class Report:
         :return: A new :class:`Report` instance populated with the loaded data.
         :rtype: Report
         """
-        with open(filepath, "r", encoding="utf-8") as f:
-            data = yaml.safe_load(f)
-        return cls(**data)
+        return ReportReader.from_yaml(filepath)
 
     def to_yaml(self, filepath: Path | None = None) -> str:
         """
@@ -251,14 +290,7 @@ class Report:
            - Preserves Unicode and does not sort keys.
            - :class:`datetime` objects are serialized using PyYAML's default ISO format.
         """
-        data = asdict(self)
-        yaml_str = yaml.safe_dump(data, sort_keys=False, allow_unicode=True)
-
-        if filepath is not None:
-            with open(filepath, "w", encoding="utf-8") as f:
-                f.write(yaml_str)
-
-        return yaml_str
+        return ReportWriter.to_yaml(self, filepath)
 
     def extend(self, other: "Report") -> None:
         """

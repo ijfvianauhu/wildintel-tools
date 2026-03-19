@@ -26,7 +26,7 @@ locations(...)
 """
 import json
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, List
 from typer_config import conf_callback_factory
 from wildintel_tools.ui.typer.i18n import _
 from wildintel_tools.ui.typer.TyperUtils import TyperUtils
@@ -47,6 +47,16 @@ app = typer.Typer(
     help=_("Helpers"),
     short_help=_("Helpers")
 )
+
+def _parse_query_params(pairs: List[str] | None) -> dict:
+    out = {}
+    for pair in pairs or []:
+        if "=" not in pair:
+            raise typer.BadParameter(f"Invalid --query-param '{pair}', expected key=value")
+        k, v = pair.split("=", 1)
+        out[k.strip()] = v.strip()
+    return out
+
 
 def make_dynaconf_callback(override_mapping: dict | None = None):
     def callback(ctx, param: typer.CallbackParam, value: Any):

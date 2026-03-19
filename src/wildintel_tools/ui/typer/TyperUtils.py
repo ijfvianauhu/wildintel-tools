@@ -1,13 +1,17 @@
 import json
 import os
+import sys
+import re
 from pathlib import Path
-from typing import List, Dict, Any, Callable, Text, Tuple
-
+from typing import List, Dict, Any, Callable, Text, Tuple, Optional
+import uuid
+from datetime import datetime
 import yaml
 from docutils.nodes import status
 from pydantic import BaseModel
 from rich import box
 from rich.panel import Panel
+from rich.prompt import Prompt
 from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 from typer_config import conf_callback_factory
 
@@ -71,6 +75,7 @@ class TyperUtils:
     console = Console()
     logger = logging.getLogger(__name__)
     home = os.path.expanduser("~")
+    _stdin_cache: Optional[str] = None
 
 
     @staticmethod
@@ -377,6 +382,17 @@ class TyperUtils:
         TyperUtils.console.print(table)
 
     @staticmethod
+    def save_report(report, file_name=None):
+        results_dir = TyperUtils.get_default_report_dir()
+        results_dir.mkdir(parents=True, exist_ok=True)
+        if file_name is None:
+            unique_id = uuid.uuid4().hex[:8]
+            file_name = f"report_{unique_id}_{datetime.now():%Y%m%d_%H%M%S}.yaml"
+        report_file = results_dir / file_name
+        report.to_yaml(report_file)
+        return report_file
+
+    @staticmethod
     def display_report(report: "Report", raw: bool = False) -> None:
         """
         Displays a formatted summary of the Report instance in the console using Rich.
@@ -397,7 +413,7 @@ class TyperUtils:
             TyperUtils.console.print(yaml_str)
             return
 
-        title = Text(f"📊 Report: {report.title}", style="bold cyan")
+        title = Text(f"📊 Report: {report.title}")
         TyperUtils.console.rule(title)
 
         time_panel = Panel.fit(
@@ -446,4 +462,113 @@ class TyperUtils:
 
         TyperUtils.console.rule(f"[bold cyan]Report Status: [white]{report.get_status().upper()}[/white]")
 
+    @staticmethod
+    def _read_stdin_once() -> str:
+        """Read stdin once and cache it (used for '-' inputs)."""
+        if TyperUtils._stdin_cache is None:
+            TyperUtils._stdin_cache = sys.stdin.read()
+        return TyperUtils._stdin_cache
+
+    @staticmethod
+    def parse_id_list(value: Optional[str], allow_stdin: bool = True, param_name: str = "value") -> Optional[list[int]]:
+        """
+        Parse a comma/space separated list of integers. If value is '-' and allow_stdin=True,
+        read from stdin (cached). Returns None for empty input.
+        """
+        if value is None:
+            return None
+        raw = value.strip()
+        if raw == "-":
+            if not allow_stdin:
+                raise typer.BadParameter(f"{param_name} does not accept stdin marker '-'")
+            raw = TyperUtils._read_stdin_once().strip()
+        if not raw:
+            return None
+        tokens = re.split(r"[\s,]+", raw)
+        ids: list[int] = []
+        for token in tokens:
+            if not token:
+                continue
+            try:
+                ids.append(int(token))
+            except ValueError as exc:
+                raise typer.BadParameter(f"Invalid {param_name} '{token}'. Expected integers separated by comma or space.") from exc
+        return ids or None
+
+    @staticmethod
+    def parse_query_params(pairs: Optional[List[str]]) -> dict:
+        """Convert a list of "key=value" strings into a dictionary."""
+        out: dict = {}
+        for pair in pairs or []:
+            if "=" not in pair:
+                raise ValueError(f"Invalid query param '{pair}', expected key=value")
+            k, v = pair.split("=", 1)
+            out[k.strip()] = v.strip()
+        return out
+
+    @staticmethod
+    def select_from_list(
+            items: List[Any],
+            title: str = "Select an item",
+            show_id: bool = True,
+            show_name: bool = True,
+            success_msg: str = "Selected item",
+            id_attr: str = "pk",
+            name_attr: str = "name",
+            prompt_msg: str = "Enter the number of the item you want to select"
+    ) -> Any:
+        """
+        Allows the user to select an item from a list. If only one item exists, it is automatically selected.
+        Otherwise, a table is displayed and the user is prompted to choose.
+
+        Parameters
+        ----------
+        items : List[Any]
+            List of objects to select from. Objects must have 'id' and 'name' attributes if show_id or show_name are True.
+        title : str, optional
+            Title of the selection table.
+        show_id : bool, optional
+            Whether to show the 'ID' column in the table.
+        show_name : bool, optional
+            Whether to show the 'Name' column in the table.
+        success_msg : str, optional
+            Message displayed when a single item is automatically selected.
+
+        Returns
+        -------
+        Any
+            The selected item from the list.
+        """
+        if not items:
+            return None
+
+        if len(items) == 1:
+            TyperUtils.success(f"{success_msg}: {items[0].name}")
+            return items[0], 0
+
+        # Crear tabla
+        table = Table(title=title, show_lines=True)
+        table.add_column("Index", justify="right", style="cyan", no_wrap=True)
+        if show_id:
+            table.add_column("ID", justify="right", style="yellow")
+        if show_name:
+            table.add_column("Name", style="green")
+
+        for i, item in enumerate(items, start=1):
+            row = [str(i)]
+            if show_id:
+                row.append(str(getattr(item, id_attr)))
+            if show_name:
+                row.append(str(getattr(item, name_attr)))
+            table.add_row(*row)
+        TyperUtils.console.print(table)
+
+        # Pedir al usuario que elija
+        choice = Prompt.ask(
+            prompt_msg,
+            choices=[str(i) for i in range(1, len(items) + 1)],
+            show_choices=False
+        )
+
+        return items[int(choice) - 1], int(choice) - 1
 

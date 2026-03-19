@@ -48,14 +48,14 @@ from wildintel_tools.ui.typer.commands import logger
 from wildintel_tools.ui.typer.commands import helpers
 from wildintel_tools.ui.typer.commands import wildintel
 from wildintel_tools.ui.typer.commands import epicollect
-
+from wildintel_tools.ui.typer.commands import zooniverse
 
 # --------------------------------------------------------------------------- #
 # App metadata
 # --------------------------------------------------------------------------- #
 
 APP_NAME = "wildintel-tools"
-__version__ = "0.2.6"
+__version__ = "0.2.7"
 
 # --------------------------------------------------------------------------- #
 # Typer CLI definition
@@ -68,6 +68,7 @@ app.add_typer(reports.app, name="reports")
 app.add_typer(logger.app, name="logger")
 app.add_typer(wildintel.app, name="wildintel")
 app.add_typer(epicollect.app, name="epicollect")
+app.add_typer(zooniverse.app, name="zooniverse")
 
 def make_dynaconf_callback(override_mapping: dict | None = None):
     def callback(ctx, param: typer.CallbackParam, value: Any):

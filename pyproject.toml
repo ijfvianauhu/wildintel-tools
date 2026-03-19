@@ -24,6 +24,7 @@ dependencies = [
     "blake3>=1.0.8",
     "tqdm>=4.67.1",
     "tzdata>=2025.3",
+    "panoptes-client>=1.7.1",
 ]
 
 [dependency-groups]

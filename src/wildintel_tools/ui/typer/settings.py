@@ -39,7 +39,7 @@ from pydantic import BaseModel, Field, HttpUrl, EmailStr, FilePath, DirectoryPat
 
 
 class LoggerSettings(BaseModel):
-    loglevel: int = Field(ge=0, le=2)
+    loglevel: int = Field(default=1, ge=0, le=2)
     filename: str = Field(
         default="",
         description="Empty string or string ending in .log",
@@ -47,32 +47,32 @@ class LoggerSettings(BaseModel):
     )
 
 class GeneralSettings(BaseModel):
-    host: HttpUrl
-    login: EmailStr
-    password: SecretStr
-    project_id: int = Field(..., ge=1)
-    verify_ssl: bool
-    ffmpeg: str
-    exiftool: str
-    data_dir: DirectoryPath
+    host: HttpUrl = Field(default="https://wildintel-trap.uhu.es/")
+    login: EmailStr = Field(default="user@example.com")
+    password: SecretStr = Field(default=SecretStr("secret"))
+    project_id: int = Field(default=123, ge=1)
+    verify_ssl: bool = Field(default=True)
+    ffmpeg: str = Field(default="ffmpeg")
+    exiftool: str = Field(default="exiftool")
+    data_dir: DirectoryPath = Field(default=Path.home() / ".wildintel-tools" / "collections")
 
 class WildIntelSettings(BaseModel):
-    rp_name: str
-    coverage: str
-    publisher: str
-    owner: str
-    tolerance_hours: int
-    resize_img: bool
-    resize_img_size: list[int]
+    rp_name: str = Field(default="WildINTEL")
+    coverage: str = Field(default="Doñana National Park")
+    publisher: str = Field(default="University of Huelva")
+    owner: str = Field(default="University of Huelva")
+    tolerance_hours: int = Field(default=1)
+    resize_img: bool = Field(default=False)
+    resize_img_size: list[int] = Field(default_factory=lambda: [1024, 768])
     #resize_img_width: int
     #resize_img_height: int
-    overwrite: bool
+    overwrite: bool = Field(default=False)
     timezone: str | None = "UTC"
     ignore_dst: bool | None = False
     convert_to_utc: bool | None = True
     remove_zip: bool | None = True
     trigger: bool | None = True
-    output_dir: DirectoryPath
+    output_dir: DirectoryPath = Field(default=Path.home() / ".wildintel-tools" / "readycollections")
 
     @field_validator("timezone")
     def validate_timezone(cls, v):
@@ -83,9 +83,9 @@ class WildIntelSettings(BaseModel):
         return v
 
 class EpiCollectSettings(BaseModel):
-    client_id: int
-    client_secret: SecretStr
-    app_slug: str
+    client_id: int = Field(default=0)
+    client_secret: SecretStr = Field(default=SecretStr("secret"))
+    app_slug: str = Field(default="default")
     site_alias: Dict[str, str] = {}
     release_alias: Dict[str, str] = {}
 
@@ -114,11 +114,28 @@ class EpiCollectSettings(BaseModel):
     capture_method_field: str = ""
     bait_type_field: str = ""
 
+class ZooniverseSettings(BaseModel):
+    zooniverse_username: str | None = "myuser"
+    zooniverse_password: SecretStr | None = SecretStr("mypassword")
+    zooniverse_project_id: str | None = "myprojectid"
+
+class ZooniverseConnectorSettings(BaseModel):
+    upload_collection_n_images_seq: int | None = 5
+    upload_collection_max_interval: int | None = 90
+    upload_collection_attempts: int | None = 5
+    upload_collection_delay: int | None = 15
+    upload_collection_max_attempts_per_subject: int | None = 5
+    upload_collection_delay_seconds_per_subject: int | None = 30
+
 class Settings(BaseModel):
-    LOGGER: LoggerSettings
-    GENERAL: GeneralSettings
-    WILDINTEL: WildIntelSettings
-    EPICOLLECT: EpiCollectSettings
+    LOGGER: LoggerSettings =  Field(default_factory=LoggerSettings)
+    GENERAL: GeneralSettings = Field(default_factory=GeneralSettings)
+    WILDINTEL: WildIntelSettings = Field(default_factory=WildIntelSettings)
+    EPICOLLECT: EpiCollectSettings = Field(default_factory=EpiCollectSettings)
+    ZOONIVERSE: ZooniverseSettings = Field(default_factory=ZooniverseSettings)
+    ZOONIVERSE_CONNECTOR: ZooniverseConnectorSettings = Field(
+        default_factory=ZooniverseConnectorSettings
+    )
 
 class SettingsManager:
     """
@@ -142,7 +159,7 @@ class SettingsManager:
         :param settings_dir: Directory to store settings files. Defaults to ``~/.trapper-tools``.
         :type settings_dir: Optional[Path]
         """
-        self.settings_dir = Path(settings_dir) if settings_dir else Path.home() / ".trapper-tools"
+        self.settings_dir = Path(settings_dir) if settings_dir else Path.home() / ".wildintel-tools"
         self.settings_dir.mkdir(parents=True, exist_ok=True)
         self.SETTINGS_ORDER = SettingsManager._generate_settings_order()
 
@@ -378,73 +395,80 @@ class SettingsManager:
         """
         settings = self.load_settings(project_name)
 
-        try:
-            section, key = param.split(".", 1)
-        except ValueError:
-            raise ValueError("Parameter must have format SECTION.KEY (e.g., GENERAL.host)")
-
-        if not hasattr(settings, section):
-            raise ValueError(f"Invalid section: {section}")
-
-        section_model = getattr(settings, section)
-
-        if not hasattr(section_model, key):
-            raise ValueError(f"Invalid parameter: {param}")
+        section, key = self._split_param(param)
 
         data = settings.model_dump()
         return (data[section][key])
 
-    def set_param(self, project_name: str, param: str, value, validate: bool = True):
-        """
-        Assign a new value to a specific configuration parameter.
-
-        :param project_name: Name of the project.
-        :type project_name: str
-        :param param: Parameter key in the format ``SECTION.KEY``, e.g. ``GENERAL.host``.
-        :type param: str
-        :param value: New value for the parameter.
-        :type value: Any
-        :param validate: Whether to validate the settings after updating. Default is ``True``.
-        :type validate: bool
-        :raises ValueError: If settings validation fails.
-        """
-
-        settings_file = self.get_settings_path(project_name)
-        settings: Settings = self.load_settings(project_name)
-
+    def _split_param(self, param: str) -> tuple[str, str]:
+        """Split SECTION.KEY into (section, key)."""
         try:
             section, key = param.split(".", 1)
         except ValueError:
             raise ValueError("Parameter must have format SECTION.KEY (e.g., GENERAL.host)")
+        return section, key
 
+    def _get_section_model(self, settings: Settings, section: str, key: str):
         if not hasattr(settings, section):
             raise ValueError(f"Invalid section: {section}")
-
         section_model = getattr(settings, section)
-
         if key not in section_model.model_fields:
-            raise ValueError(f"Invalid parameter: {param}")
+            raise ValueError(f"Invalid parameter: {section}.{key}")
+        return section_model
 
+    def _parse_value(self, section_model: BaseModel, key: str, value: Any):
         field_info = section_model.model_fields[key]
         adapter = TypeAdapter(field_info.annotation)
-
         try:
-            parsed_value = adapter.validate_python(value)
+            return adapter.validate_python(value)
         except ValidationError as e:
-            raise ValueError(f"Invalid value for {param}: {e}")
+            raise ValueError(f"Invalid value for {section_model.__class__.__name__}.{key}: {e}")
+
+    def set_value(self, project_name: str, section: str, key: str, value, validate: bool = True):
+        """Set a single setting using explicit section/key arguments."""
+        settings_file = self.get_settings_path(project_name)
+        settings: Settings = self.load_settings(project_name)
+
+        section_model = self._get_section_model(settings, section, key)
+        parsed_value = self._parse_value(section_model, key, value)
 
         new_section = section_model.model_copy(update={key: parsed_value})
         new_settings = settings.model_copy(update={section: new_section})
 
         if validate:
-            try:
-                new_settings = Settings.model_validate(new_settings.model_dump())
-            except ValidationError as e:
-                raise ValueError(f"Settings validation failed:\n{e}")
+            new_settings = Settings.model_validate(new_settings.model_dump())
 
-        # Guardamos en fichero
         self.export_settings(new_settings, settings_file)
+        return new_settings
 
+    def set_param(self, project_name: str, param: str, value, validate: bool = True):
+        """
+        Assign a new value to a specific configuration parameter.
+
+        :param param: Parameter key in the format ``SECTION.KEY``.
+        """
+        section, key = self._split_param(param)
+        return self.set_value(project_name, section, key, value, validate)
+
+    def update_settings(self, project_name: str, updates: Dict[str, Any], validate: bool = True) -> Settings:
+        """
+        Apply multiple updates in one pass. Keys must be in ``SECTION.KEY`` format.
+        """
+        settings_file = self.get_settings_path(project_name)
+        settings: Settings = self.load_settings(project_name)
+        new_settings = settings
+
+        for param, value in updates.items():
+            section, key = self._split_param(param)
+            section_model = self._get_section_model(new_settings, section, key)
+            parsed_value = self._parse_value(section_model, key, value)
+            updated_section = section_model.model_copy(update={key: parsed_value})
+            new_settings = new_settings.model_copy(update={section: updated_section})
+
+        if validate:
+            new_settings = Settings.model_validate(new_settings.model_dump())
+
+        self.export_settings(new_settings, settings_file)
         return new_settings
 
     @staticmethod
@@ -550,38 +574,7 @@ class SettingsManager:
         -------
 
         """
-        default_settings = Settings(
-            LOGGER=LoggerSettings(
-                loglevel=1,
-                filename="",
-            ),
-            GENERAL=GeneralSettings(
-                host=HttpUrl("https://wildintel-trap.uhu.es/"),
-                login="user@example.com",
-                password=SecretStr("secret"),
-                project_id=123,
-                verify_ssl=True,
-                ffmpeg="ffmpeg",
-                exiftool="exiftool",
-                data_dir=Path.home(),
-            ),
-            WILDINTEL=WildIntelSettings(
-                rp_name="WildINTEL",
-                coverage="Doñana National Park",
-                publisher="University of Huelva",
-                owner="University of Huelva",
-                tolerance_hours=1,
-                resize_img=False,
-                resize_img_size=[1024, 768],
-                overwrite=False,
-                output_dir=Path.home(),
-            ),
-            EPICOLLECT=EpiCollectSettings(
-                client_id=0,
-                client_secret="secret",
-                app_slug="default",
-            ),
-        )
+        default_settings = Settings()
 
         with tempfile.NamedTemporaryFile("w+", delete=False, suffix=".toml") as tmp:
             tmp_path = Path(tmp.name)
@@ -633,3 +626,4 @@ class SettingsManager:
 
         # pasar el resto de campos no presentes en data (si hace falta)
         return model_cls.model_construct(**converted)
+

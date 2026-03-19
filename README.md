@@ -35,7 +35,7 @@ WildIntel Tools is a utility suite for validating and preparing wildlife monitor
 deployment folders follow standardized naming conventions, verifies that images exist and are in chronological order.
 
 Once validated, it prepares collections for import into Trapper, flattening folder structures, resizing images, and 
-embedding essential XMP metadata.
+embedding essential XMP metadata. Also this tool allows you to import media collections from Trapper into Zooniverse.
 
 In short, WildIntel Tools streamlines the workflow from data quality control to ready-to-use datasets, keeping information 
 consistent, traceable, and properly formatted for analysis.
@@ -372,7 +372,89 @@ trapper-tools --settings-dir /path/to/settings config init
 ```
 
 ### Configuration File Structure
-TODO
+
+The application uses a structured configuration file divided into several sections. Each section controls a specific 
+part of the system.
+
+---
+
+#### 🔹 `LOGGER`
+
+Controls logging behavior.
+
+| Variable   | Description                                                                                  |
+| ---------- | -------------------------------------------------------------------------------------------- |
+| `loglevel` | Logging level (0 = minimal, 1 = normal, 2 = verbose/debug).                                  |
+| `filename` | Log file name. Must be empty or end with `.log`. If empty, logs are printed to console only. |
+
+---
+
+#### 🔹 `GENERAL`
+
+Basic connection and system-wide settings.
+
+| Variable     | Description                                              |
+| ------------ | -------------------------------------------------------- |
+| `host`       | URL of the Trapper server.                               |
+| `login`      | User email for authentication.                           |
+| `password`   | User password (stored securely).                         |
+| `project_id` | Default project ID used by the application.              |
+| `verify_ssl` | Whether to verify SSL certificates (`true` recommended). |
+| `ffmpeg`     | Path to the `ffmpeg` executable.                         |
+| `exiftool`   | Path to the `exiftool` executable.                       |
+| `data_dir`   | Directory where input collections are stored.            |
+
+---
+
+#### 🔹 `WILDINTEL`
+
+Controls how collections are processed and prepared.
+
+| Variable          | Description                                                 |
+| ----------------- | ----------------------------------------------------------- |
+| `rp_name`         | Research project name.                                      |
+| `coverage`        | Geographic coverage of the dataset.                         |
+| `publisher`       | Data publisher (e.g., institution).                         |
+| `owner`           | Data owner.                                                 |
+| `tolerance_hours` | Time tolerance when grouping images into sequences.         |
+| `resize_img`      | Whether to resize images before processing.                 |
+| `resize_img_size` | Target image size `[width, height]` if resizing is enabled. |
+| `overwrite`       | Whether to overwrite existing outputs.                      |
+| `timezone`        | Timezone used for timestamps (must be valid, e.g., `UTC`).  |
+| `ignore_dst`      | Ignore daylight saving time adjustments.                    |
+| `convert_to_utc`  | Convert timestamps to UTC.                                  |
+| `remove_zip`      | Remove generated `.zip` files after processing.             |
+| `trigger`         | Enable automatic triggering of workflows.                   |
+| `output_dir`      | Directory where processed collections are saved.            |
+
+---
+
+#### 🔹 `ZOONIVERSE`
+
+Credentials and project configuration for Zooniverse.
+
+| Variable                | Description                                                |
+| ----------------------- | ---------------------------------------------------------- |
+| `zooniverse_username`   | Zooniverse account username.                               |
+| `zooniverse_password`   | Zooniverse password (stored securely).                     |
+| `zooniverse_project_id` | Target Zooniverse project ID (e.g., `owner/project-name`). |
+
+---
+
+#### 🔹 `ZOONIVERSE_CONNECTOR`
+
+Advanced settings controlling uploads to Zooniverse.
+
+| Variable                                      | Description                                              |
+| --------------------------------------------- | -------------------------------------------------------- |
+| `upload_collection_n_images_seq`              | Number of images per sequence (subject).                 |
+| `upload_collection_max_interval`              | Maximum time gap (seconds) between images in a sequence. |
+| `upload_collection_attempts`                  | Number of retry attempts for uploads.                    |
+| `upload_collection_delay`                     | Delay (seconds) between retries.                         |
+| `upload_collection_max_attempts_per_subject`  | Max retries per individual subject.                      |
+| `upload_collection_delay_seconds_per_subject` | Delay between retries per subject.                       |
+
+---
 
 ## ⚡ Usage
 
@@ -553,7 +635,97 @@ If we want to process a specific deployment from a collection, then we can use t
 wildintel-tools wildintel prepare-for-trapper R0033 --deployments R0033_WICP_02 --overwrite --output-path /tmp/trapper/
 ```
 
-```python
+### Step 6: generate trapper package and upload to trapper server
+
+Once your collections are prepared, the next step is to upload them to a Trapper server instance.
+
+#### Create the Trapper package
+
+First, generate a Trapper package using the `create-trapper-package` command: 
+
+```
+wildintel-tools wildintel create-trapper-package R0033
+```
+This command will generate pairs of .zip and .yaml files:
+* The .zip file contains the images
+* The .yaml file includes:
+  * Metadata for each image 
+  * The name of the collection to be created 
+  * The classification project where the collection will be assigned
+
+To simplify the upload process, at least one .zip + .yaml pair will be created per deployment.
+
+#### Upload the package to Trapper
+
+Once the package has been generated, you can upload it to the Trapper server using:
+
+```
+wildintel-tools wildintel upload-trapper-package R0033
+```
+
+This will create the collections in Trapper and upload all associated media and metadata automatically.
+
+### Step 7: import collections into Zooniverse
+
+Once your data is ready, you can import collections from Trapper into Zooniverse using the zooniverse import command.
+
+Before running this step, ensure that AI detections have been applied to your collections. This is required because the 
+import process uses these detections to generate media sequences (subjects) in Zooniverse. By default, only media without 
+human detections will be uploaded.
+
+#### Configure Zooniverse credentials
+
+Before testing the connection, you need to configure your Zooniverse credentials and project information (username, 
+password, and project ID). You can do this by running the appropriate configuration commands in the CLI:
+
+```
+wildintel-tools config set ZOONIVERSE.zooniverse_username YOUR_USERNAME
+wildintel-tools config set ZOONIVERSE.zooniverse_password YOUR_PASSWORD
+wildintel-tools config set ZOONIVERSE.zooniverse_project_id YOUR_PROJECT_ID
+```
+
+#### Test the connection
+
+Once configured, verify that your Zooniverse credentials and configuration are correct:
+
+```
+wildintel-tools zooniverse test-conection
+```
+
+#### Run the import
+
+Upload a Trapper collection to a Zooniverse subject set:
+
+```
+wildintel-tools zooniverse import 15 --rp 10 --cp 20
+```
+
+Where:
+
+* 15 → Collection ID
+* `--rp` → Trapper Research Project ID
+* `--cp` → Trapper Classification Project ID
+
+You must provide both `--rp` and `--cp` for the command to work correctly.
+
+If you don’t know these IDs, you can retrieve them using:
+
+```
+wildintel-tools helpers --help
+```
+
+#### Use the interactive wizard (recommended)
+
+Alternatively, you can run the interactive wizard to guide you through the process:
+```
+wildintel-tools zooniverse import
+```
+
+This will guide you through:
+
+* Selecting a research project
+* Selecting a classification project
+* Selecting a collection
 
 ## 🤝 Contributing
 
