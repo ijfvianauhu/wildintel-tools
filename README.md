@@ -684,6 +684,12 @@ wildintel-tools config set ZOONIVERSE.zooniverse_password YOUR_PASSWORD
 wildintel-tools config set ZOONIVERSE.zooniverse_project_id YOUR_PROJECT_ID
 ```
 
+Also, you can use a wizard to guide you through the configuration process:
+
+```
+wildintel-tools zooniverse  wizard setup
+```
+
 #### Test the connection
 
 Once configured, verify that your Zooniverse credentials and configuration are correct:

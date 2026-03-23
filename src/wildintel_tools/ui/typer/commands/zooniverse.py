@@ -5,11 +5,12 @@ from typing import Annotated, Optional, Any, List
 
 import typer
 from panoptes_client.panoptes import PanoptesAPIException
+from pydantic import SecretStr
 from trapper_client.Schemas import TrapperDeploymentList
 from trapper_client.TrapperClient import TrapperClient
 
 from wildintel_tools.ui.typer.ZooUtils import ZooUtils
-from wildintel_tools.ui.typer.settings import Settings
+from wildintel_tools.ui.typer.settings import Settings, SettingsManager, ZooniverseSettings, ZooniverseConnectorSettings
 from wildintel_tools.ui.typer.zooniverse import check_connection, get_workflows, get_subject_sets
 from wildintel_tools.zooniverse.TrapperZooniverseConnector import TrapperZooniverseConnector
 from wildintel_tools.zooniverse.ZooniverseClient import ZooniverseClient
@@ -17,7 +18,8 @@ from wildintel_tools.ui.typer.TyperUtils import TyperUtils
 from wildintel_tools.ui.typer.i18n import _
 
 app = typer.Typer(
-    help=_("Includes command to upload medias from Trapper to Zooniverse and import Annotations from Zooniverse to Trapper"),
+    help=_("Includes command to upload medias from Trapper to Zooniverse and import Annotations from Zooniverse to "
+           "Trapper"),
     short_help=_("Utilities for managing and validating WildIntel data"))
 
 def make_dynaconf_callback(override_mapping: dict | None = None):
@@ -577,6 +579,7 @@ from enum import Enum
 
 class Wizard(str, Enum):
     importation = "import"
+    setup       = "setup"
 
 @app.command("wizard",
          short_help=_("Run a wizard to guide you through completing a task."),
@@ -588,6 +591,8 @@ def wizard_command(
     config: Annotated[Path, typer.Option(hidden=True, callback=callback_with_override)] = None,
 ) -> None:
     settings: Settings = ctx.obj.get("settings", Settings())
+    settings_manager: SettingsManager = ctx.obj.get("setting_manager", Settings())
+
     trapper_client = TrapperClient(
         base_url=str(settings.GENERAL.host),
         user_name=settings.GENERAL.login,
@@ -620,7 +625,7 @@ def wizard_command(
             deployment_selected, key = TyperUtils.select_from_list(filtered,name_attr="deployment_id",title="Select a deployment", multi_select=True)
 
             if not deployment_selected:
-                TyperUtils.fatal(f"No deployment selected.")
+                TyperUtils.fatal("No deployment selected.")
 
             deployment_pks = [str(d.pk) for d in deployment_selected]
             deployments_str = ",".join(deployment_pks)
@@ -652,6 +657,141 @@ def wizard_command(
                 typer.echo("Aborted.")
         else:
             typer.echo("Aborted.")
+    elif Wizard.setup == wizard :
+        msg = "This wizard will guide you through Zooniverse connection settings."
+        if typer.confirm(msg):
+            project_name = str(ctx.obj.get("project", "default"))
 
+            try:
+                settings = settings_manager.load_settings(project_name)
+            except FileNotFoundError:
+                settings = None
 
+            # --- Zooniverse account ---
+            username_default = settings.ZOONIVERSE.zooniverse_username if settings else "myuser"
+            password_default = settings.ZOONIVERSE.zooniverse_password.get_secret_value() if settings else "mypassword"
+            project_id_default = settings.ZOONIVERSE.zooniverse_project_id if settings else "myprojectid"
 
+            zooniverse_username = TyperUtils.prompt_with_default(
+                "Enter your Zooniverse username",
+                username_default,
+                ZooniverseSettings,
+                "zooniverse_username"
+            )
+            zooniverse_password = TyperUtils.prompt_with_default(
+                "Enter your Zooniverse password",
+                password_default,
+                ZooniverseSettings,
+                "zooniverse_password",
+                show_default=False
+            )
+            zooniverse_project_id = TyperUtils.prompt_with_default(
+                "Enter your Zooniverse project ID",
+                project_id_default,
+                ZooniverseSettings,
+                "zooniverse_project_id"
+            )
+
+            # --- Upload parameters ---
+            seq_default = str(settings.ZOONIVERSE_CONNECTOR.upload_collection_n_images_seq if settings else 5)
+            max_interval_default = str(settings.ZOONIVERSE_CONNECTOR.upload_collection_max_interval if settings else 90)
+            attempts_default = str(settings.ZOONIVERSE_CONNECTOR.upload_collection_attempts if settings else 5)
+            delay_default = str(settings.ZOONIVERSE_CONNECTOR.upload_collection_delay if settings else 15)
+            max_per_subject_default = str(settings.ZOONIVERSE_CONNECTOR.upload_collection_max_attempts_per_subject
+                                          if settings else 5)
+            delay_per_subject_default = str(settings.ZOONIVERSE_CONNECTOR.upload_collection_delay_seconds_per_subject
+                                            if settings else 30)
+
+            upload_collection_n_images_seq = int(TyperUtils.prompt_with_default(
+                "Number of images per upload batch",
+                seq_default,
+                ZooniverseConnectorSettings,
+                "upload_collection_n_images_seq"
+            ))
+            upload_collection_max_interval = int(TyperUtils.prompt_with_default(
+                "Maximum interval between upload batches (seconds)",
+                max_interval_default,
+                ZooniverseConnectorSettings,
+                "upload_collection_max_interval"
+            ))
+            upload_collection_attempts = int(TyperUtils.prompt_with_default(
+                "Maximum upload attempts per batch",
+                attempts_default,
+                ZooniverseConnectorSettings,
+                "upload_collection_attempts"
+            ))
+            upload_collection_delay = int(TyperUtils.prompt_with_default(
+                "Delay between upload attempts (seconds)",
+                delay_default,
+                ZooniverseConnectorSettings,
+                "upload_collection_delay"
+            ))
+            upload_collection_max_attempts_per_subject = int(TyperUtils.prompt_with_default(
+                "Maximum attempts per subject",
+                max_per_subject_default,
+                ZooniverseConnectorSettings,
+                "upload_collection_max_attempts_per_subject"
+            ))
+            upload_collection_delay_seconds_per_subject = int(TyperUtils.prompt_with_default(
+                "Delay per subject (seconds)",
+                delay_per_subject_default,
+                ZooniverseConnectorSettings,
+                "upload_collection_delay_seconds_per_subject"
+            ))
+
+            # Crear los modelos con los valores introducidos
+            zooniverse_settings = ZooniverseSettings(
+                zooniverse_username=zooniverse_username,
+                zooniverse_password=SecretStr(zooniverse_password),
+                zooniverse_project_id=zooniverse_project_id
+            )
+
+            connector_settings = ZooniverseConnectorSettings(
+                upload_collection_n_images_seq=upload_collection_n_images_seq,
+                upload_collection_max_interval=upload_collection_max_interval,
+                upload_collection_attempts=upload_collection_attempts,
+                upload_collection_delay=upload_collection_delay,
+                upload_collection_max_attempts_per_subject=upload_collection_max_attempts_per_subject,
+                upload_collection_delay_seconds_per_subject=upload_collection_delay_seconds_per_subject
+            )
+
+            # Guardar en settings_manager
+            updates = {
+                "ZOONIVERSE.zooniverse_username":
+                    zooniverse_settings.zooniverse_username,
+                "ZOONIVERSE.zooniverse_password":
+                    zooniverse_settings.zooniverse_password.get_secret_value(),
+                "ZOONIVERSE.zooniverse_project_id":
+                    zooniverse_settings.zooniverse_project_id,
+                "ZOONIVERSE_CONNECTOR.upload_collection_n_images_seq":
+                    connector_settings.upload_collection_n_images_seq,
+                "ZOONIVERSE_CONNECTOR.upload_collection_max_interval":
+                    connector_settings.upload_collection_max_interval,
+                "ZOONIVERSE_CONNECTOR.upload_collection_attempts":
+                    connector_settings.upload_collection_attempts,
+                "ZOONIVERSE_CONNECTOR.upload_collection_delay":
+                    connector_settings.upload_collection_delay,
+                "ZOONIVERSE_CONNECTOR.upload_collection_max_attempts_per_subject":
+                    connector_settings.upload_collection_max_attempts_per_subject,
+                "ZOONIVERSE_CONNECTOR.upload_collection_delay_seconds_per_subject":
+                    connector_settings.upload_collection_delay_seconds_per_subject,
+            }
+
+            val = []
+
+            for key, value in updates.items():
+                val.append({"Setting": key, "Value": "********" if "password" in key.lower() else str(value)})
+
+            TyperUtils.show_table(val,"Settings to update")
+
+            # Confirmación antes de aplicar cambios
+            if typer.confirm("Do you want to apply these changes?"):
+                settings_manager.update_settings(project_name, updates)
+                TyperUtils.console.print(
+                    f"[bold green]Zooniverse configuration for project '{project_name}' "
+                    f"saved successfully![/bold green]"
+                )
+            else:
+                TyperUtils.console.print("[bold red]Aborted. No changes were made.[/bold red]")
+        else:
+            typer.echo("Aborted.")
