@@ -30,6 +30,7 @@ from collections import defaultdict
 from zoneinfo import ZoneInfo
 
 from dynaconf import Dynaconf
+from pydantic import SecretStr, ValidationError
 from rich.progress import Progress, TextColumn, BarColumn, TimeElapsedColumn
 from trapper_client.TrapperClient import TrapperClient
 from typer_config import conf_callback_factory
@@ -46,6 +47,8 @@ from pathlib import Path
 from typing import List, Any, Iterable
 
 import typer
+
+from wildintel_tools.ui.typer.settings import GeneralSettings, WildIntelSettings, Settings, SettingsManager
 
 app = typer.Typer(
     help=_("Includes several utilities to validate and ensure the quality of collections and deployments produced within the WildIntel project"),
@@ -736,6 +739,90 @@ def pipeline(
                             report=report_prep)
             else:
                 TyperUtils.error(_(f"Log file {log_file} not found in collection {col}. Skipping deployment checks."))
+
+from enum import Enum
+
+class Wizard(str, Enum):
+    config = "config"
+
+@app.command("wizard",
+         short_help=_("Run a wizard to guide you through completing a task."),
+         help=_("Run a wizard to guide you through completing a task."))
+# @use_yaml_config(section=["upload_collection"], default_value=config_manager.ensure_config_file())
+def wizard_command(
+    ctx: typer.Context,
+    wizard: Annotated[Wizard, typer.Argument(help=("Wizard-style"))] = ...,
+    config: Annotated[Path, typer.Option(hidden=True, callback=callback_with_override)] = None,
+) -> None:
+    settings: Settings = ctx.obj.get("settings", Settings())
+    settings_manager: SettingsManager = ctx.obj.get("setting_manager", Settings())
+    project_name = str(ctx.obj.get("project", "default"))
+
+    try:
+        settings = settings_manager.load_settings(project_name)
+    except FileNotFoundError:
+        settings = None
+
+    #trapper_client = TrapperClient(
+    #    base_url=str(settings.GENERAL.host),
+    #    user_name=settings.GENERAL.login,
+    #    user_password=settings.GENERAL.password.get_secret_value(),
+    #    access_token=None
+    #)
+
+    if (wizard == Wizard.config):
+        msg = ("This wizard will guide you through the initial configuration of the application.")
+
+        if typer.confirm(msg):
+            host_default = settings.GENERAL.host if settings else "https://wildintel-trap.uhu.es/"
+            login_default = settings.GENERAL.login if settings else "user@example.com"
+            password_default = settings.GENERAL.password.get_secret_value() if settings else ""
+            project_id_default = str(settings.GENERAL.project_id) if settings else "123"
+            data_dir_default = str(settings.GENERAL.data_dir) if settings else str(
+                Path.home() / ".wildintel-tools/collections")
+
+            # General settings
+            host = TyperUtils.prompt_with_default("Enter the Trapper instance URL", host_default, GeneralSettings, "host")
+            login = TyperUtils.prompt_with_default("Enter your email login", login_default, GeneralSettings, "login")
+            password = TyperUtils.prompt_with_default("Enter your password", password_default, GeneralSettings, "password", show_default=False)
+            # cp = trapper_client.classification_projects.get_by_research_project(rp_selected.pk)
+            # cp_selected, key = TyperUtils.select_from_list(cp.results, title="Select a classification project")
+            project_id = TyperUtils.prompt_with_default("Enter the classification project ID",project_id_default,GeneralSettings, "project_id")
+            data_dir = TyperUtils.prompt_with_default("Enter the directory for project collections", data_dir_default,
+                                           GeneralSettings, "data_dir")
+
+            # WILDINTEL
+            rp_name_default = settings.WILDINTEL.rp_name if settings else "WildINTEL"
+            coverage_default =settings.WILDINTEL.coverage if settings else "Doñana National Park"
+            output_dir_default = str(settings.WILDINTEL.output_dir) if settings else str(
+                Path.home() / ".wildintel-tools/readycollections")
+            timezone_default = settings.WILDINTEL.timezone if settings else "UTC"
+
+            rp_name = TyperUtils.prompt_with_default("Enter the research project name", rp_name_default, WildIntelSettings, "rp_name")
+            coverage = TyperUtils.prompt_with_default("Enter the coverage area", coverage_default, WildIntelSettings, "coverage")
+            output_dir = TyperUtils.prompt_with_default("Enter the directory for processed collections", output_dir_default,
+                                         WildIntelSettings, "output_dir")
+            timezone = TyperUtils.prompt_with_default("Enter the timezone (e.g. UTC, Europe/Madrid)", timezone_default,
+                                       WildIntelSettings, "timezone")
+
+            updates = {
+                "GENERAL.host": host,
+                "GENERAL.login": login,
+                "GENERAL.password": password,
+                "GENERAL.project_id": int(project_id),
+                "GENERAL.data_dir": str(data_dir),
+                "WILDINTEL.rp_name": rp_name,
+                "WILDINTEL.coverage": coverage,
+                "WILDINTEL.output_dir": str(output_dir),
+                "WILDINTEL.timezone": timezone
+            }
+
+            #settings_manager.create_project_settings(project_name)
+            settings_manager.update_settings(project_name, updates)
+            typer.echo(
+                f"\nConfiguration for project '{project_name}' saved successfully at {settings_manager.get_settings_path(project_name)}")
+        else:
+            typer.echo("Aborted.")
 
 def _show_report(report:"Report", success_msg="Validation completed successfully", error_msg ="There were errors during the validation", output = None):
     """

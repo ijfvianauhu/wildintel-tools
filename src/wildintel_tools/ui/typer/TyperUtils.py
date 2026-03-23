@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime
 import yaml
 from docutils.nodes import status
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from rich import box
 from rich.panel import Panel
 from rich.prompt import Prompt
@@ -505,6 +505,39 @@ class TyperUtils:
             k, v = pair.split("=", 1)
             out[k.strip()] = v.strip()
         return out
+
+    def prompt_with_default(
+            prompt_msg: str,
+            default: str | None,
+            model_cls: type,
+            field_name: str,
+            show_default: bool = True
+    ):
+        """
+        Prompt the user, showing a default value optionally.
+        If Enter is pressed, keep default. Validates input using Pydantic.
+
+        :param prompt_msg: Message to show to the user.
+        :param default: Default value to keep if Enter is pressed.
+        :param model_cls: Pydantic model class for validation.
+        :param field_name: Field name in the model to validate.
+        :param show_default: If True, shows the default value in the prompt; if False, hides it.
+        """
+        while True:
+            if default and show_default:
+                value = typer.prompt(f"{prompt_msg} [{default}]", default=default, show_default=False)
+            elif default:
+                # Default exists but we hide it
+                value = typer.prompt(prompt_msg, default=default, show_default=False)
+            else:
+                value = typer.prompt(prompt_msg)
+
+            try:
+                # Validar usando Pydantic
+                model_cls(**{field_name: value})
+                return value
+            except ValidationError as e:
+                typer.echo(f"Invalid input: {e.errors()[0]['msg']}. Please try again.")
 
     @staticmethod
     def select_from_list(
