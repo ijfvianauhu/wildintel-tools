@@ -72,3 +72,4 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: dist/wildintel-tools-${{ matrix.pyinstaller_os }}.zip
+          token: ${{ secrets.PAT_TOKEN }}
