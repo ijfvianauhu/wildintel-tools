@@ -352,3 +352,62 @@ def upload_trapper_package(
             )
 
     return report
+
+
+def import_deployment(
+    source_dir: Path,
+    destination_dir: Path,
+    deployment_name: str,
+    log_file: Path,
+    timezone: ZoneInfo = ZoneInfo("UTC"),
+    ignore_dst: bool = False,
+) -> "Report":
+    """
+    Copy images from *source_dir* into *destination_dir* with two Rich progress
+    bars: one for the file copy phase and one for the EXIF extraction phase.
+    Delegates all business logic to :func:`wildintel_tools.wildintel.import_deployment`.
+
+    :returns: :class:`~wildintel_tools.reports.Report` with actions ``copy``,
+              ``exif`` and ``csv_log``. The ``csv_log`` success entry carries
+              ``start_dt``, ``end_dt``, ``copied_files`` and ``copied_dirs`` as extras.
+    """
+    copy_task_id = None
+    exif_task_id = None
+
+    with Progress(
+        TextColumn("[bold blue]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        TimeElapsedColumn(),
+    ) as progress:
+
+        def on_progress(event: str, count: int) -> None:
+            nonlocal copy_task_id, exif_task_id
+
+            if event.startswith("copy_start:"):
+                total = int(event.split(":", 1)[1])
+                copy_task_id = progress.add_task("[cyan]Copying files…", total=total)
+
+            elif event.startswith("copy_file:"):
+                if copy_task_id is not None:
+                    progress.advance(copy_task_id, 1)
+
+            elif event.startswith("exif_start:"):
+                total = int(event.split(":", 1)[1])
+                exif_task_id = progress.add_task("[yellow]Reading timestamps…", total=total)
+
+            elif event.startswith("exif_file:") or event.startswith("exif_skip:"):
+                if exif_task_id is not None:
+                    progress.advance(exif_task_id, 1)
+
+        result = wildintel_tools.wildintel.import_deployment(
+            source_dir=source_dir,
+            destination_dir=destination_dir,
+            deployment_name=deployment_name,
+            log_file=log_file,
+            timezone=timezone,
+            ignore_dst=ignore_dst,
+            progress_callback=on_progress,
+        )
+
+    return result

@@ -607,7 +607,7 @@ class TyperUtils:
         def parse_selection(choice_str: str) -> List[int]:
             result = set()
 
-            parts = choice_str.split(",")
+            parts = choice_str.strip().split(",")
             for part in parts:
                 part = part.strip()
 
@@ -615,7 +615,11 @@ class TyperUtils:
                     start, end = part.split("-")
                     result.update(range(int(start), int(end) + 1))
                 else:
-                    result.add(int(part))
+                    try:
+                        value = int(part)
+                    except ValueError:
+                        continue
+                    result.add(value)
 
             # Filtrar índices válidos
             return [i for i in sorted(result) if 1 <= i <= len(items)]

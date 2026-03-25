@@ -23,25 +23,16 @@ prepare_for_trapper(...)
 _show_report(report, success_msg, error_msg, output)
     Render and persist a report in YAML format.
 """
-import asyncio
-import json
-import tempfile
-from collections import defaultdict
-from zoneinfo import ZoneInfo
 
-from dynaconf import Dynaconf
-from pydantic import SecretStr, ValidationError
-from rich.progress import Progress, TextColumn, BarColumn, TimeElapsedColumn
+import tempfile
+from zoneinfo import ZoneInfo
 from trapper_client.TrapperClient import TrapperClient
-from typer_config import conf_callback_factory
 import logging
 
-from wildintel_tools.http_uploader import HTTPUploader
 from wildintel_tools.resouceutils import ResourceExtensionDTO
-from wildintel_tools.trapper_package import DataPackageGeneratorParallel
 from wildintel_tools.ui.typer.i18n import _
-from wildintel_tools.ui.typer.TyperUtils import TyperUtils, HierarchicalProgress
-import wildintel_tools.wildintel as wildintel_processing
+from wildintel_tools.ui.typer.TyperUtils import TyperUtils
+import wildintel_tools.ui.typer.wildintel as wildintel_ui
 from typing_extensions import Annotated
 from pathlib import Path
 from typing import List, Any, Iterable
@@ -744,6 +735,7 @@ from enum import Enum
 
 class Wizard(str, Enum):
     config = "config"
+    setup  = "setup"
     import_deployment = "import_deployment"
 
 @app.command("wizard",
@@ -755,7 +747,6 @@ def wizard_command(
     wizard: Annotated[Wizard, typer.Argument(help=("Wizard-style"))] = ...,
     config: Annotated[Path, typer.Option(hidden=True, callback=callback_with_override)] = None,
 ) -> None:
-    settings: Settings = ctx.obj.get("settings", Settings())
     settings_manager: SettingsManager = ctx.obj.get("setting_manager", Settings())
     project_name = str(ctx.obj.get("project", "default"))
 
@@ -764,14 +755,8 @@ def wizard_command(
     except FileNotFoundError:
         settings = None
 
-    #trapper_client = TrapperClient(
-    #    base_url=str(settings.GENERAL.host),
-    #    user_name=settings.GENERAL.login,
-    #    user_password=settings.GENERAL.password.get_secret_value(),
-    #    access_token=None
-    #)
 
-    if (wizard == Wizard.config):
+    if (wizard == Wizard.config or wizard == Wizard.setup):
         msg = ("This wizard will guide you through the initial configuration of the application.")
 
         if typer.confirm(msg):
@@ -782,13 +767,46 @@ def wizard_command(
             data_dir_default = str(settings.GENERAL.data_dir) if settings else str(
                 Path.home() / ".wildintel-tools/collections")
 
-            # General settings
-            host = TyperUtils.prompt_with_default("Enter the Trapper instance URL", host_default, GeneralSettings, "host")
-            login = TyperUtils.prompt_with_default("Enter your email login", login_default, GeneralSettings, "login")
-            password = TyperUtils.prompt_with_default("Enter your password", password_default, GeneralSettings, "password", show_default=False)
-            # cp = trapper_client.classification_projects.get_by_research_project(rp_selected.pk)
-            # cp_selected, key = TyperUtils.select_from_list(cp.results, title="Select a classification project")
-            project_id = TyperUtils.prompt_with_default("Enter the classification project ID",project_id_default,GeneralSettings, "project_id")
+            # General settings + connection retry
+            while True:
+                host = TyperUtils.prompt_with_default("Enter the Trapper instance URL", host_default, GeneralSettings, "host")
+                login = TyperUtils.prompt_with_default("Enter your email login", login_default, GeneralSettings, "login")
+                password = TyperUtils.prompt_with_default(
+                    "Enter your password",
+                    password_default,
+                    GeneralSettings,
+                    "password",
+                    show_default=False,
+                )
+
+                try:
+                    trapper_client = TrapperClient(
+                        base_url=str(host),
+                        user_name=login,
+                        user_password=password,
+                        access_token=None,
+                    )
+                    cp = trapper_client.classification_projects.get_all()
+                    break
+                except Exception as e:
+                    TyperUtils.error(_("Could not connect to Trapper with the provided credentials: {0}").format(str(e)))
+                    retry = typer.confirm(_("Do you want to try again with host/login/password?"), default=True)
+                    if not retry:
+                        typer.echo("Aborted.")
+                        return
+
+                    # Reuse last entered values as defaults in the next attempt.
+                    host_default = str(host)
+                    login_default = str(login)
+                    password_default = str(password)
+
+            result = TyperUtils.select_from_list(cp.results, title=f"Select a classification project [default: {project_id_default}]")
+            if result is None:
+                project_id = project_id_default
+            else:
+                project_selected, key = result
+                project_id = getattr(project_selected, "pk", project_selected)
+
             data_dir = TyperUtils.prompt_with_default("Enter the directory for project collections", data_dir_default,
                                            GeneralSettings, "data_dir")
 
@@ -817,8 +835,6 @@ def wizard_command(
                 "WILDINTEL.output_dir": str(output_dir),
                 "WILDINTEL.timezone": timezone
             }
-
-            #settings_manager.create_project_settings(project_name)
             settings_manager.update_settings(project_name, updates)
             typer.echo(
                 f"\nConfiguration for project '{project_name}' saved successfully at {settings_manager.get_settings_path(project_name)}")
@@ -827,14 +843,23 @@ def wizard_command(
     elif wizard == Wizard.import_deployment:
         msg = "This wizard will guide you through importing a new deployment."
         if typer.confirm(msg):
-            # 1️⃣ Preguntar proyecto de investigación
-            rp_name_default = settings.WILDINTEL.rp_name if settings else "WildINTEL"
-            rp_name = TyperUtils.prompt_with_default(
-                "Enter the research project name",
-                rp_name_default,
-                WildIntelSettings,
-                "rp_name"
+
+            trapper_client = TrapperClient(
+                base_url=str(settings.GENERAL.host),
+                user_name=settings.GENERAL.login,
+                user_password=settings.GENERAL.password.get_secret_value(),
+                access_token=None,
             )
+
+            rp=trapper_client.research_projects.get_all()
+
+            result = TyperUtils.select_from_list(rp.results,
+                                                 title=f"Select a research project")
+            if result is None:
+                TyperUtils.error(_("Could not find research project"))
+                return
+            else:
+                rproject_selected, key = result
 
             # 2️⃣ Número de revisión
             revision_number = TyperUtils.prompt_with_default(
@@ -845,32 +870,91 @@ def wizard_command(
             )
             revision_number = int(revision_number)
 
-            # 3️⃣ Localización
-            location = TyperUtils.prompt_with_default(
-                "Enter the location code",
-                "loc_001",
-                GeneralSettings,
-                "data_dir"  # usar solo para validación de string
-            )
+            locations=trapper_client.locations.get_all()
+
+            result = TyperUtils.select_from_list(locations.results,
+                                                 title=f"Select a location", name_attr="location_id")
+            if result is None:
+                TyperUtils.error(_("Could not find location"))
+                return
+            else:
+                loc_selected, key = result
 
             # Carpeta base: GENERAL.data_dir / R0001 (por ejemplo)
-            base_dir = Path(settings.GENERAL.data_dir) / f"R{revision_number:04d}"
+            base_dir = Path(settings.GENERAL.data_dir) / f"R{revision_number:04d}".upper()
             base_dir.mkdir(parents=True, exist_ok=True)
 
             # Subcarpeta: R0001_loc_001
-            sub_dir_name = f"R{revision_number:04d}_{location}"
+            revision_name = f"R{revision_number:04d}".upper()
+            sub_dir_name = f"{revision_name}-{loc_selected.location_id}".upper()
             sub_dir = base_dir / sub_dir_name
             sub_dir.mkdir(parents=True, exist_ok=True)
 
             typer.echo(f"Deployment folder created at: {sub_dir}")
 
-            # Guardar info en settings si quieres, por ejemplo:
-            updates = {
-                "WILDINTEL.rp_name": rp_name,
-                "GENERAL.data_dir": str(settings.GENERAL.data_dir),
-            }
-            settings_manager.update_settings(project_name, updates)
+            source_images_input = typer.prompt(_("Enter the path containing the images to import"))
+            source_images_dir = Path(source_images_input).expanduser()
+
+            if not source_images_dir.exists() or not source_images_dir.is_dir():
+                TyperUtils.error(_("The provided images path does not exist or is not a directory."))
+                return
+
+            try:
+                source_resolved = source_images_dir.resolve()
+                destination_resolved = sub_dir.resolve()
+            except OSError as e:
+                TyperUtils.error(_("Could not resolve the provided path: {0}").format(str(e)))
+                return
+
+            if source_resolved == destination_resolved or destination_resolved.is_relative_to(source_resolved):
+                TyperUtils.error(_("The source images directory cannot be the deployment directory or one of its parent directories."))
+                return
+
+            timezone_name = getattr(settings.WILDINTEL, "timezone", "UTC")
+            ignore_dst = getattr(settings.WILDINTEL, "ignore_dst", False)
+
+            try:
+                tz = ZoneInfo(str(timezone_name))
+            except Exception:
+                tz = ZoneInfo("UTC")
+
+            log_file = base_dir / f"{revision_name}_FileTimestampLog.csv"
+
+            try:
+                report = wildintel_ui.import_deployment(
+                    source_dir=source_images_dir,
+                    destination_dir=sub_dir,
+                    deployment_name=sub_dir_name,
+                    log_file=log_file,
+                    timezone=tz,
+                    ignore_dst=ignore_dst,
+                )
+            except Exception as e:
+                TyperUtils.error(str(e))
+                return
+
+            # Extract date-range extras from the csv_log success entry if available.
+            csv_entries = report.successes.get(sub_dir_name, [])
+            csv_entry = next((e for e in csv_entries if e.get("action") == "csv_log"), None)
+            TyperUtils.display_report(report)
+            #_show_report(
+            #    report,
+            #    success_msg=_("Deployment {0} imported successfully").format(sub_dir_name),
+            #    error_msg=_("Deployment {0} imported with errors").format(sub_dir_name),
+            #)
+
+            if csv_entry:
+                TyperUtils.info(
+                    _("Date range: {0} → {1}  |  files: {2}, folders: {3}").format(
+                        csv_entry.get("start_dt", "?"),
+                        csv_entry.get("end_dt", "?"),
+                        csv_entry.get("copied_files", "?"),
+                        csv_entry.get("copied_dirs", "?"),
+                    )
+                )
+
             typer.echo("Deployment settings updated successfully.")
+
         else:
             typer.echo("Aborted.")
 

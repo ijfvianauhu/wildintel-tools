@@ -1,10 +1,8 @@
 import csv
 import hashlib
-import random
 import re
 import time
 import unicodedata
-from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import shutil
 from datetime import datetime, timedelta
@@ -891,3 +889,202 @@ def _collect_package_pairs(
             results.append((deployment, files[".yaml"], files[".zip"]))
 
     return results
+
+
+def import_deployment(
+    source_dir: Path,
+    destination_dir: Path,
+    deployment_name: str,
+    log_file: Path,
+    timezone: ZoneInfo = ZoneInfo("UTC"),
+    ignore_dst: bool = False,
+    progress_callback: Callable[[str, int], None] = None,
+) -> Report:
+    """
+    Copy images from *source_dir* into *destination_dir* recursively, preserving
+    the sub-folder structure, then compute the EXIF date range for the copied
+    media and upsert one row in the FileTimestampLog CSV.
+
+    Progress events emitted via *progress_callback(event: str, count: int)*:
+
+    * ``copy_start:<total>``          – total number of files to copy
+    * ``copy_file:<filename>``        – one file has been copied
+    * ``exif_start:<total>``          – total media files to scan
+    * ``exif_file:<filename>``        – timestamp extracted from one file
+    * ``exif_skip:<filename>``        – file skipped (no readable timestamp)
+
+    :param source_dir: Directory that contains the images to import.
+    :param destination_dir: Deployment sub-folder created by the wizard.
+    :param deployment_name: Name used as the ``Deployment`` key in the CSV.
+    :param log_file: Path to the ``RNNNN_FileTimestampLog.csv`` file (created if absent).
+    :param timezone: Timezone used to interpret naive EXIF timestamps.
+    :param ignore_dst: If True, DST offset is ignored when localising datetimes.
+    :param progress_callback: Optional callable ``(event, count)`` for progress reporting.
+    :returns: :class:`Report` with actions ``copy``, ``exif`` and ``csv_log``.
+              The ``csv_log`` success entry carries ``start_dt``, ``end_dt``,
+              ``copied_files`` and ``copied_dirs`` as extras.
+    """
+
+    report = Report(title=f"Import deployment {deployment_name}", type="import_deployment")
+
+    source_dir = Path(source_dir)
+    destination_dir = Path(destination_dir)
+
+    if not source_dir.exists() or not source_dir.is_dir():
+        report.add_error(deployment_name, "copy",
+                         f"Source directory does not exist or is not a directory: {source_dir}")
+        report.finish()
+        return report
+
+    source_resolved = source_dir.resolve()
+    dest_resolved = destination_dir.resolve()
+    if source_resolved == dest_resolved or dest_resolved.is_relative_to(source_resolved):
+        report.add_error(deployment_name, "copy",
+                         "The source images directory cannot be the deployment directory "
+                         "or one of its parent directories.")
+        report.finish()
+        return report
+
+    all_entries = list(source_dir.rglob("*"))
+    all_dirs = [p for p in all_entries if p.is_dir()]
+    all_files = [p for p in all_entries if p.is_file()]
+
+    if progress_callback:
+        progress_callback(f"copy_start:{len(all_files)}", len(all_files))
+
+    copied_files = 0
+    copied_dirs = 0
+
+    for source_path in all_dirs:
+        relative_path = source_path.relative_to(source_dir)
+        destination_path = destination_dir / relative_path
+        destination_path.mkdir(parents=True, exist_ok=True)
+        copied_dirs += 1
+
+    def _copy_one(source_path: Path) -> tuple[str, Path, str | None]:
+        relative_path = source_path.relative_to(source_dir)
+        destination_path = destination_dir / relative_path
+        try:
+            destination_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source_path, destination_path)
+            return str(relative_path), destination_path, None
+        except Exception as exc:
+            return str(relative_path), destination_path, str(exc)
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        future_to_path = {executor.submit(_copy_one, source_path): source_path for source_path in all_files}
+        for future in as_completed(future_to_path):
+            source_path = future_to_path[future]
+            relative_path, destination_path, error = future.result()
+            if error is None:
+                copied_files += 1
+                report.add_success(relative_path, "copy", f"Copied to {destination_path}")
+            else:
+                report.add_error(relative_path, "copy", error)
+
+            if progress_callback:
+                progress_callback(f"copy_file:{source_path.name}", 1)
+
+    media_extensions = {ext.value.lower() for ext in ResourceExtensionDTO}
+    media_files = [
+        p for p in destination_dir.rglob("*")
+        if p.is_file() and p.suffix.lower() in media_extensions
+    ]
+
+    if progress_callback:
+        progress_callback(f"exif_start:{len(media_files)}", len(media_files))
+
+    exif_timestamps: List[datetime] = []
+
+    def _extract_exif_date(media_file: Path) -> tuple[str, datetime | None, str | None]:
+        rel = str(media_file.relative_to(destination_dir))
+        try:
+            metadata = ResourceUtils.get_exif_from_path(
+                media_file,
+                tags=ResourceUtils.METADATA_EXIF_TAGS,
+            )
+            exif_time = ResourceUtils.parse_date_recorded(
+                metadata,
+                timezone=timezone,
+                ignore_dst=ignore_dst,
+                convert_to_utc=False,
+            )
+            return rel, exif_time, None
+        except Exception as exc:
+            return rel, None, str(exc)
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        future_to_media = {executor.submit(_extract_exif_date, media_file): media_file for media_file in media_files}
+        for future in as_completed(future_to_media):
+            media_file = future_to_media[future]
+            rel, exif_time, error = future.result()
+            if error is None and exif_time is not None:
+                exif_timestamps.append(exif_time)
+                report.add_success(rel, "exif", f"Timestamp: {exif_time.strftime('%Y-%m-%d %H:%M:%S')}")
+                if progress_callback:
+                    progress_callback(f"exif_file:{media_file.name}", 1)
+            else:
+                report.add_error(rel, "exif", error or "Unknown EXIF error")
+                if progress_callback:
+                    progress_callback(f"exif_skip:{media_file.name}", 1)
+
+    if not exif_timestamps:
+        report.add_error(deployment_name, "csv_log",
+                         f"No valid image/video timestamps were found in {destination_dir}.")
+        report.finish()
+        return report
+
+    start_dt = min(exif_timestamps)
+    end_dt = max(exif_timestamps)
+
+    fields = ["Deployment", "StartDate", "StartTime", "EndDate", "EndTime"]
+    log_rows: List[Dict] = []
+
+    if log_file.exists():
+        with open(log_file, newline="", encoding="utf-8-sig") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                dep = (row.get("Deployment") or "").strip()
+                if not dep:
+                    continue
+                log_rows.append({
+                    "Deployment": dep,
+                    "StartDate": (row.get("StartDate") or "").strip(),
+                    "StartTime": (row.get("StartTime") or "").strip(),
+                    "EndDate":   (row.get("EndDate") or "").strip(),
+                    "EndTime":   (row.get("EndTime") or "").strip(),
+                })
+
+    deployment_exists = any(
+        row["Deployment"].upper() == deployment_name.upper()
+        for row in log_rows
+    )
+
+    if not deployment_exists:
+        log_rows.append({
+            "Deployment": deployment_name,
+            "StartDate": start_dt.strftime("%Y:%m:%d"),
+            "StartTime": start_dt.strftime("%H:%M:%S"),
+            "EndDate":   end_dt.strftime("%Y:%m:%d"),
+            "EndTime":   end_dt.strftime("%H:%M:%S"),
+        })
+
+    with open(log_file, "w", newline="", encoding="utf-8-sig") as f:
+        writer = csv.DictWriter(f, fieldnames=fields)
+        writer.writeheader()
+        writer.writerows(log_rows)
+
+    if deployment_exists:
+        report.add_error(deployment_name, "csv_log",
+                         f"Deployment already existed in {log_file}; no new CSV row was added.")
+    else:
+        report.add_success(deployment_name, "csv_log",
+                           f"Row added to {log_file}.",
+                           start_dt=start_dt.strftime("%Y-%m-%d %H:%M:%S"),
+                           end_dt=end_dt.strftime("%Y-%m-%d %H:%M:%S"),
+                           copied_files=copied_files,
+                           copied_dirs=copied_dirs)
+
+    report.finish()
+    return report
+

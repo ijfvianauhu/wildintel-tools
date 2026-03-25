@@ -161,7 +161,7 @@ def main_callback(ctx: typer.Context,
     :return: None
     :rtype: None
     """
-    if (version):
+    if version:
         prog = os.path.basename(sys.argv[0])
         TyperUtils.console.print(f"{prog}s {__version__}")
         exit(1)
