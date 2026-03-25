@@ -48,7 +48,11 @@ jobs:
 
       - name: Install project dependencies
         run: uv sync --all-extras --dev
-
+        
+      - name: Install python-magic-bin (Windows only)
+        if: runner.os == 'Windows'
+        run: uv pip install python-magic-bin
+        
       - name: Build executable with PyInstaller
         run: |
           uv run pyinstaller --onefile --name ${{ matrix.file_name }} src/wildintel_tools/ui/typer/main.py
