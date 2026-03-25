@@ -744,6 +744,7 @@ from enum import Enum
 
 class Wizard(str, Enum):
     config = "config"
+    import_deployment = "import_deployment"
 
 @app.command("wizard",
          short_help=_("Run a wizard to guide you through completing a task."),
@@ -823,6 +824,56 @@ def wizard_command(
                 f"\nConfiguration for project '{project_name}' saved successfully at {settings_manager.get_settings_path(project_name)}")
         else:
             typer.echo("Aborted.")
+    elif wizard == Wizard.import_deployment:
+        msg = "This wizard will guide you through importing a new deployment."
+        if typer.confirm(msg):
+            # 1️⃣ Preguntar proyecto de investigación
+            rp_name_default = settings.WILDINTEL.rp_name if settings else "WildINTEL"
+            rp_name = TyperUtils.prompt_with_default(
+                "Enter the research project name",
+                rp_name_default,
+                WildIntelSettings,
+                "rp_name"
+            )
+
+            # 2️⃣ Número de revisión
+            revision_number = TyperUtils.prompt_with_default(
+                "Enter the revision number",
+                "1",
+                GeneralSettings,
+                "project_id"  # solo para validación de int
+            )
+            revision_number = int(revision_number)
+
+            # 3️⃣ Localización
+            location = TyperUtils.prompt_with_default(
+                "Enter the location code",
+                "loc_001",
+                GeneralSettings,
+                "data_dir"  # usar solo para validación de string
+            )
+
+            # Carpeta base: GENERAL.data_dir / R0001 (por ejemplo)
+            base_dir = Path(settings.GENERAL.data_dir) / f"R{revision_number:04d}"
+            base_dir.mkdir(parents=True, exist_ok=True)
+
+            # Subcarpeta: R0001_loc_001
+            sub_dir_name = f"R{revision_number:04d}_{location}"
+            sub_dir = base_dir / sub_dir_name
+            sub_dir.mkdir(parents=True, exist_ok=True)
+
+            typer.echo(f"Deployment folder created at: {sub_dir}")
+
+            # Guardar info en settings si quieres, por ejemplo:
+            updates = {
+                "WILDINTEL.rp_name": rp_name,
+                "GENERAL.data_dir": str(settings.GENERAL.data_dir),
+            }
+            settings_manager.update_settings(project_name, updates)
+            typer.echo("Deployment settings updated successfully.")
+        else:
+            typer.echo("Aborted.")
+
 
 def _show_report(report:"Report", success_msg="Validation completed successfully", error_msg ="There were errors during the validation", output = None):
     """
