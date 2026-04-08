@@ -138,6 +138,7 @@ class TrapperZooniverseConnector:
             max_attempts_per_subject=5,
             delay_seconds_per_subject=30,
             progress_callback: Optional[Callable[[str, str, int, Optional[int], Optional[str], bool, Optional[str], Optional[str]], None]] = None,
+            dry_run: bool = False,
     ) -> Report:
 
         deployments = list(deployments) if deployments is not None else None
@@ -241,8 +242,12 @@ class TrapperZooniverseConnector:
             total = sum(len(sequence) for sequence in sequences)
 
             # Crear SubjectSet antes de comenzar
-            self.logger.debug(f"Creando SubjectSet {subjectset_name} en Zooniverse")
-            subjectset = self.zoo.subjectsets.create(subjectset_name)
+            if dry_run:
+                self.logger.info(f"[DRY-RUN] Skipping subjectset creation: '{subjectset_name}'")
+                subjectset = None
+            else:
+                self.logger.debug(f"Creando SubjectSet {subjectset_name} en Zooniverse")
+                subjectset = self.zoo.subjectsets.create(subjectset_name)
 
             self._notify(progress_callback, "synchronizing_images", state="start",
                      description=f"Synchronizing {total} images...",
@@ -263,65 +268,91 @@ class TrapperZooniverseConnector:
                                            , item_status="start")
 
                         try:
-                            self._download_image_safe(str(media['filePath']), str(Path(temp_dir) / name),
-                                                      attempts=attempts, delay_seconds=delay)
-                            self._notify(
-                                progress_callback,
-                                "synchronizing_images",
-                                state="running",
-                                advance=0,
-                                item_description=f"↓↓ Downloading media to {str(Path(temp_dir) / name)}",
-                                item_name=f"{media_id}",
-                                item_status="end",
-                            )
-                            report.add_success(f"{media_id}@media", "download", **{"path":local_path})
+                            if dry_run:
+                                self.logger.info(f"[DRY-RUN] Skipping download of media {media_id}")
+                                self._notify(
+                                    progress_callback,
+                                    "synchronizing_images",
+                                    state="running",
+                                    advance=0,
+                                    item_description=f"[DRY-RUN] Simulated download of {str(Path(temp_dir) / name)}",
+                                    item_name=f"{media_id}",
+                                    item_status="end",
+                                )
+                                report.add_success(f"{media_id}@media", "download_simulated", **{"path": local_path})
+                            else:
+                                self._download_image_safe(str(media['filePath']), str(Path(temp_dir) / name),
+                                                          attempts=attempts, delay_seconds=delay)
+                                self._notify(
+                                    progress_callback,
+                                    "synchronizing_images",
+                                    state="running",
+                                    advance=0,
+                                    item_description=f"↓↓ Downloading media to {str(Path(temp_dir) / name)}",
+                                    item_name=f"{media_id}",
+                                    item_status="end",
+                                )
+                                report.add_success(f"{media_id}@media", "download", **{"path":local_path})
 
-                            self._notify(
-                                progress_callback,
-                                "synchronizing_images",
-                                state="running",
-                                advance=0,
-                                item_description=f"↑↑↑ Uploading media to Zooniverse subject {subjectset_name}",
-                                item_name=f"{media_id}",
-                                item_status="start",
-                            )
-                            #origin = f"{self.trapper.base_url}:media:{media_id}"
-                            subject_metadata = {
-                                # "origin": origin
-                                "external_id": f"{self.trapper.base_url}:media:{media_id}",
-                                "preview": f"{self.trapper.base_url}storage/resource/media/{media_id}/pfile/",
-                                "link": f"{self.trapper.base_url}storage/resource/media/{media_id}/file/",
-                                "thumbnail": f"{self.trapper.base_url}storage/resource/media/{media_id}/tfile/",
-                                "origin": f"{self.trapper.base_url}",
-                                "license": "http://creativecommons.org/licenses/by-nc/4.0/legalcode",
-                                "image_name": media["fileName"],
-                            }
+                            if dry_run:
+                                self.logger.info(f"[DRY-RUN] Skipping upload of media {media_id} to Zooniverse")
+                                self._notify(
+                                    progress_callback,
+                                    "synchronizing_images",
+                                    state="running",
+                                    advance=1,
+                                    item_description=f"[DRY-RUN] Simulated upload to Zooniverse subject {subjectset_name}",
+                                    item_name=f"{media_id}",
+                                    item_status="end",
+                                )
+                                report.add_success(f"{media_id}@media", "upload_simulated", **{"subject_id": "dry-run", "path": local_path})
+                            else:
+                                self._notify(
+                                    progress_callback,
+                                    "synchronizing_images",
+                                    state="running",
+                                    advance=0,
+                                    item_description=f"↑↑↑ Uploading media to Zooniverse subject {subjectset_name}",
+                                    item_name=f"{media_id}",
+                                    item_status="start",
+                                )
+                                #origin = f"{self.trapper.base_url}:media:{media_id}"
+                                subject_metadata = {
+                                    # "origin": origin
+                                    "external_id": f"{self.trapper.base_url}:media:{media_id}",
+                                    "preview": f"{self.trapper.base_url}storage/resource/media/{media_id}/pfile/",
+                                    "link": f"{self.trapper.base_url}storage/resource/media/{media_id}/file/",
+                                    "thumbnail": f"{self.trapper.base_url}storage/resource/media/{media_id}/tfile/",
+                                    "origin": f"{self.trapper.base_url}",
+                                    "license": "http://creativecommons.org/licenses/by-nc/4.0/legalcode",
+                                    "image_name": media["fileName"],
+                                }
 
-                            subject = self.zoo.subjects.create(
-                                local_path,
-                                subjectset,
-                                subject_metadata,
-                                max_attempts_per_subject,
-                                delay_seconds_per_subject,
-                                skip_if_exists=False
-                            )
+                                subject = self.zoo.subjects.create(
+                                    local_path,
+                                    subjectset,
+                                    subject_metadata,
+                                    max_attempts_per_subject,
+                                    delay_seconds_per_subject,
+                                    skip_if_exists=False
+                                )
 
-                            report.add_success(f"{media_id}@media", "upload",
-                                              **{"subject_id": subject.id, "path": local_path})
+                                report.add_success(f"{media_id}@media", "upload",
+                                                  **{"subject_id": subject.id, "path": local_path})
 
-                            if os.path.exists(local_path):
-                                os.remove(local_path)
-                                self.logger.debug(f"Removed temporary file {local_path}")
+                                if os.path.exists(local_path):
+                                    os.remove(local_path)
+                                    self.logger.debug(f"Removed temporary file {local_path}")
 
-                            self._notify(
-                                progress_callback,
-                                "synchronizing_images",
-                                state="running",
-                                advance=1,
-                                item_description=f"↑↑↑ Uploading media to Zooniverse subject {subjectset_name}. {subject.id}",
-                                item_name=f"{media_id}",
-                                item_status="end",
-                            )
+                                self._notify(
+                                    progress_callback,
+                                    "synchronizing_images",
+                                    state="running",
+                                    advance=1,
+                                    item_description=f"↑↑↑ Uploading media to Zooniverse subject {subjectset_name}. {subject.id}",
+                                    item_name=f"{media_id}",
+                                    item_status="end",
+                                )
 
                         except DownloadException as e:
                             self._notify(

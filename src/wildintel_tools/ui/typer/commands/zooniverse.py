@@ -485,6 +485,13 @@ def importation(
     max_interval: Annotated[
         int, typer.Option("--max-interval", help="Maximum interval between images in a sequence (seconds)")
     ] = None,
+    dry_run: Annotated[
+        bool,
+        typer.Option(
+            "--dry-run",
+            help=_("Simulate the process: no images are downloaded, no subject set is created and nothing is uploaded to Zooniverse."),
+        ),
+    ] = False,
     config: Annotated[Path, typer.Option(hidden=True, callback=callback_with_override)] = None,
 ) -> None:
     """
@@ -545,6 +552,11 @@ def importation(
     if subjectset_name is None:
         subjectset_name = f"{rp_selected.name}_{rp_selected.pk}_{collection_selected.name}_{collection_selected.collection_pk}_{datetime.now():%Y-%m}"
 
+    if dry_run:
+        TyperUtils.console.print()
+        TyperUtils.console.print("[bold yellow]⚠  DRY-RUN mode: no images will be downloaded, no subject set will be created and nothing will be uploaded to Zooniverse.[/bold yellow]")
+        TyperUtils.console.print()
+
     #logger.debug(f"Using subjectset name: {subjectset_name}")
 
     import wildintel_tools.ui.typer.zooniverse
@@ -563,6 +575,7 @@ def importation(
             delay=15,
             max_attempts_per_subject=5,
             delay_seconds_per_subject=15,
+            dry_run=dry_run,
         )
 
         TyperUtils.success(f"Collection {collection} uploaded to Zooniverse subject set '{subjectset_name}'")
@@ -593,6 +606,13 @@ def wizard_command(
     settings: Settings = ctx.obj.get("settings", Settings())
     settings_manager: SettingsManager = ctx.obj.get("setting_manager", Settings())
 
+    def print_section(title: str):
+        """Print a section header."""
+        TyperUtils.console.print()
+        TyperUtils.console.print(f"[green]{'━' * 67}[/green]")
+        TyperUtils.console.print(f"[green]  {title}[/green]")
+        TyperUtils.console.print(f"[green]{'━' * 67}[/green]")
+
     trapper_client = TrapperClient(
         base_url=str(settings.GENERAL.host),
         user_name=settings.GENERAL.login,
@@ -601,20 +621,34 @@ def wizard_command(
     )
 
     if (wizard == Wizard.importation):
-        msg = ("This wizard will guide you through the process of importing a Trapper collection into a"
-               " Zooniverse subject set. As a general rule, only images that contain animals will be imported.")
 
-        if typer.confirm(msg):
+        print_section("Import images from Trapper to Zooniverse")
+
+        TyperUtils.console.print()
+        TyperUtils.console.print("[blue]ℹ[/blue] This wizard will guide you through the process of importing a Trapper collection ")
+        TyperUtils.console.print("    into a Zooniverse subject set. As a general rule, only blank images and images ")
+        TyperUtils.console.print("    that contain animals will be imported.")
+        TyperUtils.console.print()
+
+        if typer.confirm("Continue?"):
             # select research_project
             rp = trapper_client.research_projects.get_all()
+            TyperUtils.console.print()
             rp_selected, key = TyperUtils.select_from_list(rp.results, title="Select a research project")
             # select cp
             cp = trapper_client.classification_projects.get_by_research_project(rp_selected.pk)
+            if len(cp.results) == 0:
+                TyperUtils.fatal(f"No classification project found in research project {rp_selected.name} ({rp_selected.pk}). Cannot continue.")
+
+            TyperUtils.console.print()
             cp_selected, key = TyperUtils.select_from_list(cp.results, title="Select a classification project")
             # select collection
             collections = trapper_client.collections.get_by_classification_project(cp_selected.pk)
+            TyperUtils.console.print()
+
             collection_selected, key = TyperUtils.select_from_list(collections.results, id_attr="collection_pk", title="Select a collection")
             # select deployments
+            TyperUtils.console.print()
             deployments : TrapperDeploymentList = trapper_client.deployments.get_all(query={"research_project": rp_selected.pk})
 
             prefixes = f"{collection_selected.name}-".lower()
@@ -622,6 +656,7 @@ def wizard_command(
             filtered = [
                 d for d in deployments.results if d.deployment_id.lower().startswith(prefixes)
             ]
+            TyperUtils.console.print()
             deployment_selected, key = TyperUtils.select_from_list(filtered,name_attr="deployment_id",title="Select a deployment", multi_select=True)
 
             if not deployment_selected:
@@ -642,7 +677,19 @@ def wizard_command(
                 f"Are you sure?"
             )
 
+            TyperUtils.console.print()
+
             if typer.confirm(msg):
+                TyperUtils.console.print()
+                dry_run = typer.confirm(
+                    "Do you want to run in DRY-RUN mode? "
+                    "(No images will be downloaded, no subject set will be created and nothing will be uploaded to Zooniverse)",
+                    default=False,
+                )
+                if dry_run:
+                    TyperUtils.console.print("[bold yellow]⚠  DRY-RUN mode enabled.[/bold yellow]")
+                TyperUtils.console.print()
+
                 importation(ctx,
                             collection=collection_selected.collection_pk,
                             research_project=rp_selected.pk,
@@ -650,6 +697,7 @@ def wizard_command(
                             deployments_input=deployments_str,
                             n_images_seq=settings.ZOONIVERSE_CONNECTOR.upload_collection_n_images_seq,
                             max_interval=settings.ZOONIVERSE_CONNECTOR.upload_collection_max_interval,
+                            dry_run=dry_run,
                 )
 
                 typer.echo("Continuing...")
@@ -658,8 +706,15 @@ def wizard_command(
         else:
             typer.echo("Aborted.")
     elif Wizard.setup == wizard :
-        msg = "This wizard will guide you through Zooniverse connection settings."
-        if typer.confirm(msg):
+        print_section("Configure zooniverse module")
+
+        TyperUtils.console.print()
+        TyperUtils.console.print("[blue]ℹ[/blue] This wizard will guide you through Zooniverse connection settings. ")
+        TyperUtils.console.print("    into a Zooniverse subject set. As a general rule, only blank images and images ")
+        TyperUtils.console.print("    that contain animals will be imported.")
+        TyperUtils.console.print()
+
+        if typer.confirm("Continue?"):
             project_name = str(ctx.obj.get("project", "default"))
 
             try:

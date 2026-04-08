@@ -34,45 +34,125 @@ from zoneinfo import ZoneInfo
 
 from dynaconf import Dynaconf
 from dynaconf import loaders
-from pydantic import BaseModel, Field, HttpUrl, EmailStr, FilePath, DirectoryPath, ValidationError, SecretStr, \
-    TypeAdapter, field_validator
+from pydantic import BaseModel, Field, HttpUrl, EmailStr, ValidationError, SecretStr, \
+    TypeAdapter, field_validator, field_serializer
 
 
 class LoggerSettings(BaseModel):
-    loglevel: int = Field(default=1, ge=0, le=2)
+    loglevel: int = Field(
+        default=1, ge=0, le=2,
+        description="Logging verbosity level: 0 = ERROR, 1 = INFO, 2 = DEBUG.",
+    )
     filename: str = Field(
         default="",
-        description="Empty string or string ending in .log",
+        description="Path to the log file. Leave empty to log to stdout only. Must end with '.log' if set.",
         pattern=r"(^$|^.*\.log$)",
     )
 
 class GeneralSettings(BaseModel):
-    host: HttpUrl = Field(default="https://wildintel-trap.uhu.es/")
-    login: EmailStr = Field(default="user@example.com")
-    password: SecretStr = Field(default=SecretStr("secret"))
-    project_id: int = Field(default=123, ge=1)
-    verify_ssl: bool = Field(default=True)
-    ffmpeg: str = Field(default="ffmpeg")
-    exiftool: str = Field(default="exiftool")
-    data_dir: DirectoryPath = Field(default=Path.home() / ".wildintel-tools" / "collections")
+    host: HttpUrl = Field(
+        default="https://wildintel-trap.uhu.es/",
+        description="Base URL of the Trapper server (must include trailing slash).",
+    )
+    login: EmailStr = Field(
+        default="user@example.com",
+        description="Email address used to authenticate against the Trapper server.",
+    )
+    password: SecretStr = Field(
+        default=SecretStr("secret"),
+        description="Password for the Trapper account. Stored as a secret value.",
+    )
+    project_id: int = Field(
+        default=123, ge=1,
+        description="Numeric ID of the Trapper research project to work with.",
+    )
+    verify_ssl: bool = Field(
+        default=True,
+        description="Whether to verify the SSL certificate of the Trapper server. Set to False only for development.",
+    )
+    ffmpeg: str = Field(
+        default="ffmpeg",
+        description="Path or command name of the ffmpeg binary used for video processing.",
+    )
+    exiftool: str = Field(
+        default="exiftool",
+        description="Path or command name of the exiftool binary used for reading image metadata.",
+    )
+    data_dir: Path = Field(
+        default=Path.home() / ".wildintel-tools" / "collections",
+        description="Local directory where downloaded Trapper collections are stored. Created automatically if it does not exist.",
+    )
+
+    @field_serializer("host")
+    def serialize_host(self, value: HttpUrl) -> str:
+        """Serialize HttpUrl to plain string to avoid Pydantic serialization warnings."""
+        return str(value)
+
+    @field_validator("data_dir", mode="before")
+    @classmethod
+    def create_data_dir(cls, v: Any) -> Path:
+        """Create the data directory if it does not exist."""
+        p = Path(v)
+        p.mkdir(parents=True, exist_ok=True)
+        return p
 
 class WildIntelSettings(BaseModel):
-    rp_name: str = Field(default="WildINTEL")
-    coverage: str = Field(default="Doñana National Park")
-    publisher: str = Field(default="University of Huelva")
-    owner: str = Field(default="University of Huelva")
-    tolerance_hours: int = Field(default=1)
-    resize_img: bool = Field(default=False)
-    resize_img_size: list[int] = Field(default_factory=lambda: [1024, 768])
-    #resize_img_width: int
-    #resize_img_height: int
-    overwrite: bool = Field(default=False)
-    timezone: str | None = "UTC"
-    ignore_dst: bool | None = False
-    convert_to_utc: bool | None = True
-    remove_zip: bool | None = True
-    trigger: bool | None = True
-    output_dir: DirectoryPath = Field(default=Path.home() / ".wildintel-tools" / "readycollections")
+    rp_name: str = Field(
+        default="WildINTEL",
+        description="Name of the WildINTEL research project used as a label in generated outputs.",
+    )
+    coverage: str = Field(
+        default="Doñana National Park",
+        description="Geographic area covered by the camera-trap deployment (used in metadata exports).",
+    )
+    publisher: str = Field(
+        default="University of Huelva",
+        description="Organisation responsible for publishing the dataset (used in metadata exports).",
+    )
+    owner: str = Field(
+        default="University of Huelva",
+        description="Organisation or individual that owns the dataset (used in metadata exports).",
+    )
+    tolerance_hours: int = Field(
+        default=1,
+        description="Maximum time difference in hours allowed when matching camera-trap records across sources.",
+    )
+    resize_img: bool = Field(
+        default=False,
+        description="Whether to resize images before uploading them to Zooniverse.",
+    )
+    resize_img_size: list[int] = Field(
+        default_factory=lambda: [1024, 768],
+        description="Target [width, height] in pixels when resize_img is True.",
+    )
+    overwrite: bool = Field(
+        default=False,
+        description="If True, existing output files will be overwritten without prompting.",
+    )
+    timezone: str | None = Field(
+        default="UTC",
+        description="IANA timezone name (e.g. 'Europe/Madrid') used to interpret camera-trap timestamps.",
+    )
+    ignore_dst: bool | None = Field(
+        default=False,
+        description="If True, Daylight Saving Time transitions are ignored when parsing timestamps.",
+    )
+    convert_to_utc: bool | None = Field(
+        default=True,
+        description="If True, all timestamps are converted to UTC before being stored or exported.",
+    )
+    remove_zip: bool | None = Field(
+        default=True,
+        description="If True, ZIP archives are deleted after being successfully extracted.",
+    )
+    trigger: bool | None = Field(
+        default=True,
+        description="If True, only triggered (motion-detected) images are processed; continuous captures are skipped.",
+    )
+    output_dir: Path = Field(
+        default=Path.home() / ".wildintel-tools" / "readycollections",
+        description="Local directory where processed collections ready for upload are saved. Created automatically if it does not exist.",
+    )
 
     @field_validator("timezone")
     def validate_timezone(cls, v):
@@ -82,50 +162,85 @@ class WildIntelSettings(BaseModel):
             raise ValueError(f"Invalid timezone: {v}")
         return v
 
-class EpiCollectSettings(BaseModel):
-    client_id: int = Field(default=0)
-    client_secret: SecretStr = Field(default=SecretStr("secret"))
-    app_slug: str = Field(default="default")
-    site_alias: Dict[str, str] = {}
-    release_alias: Dict[str, str] = {}
+    @field_validator("output_dir", mode="before")
+    @classmethod
+    def create_output_dir(cls, v: Any) -> Path:
+        """Create the output directory if it does not exist."""
+        p = Path(v)
+        p.mkdir(parents=True, exist_ok=True)
+        return p
 
-    site_field: str = ""
-    release_field: str = ""
-    start_date_field: str = ""
-    end_date_field: str = ""
-    correct_setup_field: str = ""
-    correct_tstamp_field: str = ""
-    view_quality_field: str = ""
-    tags_field: str = ""
-    comments_field: str = ""
-    managers_field: str = ""
-    setup_by_field: str = ""
-    camera_id_field: str = ""
-    camera_model_field: str = ""
-    camera_interval_field: str = ""
-    camera_height_field: str = ""
-    camera_depth_field: str = ""
-    camera_tilt_field: str = ""
-    camera_heading_field: str = ""
-    session_field: str = ""
-    array_field: str = ""
-    feature_type_field: str = ""
-    habitat_field: str = ""
-    capture_method_field: str = ""
-    bait_type_field: str = ""
+class EpiCollectSettings(BaseModel):
+    client_id: int = Field(default=0, description="EpiCollect5 OAuth2 client ID for API authentication.")
+    client_secret: SecretStr = Field(default=SecretStr("secret"), description="EpiCollect5 OAuth2 client secret. Stored as a secret value.")
+    app_slug: str = Field(default="default", description="EpiCollect5 application slug (project identifier in the URL).")
+    site_alias: Dict[str, str] = Field(default_factory=dict, description="Mapping of EpiCollect5 site names to Trapper deployment IDs.")
+    release_alias: Dict[str, str] = Field(default_factory=dict, description="Mapping of EpiCollect5 release names to internal identifiers.")
+
+    site_field: str = Field(default="", description="Name of the EpiCollect5 form field that contains the site identifier.")
+    release_field: str = Field(default="", description="Name of the EpiCollect5 form field that contains the release/session identifier.")
+    start_date_field: str = Field(default="", description="Name of the EpiCollect5 form field for the deployment start date.")
+    end_date_field: str = Field(default="", description="Name of the EpiCollect5 form field for the deployment end date.")
+    correct_setup_field: str = Field(default="", description="Name of the EpiCollect5 form field indicating whether the setup was correct.")
+    correct_tstamp_field: str = Field(default="", description="Name of the EpiCollect5 form field indicating whether the timestamp is correct.")
+    view_quality_field: str = Field(default="", description="Name of the EpiCollect5 form field for the camera view quality assessment.")
+    tags_field: str = Field(default="", description="Name of the EpiCollect5 form field for free-text tags.")
+    comments_field: str = Field(default="", description="Name of the EpiCollect5 form field for free-text comments.")
+    managers_field: str = Field(default="", description="Name of the EpiCollect5 form field listing the deployment managers.")
+    setup_by_field: str = Field(default="", description="Name of the EpiCollect5 form field recording who set up the camera.")
+    camera_id_field: str = Field(default="", description="Name of the EpiCollect5 form field for the camera unit identifier.")
+    camera_model_field: str = Field(default="", description="Name of the EpiCollect5 form field for the camera model name.")
+    camera_interval_field: str = Field(default="", description="Name of the EpiCollect5 form field for the camera trigger interval (seconds).")
+    camera_height_field: str = Field(default="", description="Name of the EpiCollect5 form field for the camera mounting height (metres).")
+    camera_depth_field: str = Field(default="", description="Name of the EpiCollect5 form field for the camera depth/distance setting.")
+    camera_tilt_field: str = Field(default="", description="Name of the EpiCollect5 form field for the camera tilt angle (degrees).")
+    camera_heading_field: str = Field(default="", description="Name of the EpiCollect5 form field for the compass heading the camera faces.")
+    session_field: str = Field(default="", description="Name of the EpiCollect5 form field for the session or survey identifier.")
+    array_field: str = Field(default="", description="Name of the EpiCollect5 form field for the camera array identifier.")
+    feature_type_field: str = Field(default="", description="Name of the EpiCollect5 form field for the habitat feature type.")
+    habitat_field: str = Field(default="", description="Name of the EpiCollect5 form field for the habitat classification.")
+    capture_method_field: str = Field(default="", description="Name of the EpiCollect5 form field for the capture method (e.g. motion, time-lapse).")
+    bait_type_field: str = Field(default="", description="Name of the EpiCollect5 form field for the type of bait used, if any.")
 
 class ZooniverseSettings(BaseModel):
-    zooniverse_username: str | None = "myuser"
-    zooniverse_password: SecretStr | None = SecretStr("mypassword")
-    zooniverse_project_id: str | None = "myprojectid"
+    zooniverse_username: str | None = Field(
+        default="myuser",
+        description="Zooniverse account username used for API authentication.",
+    )
+    zooniverse_password: SecretStr | None = Field(
+        default=SecretStr("mypassword"),
+        description="Zooniverse account password. Stored as a secret value.",
+    )
+    zooniverse_project_id: str | None = Field(
+        default="myprojectid",
+        description="Zooniverse project identifier (numeric ID or 'owner/project-slug').",
+    )
 
 class ZooniverseConnectorSettings(BaseModel):
-    upload_collection_n_images_seq: int | None = 5
-    upload_collection_max_interval: int | None = 90
-    upload_collection_attempts: int | None = 5
-    upload_collection_delay: int | None = 15
-    upload_collection_max_attempts_per_subject: int | None = 5
-    upload_collection_delay_seconds_per_subject: int | None = 30
+    upload_collection_n_images_seq: int | None = Field(
+        default=5,
+        description="Number of images grouped into a single Zooniverse subject (sequence length).",
+    )
+    upload_collection_max_interval: int | None = Field(
+        default=90,
+        description="Maximum time gap in seconds between consecutive images in the same sequence.",
+    )
+    upload_collection_attempts: int | None = Field(
+        default=5,
+        description="Maximum number of retry attempts when downloading a media file from Trapper.",
+    )
+    upload_collection_delay: int | None = Field(
+        default=15,
+        description="Delay in seconds between download retry attempts.",
+    )
+    upload_collection_max_attempts_per_subject: int | None = Field(
+        default=5,
+        description="Maximum number of retry attempts when uploading a single subject to Zooniverse.",
+    )
+    upload_collection_delay_seconds_per_subject: int | None = Field(
+        default=30,
+        description="Delay in seconds between upload retry attempts for a single subject.",
+    )
 
 class Settings(BaseModel):
     LOGGER: LoggerSettings =  Field(default_factory=LoggerSettings)
