@@ -1,8 +1,10 @@
 from pathlib import Path
 from typing import Literal, List, Any, Optional, Dict
+import re
 
 from panoptes_client import Workflow
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
+from trapper_client.TrapperClient import TrapperClient
 
 from wildintel_tools.zooniverse.TrapperZooniverseConnector import TrapperZooniverseConnector
 from wildintel_tools.reports import Report
@@ -201,6 +203,224 @@ def upload_collection( tzc : TrapperZooniverseConnector,
         )
 
     return report
+
+def update_subject_metadata(
+    zooniverse_client: ZooniverseClient,
+    subject_set_id: int,
+    global_metadata: Optional[Dict[str, Any]] = None,
+    per_subject_metadata: Optional[Dict[str, Dict[str, Any]]] = None,
+    max_workers: int = 1,
+) -> Report:
+    """
+    Update the metadata of every subject inside a SubjectSet, showing a Rich progress bar.
+
+    :param zooniverse_client: Authenticated ZooniverseClient instance.
+    :param subject_set_id: ID of the SubjectSet whose subjects will be updated.
+    :param global_metadata: Key-value pairs applied to every subject.
+    :param per_subject_metadata: Mapping ``{subject_id: {key: value}}`` for per-subject updates.
+    :param max_workers: Number of parallel threads (default 1 → sequential).
+    :returns: Report with successes and errors.
+    :rtype: Report
+    """
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TextColumn("{task.completed}/{task.total}"),
+        TimeElapsedColumn(),
+    ) as progress:
+        task = progress.add_task("Updating subjects...", total=None)
+
+        def _callback(event: str, sid, name, total=None, step=None):
+            if total is not None:
+                progress.update(task, total=total)
+            if event == "start":
+                progress.update(task, description=f"[cyan]→ {name}")
+            elif event == "end":
+                progress.advance(task, 1)
+                progress.update(task, description=f"[green]✓ {name}")
+            elif event == "fail":
+                progress.advance(task, 1)
+                progress.update(task, description=f"[red]✗ {name}")
+
+        report = zooniverse_client.subjects.update_metadata(
+            subject_set_id=subject_set_id,
+            global_metadata=global_metadata,
+            per_subject_metadata=per_subject_metadata,
+            max_workers=max_workers,
+            callback=_callback,
+        )
+
+    return report
+
+
+def update_subject_metadata_from_trapper(
+    tzc: TrapperZooniverseConnector,
+    subject_set_id: int,
+    classification_project: int,
+    dry_run: bool = False,
+) -> Report:
+    """
+    Update subject metadata in Zooniverse using Trapper as source, with progress UI.
+    """
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TextColumn("{task.completed}/{task.total}"),
+        TimeElapsedColumn(),
+    ) as progress:
+        task_registry: Dict[str, int] = {}
+
+        def get_or_create_task(task_name: str, total=None, description=None):
+            if task_name not in task_registry:
+                task_registry[task_name] = progress.add_task(description or task_name.replace("_", " ").title(), total=total)
+            return task_registry[task_name]
+
+        def progress_callback(
+            task_name: str,
+            state: str,
+            advance: int = 1,
+            total: int | None = None,
+            description: str | None = None,
+            set_total: bool = False,
+            item_name: str | None = None,
+            item_status: Literal["start", "end", "fail"] | None = None,
+            item_description: str | None = None,
+        ):
+            task_id = get_or_create_task(task_name, total, description)
+
+            if set_total and total is not None:
+                progress.update(task_id, total=total)
+
+            if state == "start":
+                progress.update(task_id, description=f"🟢  {description or task_name.replace('_', ' ').title()}")
+            elif state == "end":
+                progress.update(task_id, completed=progress.tasks[task_id].total or 1,
+                                description=f"✔️  {description or task_name.replace('_', ' ').title()}")
+                progress.stop_task(task_id)
+                return
+            elif state == "fail":
+                progress.update(task_id, description=f"❌  {description or task_name.replace('_', ' ').title()}")
+                progress.stop_task(task_id)
+                return
+
+            if item_name is not None:
+                status_messages = {
+                    "start": f"[yellow]→ {item_name}: {item_description}" if item_description else f"[yellow]→ Starting {item_name}",
+                    "end": f"[green]✓ {item_name}: {item_description}" if item_description else f"[green]✓ Finished {item_name}",
+                    "fail": f"[red]✗ {item_name}: {item_description}" if item_description else f"[red]✗ Failed {item_name}",
+                }
+                message = status_messages.get(item_status)
+                if message:
+                    progress.log(message)
+                progress.advance(task_id, advance)
+
+        report = tzc.update_subject_metadata(
+            subjectset_id=subject_set_id,
+            classification_project=classification_project,
+            progress_callback=progress_callback,
+            dry_run=dry_run,
+        )
+
+    return report
+
+
+def _extract_subject_filename(subject: Any) -> str | None:
+    metadata = getattr(subject, "metadata", {}) or {}
+    for key in ("Filename", "filename", "file_name", "name", "display_name"):
+        value = metadata.get(key)
+        if value:
+            return str(value)
+
+    # Fallback a atributos del subject si el metadata no trae nombre.
+    for attr in ("display_name", "name"):
+        value = getattr(subject, attr, None)
+        if value:
+            return str(value)
+    return None
+
+
+def _extract_media_id_from_filename(filename: str) -> int | None:
+    basename = Path(filename).name
+
+    # Formato más habitual en el proyecto: <media_id>_x_...
+    match = re.match(r"(\d+)(?=_x_)", basename)
+    if match:
+        return int(match.group(1))
+
+    # Fallback: primer bloque numérico del nombre.
+    fallback = re.search(r"(\d+)", basename)
+    if fallback:
+        return int(fallback.group(1))
+
+    return None
+
+
+def build_subject_metadata_from_trapper(
+    zooniverse_client: ZooniverseClient,
+    trapper_client: TrapperClient,
+    subject_set_id: int,
+    classification_project: int,
+) -> Dict[str, Dict[str, Any]]:
+    """
+    Build per-subject metadata dict from Trapper media data.
+
+    It extracts ``media_id`` from each subject filename and queries Trapper to get
+    the media record, then maps key fields into Zooniverse subject metadata.
+    """
+    subjects = zooniverse_client.subjects.get_by_subjectset(subject_set_id)
+    per_subject_metadata: Dict[str, Dict[str, Any]] = {}
+
+    for subject in subjects:
+        sid = str(getattr(subject, "id", ""))
+        filename = _extract_subject_filename(subject)
+        if not filename:
+            TyperUtils.warning(f"Subject {sid}: filename not found in metadata, skipping.")
+            continue
+
+        media_id = _extract_media_id_from_filename(filename)
+        if media_id is None:
+            TyperUtils.warning(f"Subject {sid}: could not extract media_id from filename '{filename}', skipping.")
+            continue
+
+        media_list = trapper_client.media.get_by_media_id(classification_project, media_id)
+        results = getattr(media_list, "results", []) or []
+        if not results:
+            TyperUtils.warning(f"Subject {sid}: no Trapper media found for media_id={media_id}, skipping.")
+            continue
+
+        media = results[0]
+        base_url = str(trapper_client.base_url)
+        if not base_url.endswith("/"):
+            base_url = base_url + "/"
+
+        metadata = {
+            "media_id": getattr(media, "mediaID", media_id),
+            "deployment_id": getattr(media, "deploymentID", None),
+            "capture_method": getattr(media, "captureMethod", None),
+            "timestamp": str(getattr(media, "timestamp", "")),
+            "file_name": getattr(media, "fileName", None),
+            "file_public": getattr(media, "filePublic", None),
+            "file_type": getattr(media, "fileMediatype", None),
+            "file_path": getattr(media, "filePath", None),
+            "external_id": f"{base_url}:media:{media_id}",
+            "preview": f"{base_url}storage/resource/media/{media_id}/pfile/",
+            "link": f"{base_url}storage/resource/media/{media_id}/file/",
+            "thumbnail": f"{base_url}storage/resource/media/{media_id}/tfile/",
+            "origin": base_url,
+            "source": "trapper",
+        }
+
+        exif_data = getattr(media, "exifData", None)
+        if exif_data is not None:
+            metadata["exif_data"] = exif_data
+
+        # Limpiar nulos para no sobreescribir metadatos existentes con None.
+        per_subject_metadata[sid] = {k: v for k, v in metadata.items() if v is not None and v != ""}
+
+    return per_subject_metadata
+
 
 def public_annotations(tzc : TrapperZooniverseConnector, cp_id:int, collection_id: int, subjectset_id: int
                        , wf_id: int, observations_file:Path = None):

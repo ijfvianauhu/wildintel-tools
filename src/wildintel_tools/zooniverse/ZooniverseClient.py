@@ -555,6 +555,133 @@ class SubjectsComponent(ZooniverseClientComponent):
             cause = e.last_attempt.exception() if e.last_attempt else e
             raise UploadingException(f"Failed Uploading {path}") from cause
 
+    def update_one_metadata(
+        self,
+        subject_id: Union[int, Subject],
+        metadata: Dict[str, Any],
+    ) -> Subject:
+        """
+        Update metadata for a single Zooniverse subject.
+
+        Parameters
+        ----------
+        subject_id : int | Subject
+            Subject identifier or Subject instance.
+        metadata : dict
+            Metadata key-value pairs to merge into subject metadata.
+
+        Returns
+        -------
+        Subject
+            Updated Subject instance.
+        """
+        self.client._ensure_connection()
+
+        if not metadata:
+            raise ValueError("metadata cannot be empty")
+
+        subject_obj = subject_id if isinstance(subject_id, Subject) else Subject.find(subject_id)
+        if not subject_obj:
+            raise ValueError(f"Subject with ID {subject_id} not found.")
+
+        for k, v in metadata.items():
+            subject_obj.metadata[k] = v
+
+        # Mantener external_id consistente cuando venga en metadata.
+        if metadata.get("external_id"):
+            subject_obj.external_id = str(metadata["external_id"])
+
+        subject_obj.save()
+        return subject_obj
+
+
+    def update_metadata(
+        self,
+        subject_set_id: int,
+        global_metadata: Optional[Dict[str, Any]] = None,
+        per_subject_metadata: Optional[Dict[str, Dict[str, Any]]] = None,
+        max_workers: int = 1,
+        callback: Optional[Callable] = None,
+    ) -> "Report":
+        """
+        Update the metadata of every subject inside a SubjectSet.
+
+        Parameters
+        ----------
+        subject_set_id : int
+            ID of the SubjectSet whose subjects will be updated.
+        global_metadata : dict, optional
+            Key-value pairs applied to **every** subject in the set.
+            Existing keys are overwritten; keys not present in a subject are added.
+        per_subject_metadata : dict[str, dict], optional
+            Mapping ``{subject_id: {key: value, …}}``.  When provided, the
+            per-subject dict is merged on top of ``global_metadata`` for each
+            matching subject.
+        max_workers : int
+            Number of parallel threads (default 1 → sequential).
+        callback : callable, optional
+            Optional progress callback ``callback(event, sid, name, total, step)``.
+
+        Returns
+        -------
+        Report
+        """
+        from wildintel_tools.reports import Report
+
+        self.client._ensure_connection()
+
+        report = Report(
+            f"Update Metadata Report for subjectset {subject_set_id}, project {self.client.project_id}"
+        )
+
+        subject_set = SubjectSet.find(subject_set_id)
+        if not subject_set:
+            raise ValueError(f"SubjectSet with ID {subject_set_id} not found.")
+
+        subjects = list(subject_set.subjects)
+        total = len(subjects)
+
+        def _notify(event: str, sid, name, step=None):
+            if callback:
+                try:
+                    callback(event, sid, name, total, step)
+                except Exception:
+                    self.client.logger.debug("Callback raised an exception", exc_info=True)
+
+        def _update_one(subj):
+            sid = str(getattr(subj, "id", "unknown"))
+            name = str(getattr(subj, "display_name", None) or getattr(subj, "name", None) or f"subject_{sid}")
+            _notify("start", sid, f"Updating metadata for {name}")
+            try:
+                merged: Dict[str, Any] = {}
+                if global_metadata:
+                    merged.update(global_metadata)
+                if per_subject_metadata:
+                    merged.update(per_subject_metadata.get(sid, {}))
+
+                if not merged:
+                    self.client.logger.debug(f"No metadata to update for subject {sid}, skipping.")
+                    _notify("end", sid, f"Skipped (no metadata) {name}")
+                    report.add_success(sid, "update_metadata", "skipped – no metadata provided")
+                    return sid
+
+                self.update_one_metadata(subj, merged)
+
+                _notify("end", sid, f"Updated {name}")
+                report.add_success(sid, "update_metadata", f"updated {list(merged.keys())}")
+                return sid
+            except Exception as exc:
+                _notify("fail", sid, f"Failed {name}")
+                report.add_error(sid, "update_metadata", str(exc))
+                self.client.logger.warning(f"Error updating metadata for subject {sid}: {exc}")
+                return None
+
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            for _ in pool.map(_update_one, subjects):
+                pass
+
+        report.finish()
+        return report
 
     def download(self,  subject_id: Union[int, Subject], save_path: str = None, max_retries: int = 5, delay_seconds: int = 15, overwrite = False) -> str:
         """

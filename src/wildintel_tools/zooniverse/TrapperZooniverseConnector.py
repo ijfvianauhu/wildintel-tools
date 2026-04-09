@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import List, Dict, Tuple, Any, Optional, Callable, Literal
 import logging, os
 import tempfile
+import re
 from urllib.error import URLError, HTTPError
 
 from pydantic import BaseModel, validator, HttpUrl
@@ -386,6 +387,108 @@ class TrapperZooniverseConnector:
         report.finish()
         return report
 
+    def update_subject_metadata(
+        self,
+        subjectset_id: int,
+        classification_project: int,
+        progress_callback: Optional[Callable[[str, str, int, Optional[int], Optional[str], bool, Optional[str], Optional[str]], None]] = None,
+        dry_run: bool = False,
+    ) -> Report:
+        """
+        Update metadata of all subjects in a Zooniverse SubjectSet using Trapper media info.
+
+        It extracts ``media_id`` from each subject filename, fetches media from Trapper,
+        builds metadata with the same schema used during uploads, and updates each subject.
+        """
+        report = Report(
+            f"Update subject metadata for subjectset {subjectset_id} from {self.trapper.base_url}",
+            type="UpdateSubjectMetadataReport",
+        )
+
+        self._notify(
+            progress_callback,
+            "getting_subjects",
+            state="start",
+            description=f"Getting subjects from subjectset {subjectset_id}...",
+        )
+        subjects = self.zoo.subjects.get_by_subjectset(subjectset_id)
+        self._notify(
+            progress_callback,
+            "getting_subjects",
+            state="end",
+            set_total=True,
+            total=len(subjects),
+        )
+
+        self._notify(
+            progress_callback,
+            "updating_subjects",
+            state="start",
+            description=f"Updating metadata for {len(subjects)} subjects...",
+            total=len(subjects),
+            set_total=True,
+        )
+
+        for subject in subjects:
+            sid = str(getattr(subject, "id", "unknown"))
+            try:
+                filename = self._extract_subject_filename(subject)
+                if not filename:
+                    raise ValueError("filename not found in subject metadata")
+
+                media_id = self._extract_media_id_from_filename(filename)
+                if media_id is None:
+                    raise ValueError(f"could not extract media_id from filename '{filename}'")
+
+                self._notify(
+                    progress_callback,
+                    "updating_subjects",
+                    state="running",
+                    advance=0,
+                    item_name=sid,
+                    item_status="start",
+                    item_description=f"Resolving media {media_id} from Trapper",
+                )
+
+                media_list = self.trapper.media.get_by_media_id(classification_project, media_id)
+                media_results = getattr(media_list, "results", []) or []
+                if not media_results:
+                    raise ValueError(f"no Trapper media found for media_id {media_id}")
+
+                media = media_results[0]
+                subject_metadata = self._build_subject_metadata(media_id, getattr(media, "fileName", filename))
+
+                if dry_run:
+                    report.add_success(f"{sid}@subject", "update_metadata_simulated", **{"media_id": media_id})
+                else:
+                    self.zoo.subjects.update_one_metadata(subject, subject_metadata)
+                    report.add_success(f"{sid}@subject", "update_metadata", **{"media_id": media_id})
+
+                self._notify(
+                    progress_callback,
+                    "updating_subjects",
+                    state="running",
+                    advance=1,
+                    item_name=sid,
+                    item_status="end",
+                    item_description=f"Metadata updated from media {media_id}",
+                )
+            except Exception as e:
+                report.add_error(f"{sid}@subject", "update_metadata", str(e))
+                self._notify(
+                    progress_callback,
+                    "updating_subjects",
+                    state="running",
+                    advance=1,
+                    item_name=sid,
+                    item_status="fail",
+                    item_description=str(e),
+                )
+
+        self._notify(progress_callback, "updating_subjects", state="end")
+        report.finish()
+        return report
+
     def upload_annotations(
           self,
           subjectset_id: int,
@@ -548,6 +651,47 @@ class TrapperZooniverseConnector:
 
     def _get_zoo_filename(self, media):
         return f"{media['mediaID']}_x_{media['deploymentID']}_x_{media['fileName']}"
+
+    @staticmethod
+    def _extract_subject_filename(subject: Any) -> Optional[str]:
+        metadata = getattr(subject, "metadata", {}) or {}
+        for key in ("Filename", "filename", "file_name", "name", "display_name"):
+            value = metadata.get(key)
+            if value:
+                return str(value)
+
+        for attr in ("display_name", "name"):
+            value = getattr(subject, attr, None)
+            if value:
+                return str(value)
+        return None
+
+    @staticmethod
+    def _extract_media_id_from_filename(filename: str) -> Optional[int]:
+        basename = Path(filename).name
+        match = re.match(r"(\d+)(?=_x_)", basename)
+        if match:
+            return int(match.group(1))
+
+        fallback = re.search(r"(\d+)", basename)
+        if fallback:
+            return int(fallback.group(1))
+        return None
+
+    def _build_subject_metadata(self, media_id: int, image_name: str) -> Dict[str, Any]:
+        base_url = str(self.trapper.base_url)
+        if not base_url.endswith("/"):
+            base_url = base_url + "/"
+
+        return {
+            "external_id": f"{base_url}:media:{media_id}",
+            "preview": f"{base_url}storage/resource/media/{media_id}/pfile/",
+            "link": f"{base_url}storage/resource/media/{media_id}/file/",
+            "thumbnail": f"{base_url}storage/resource/media/{media_id}/tfile/",
+            "origin": f"{base_url}",
+            "license": "http://creativecommons.org/licenses/by-nc/4.0/legalcode",
+            "image_name": image_name,
+        }
 
     def _get_extrator_vote(self, workflow_id) -> Tuple[AnnotationsExtractor, AnnotationsVoter]:
         import importlib

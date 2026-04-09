@@ -11,7 +11,12 @@ from trapper_client.TrapperClient import TrapperClient
 
 from wildintel_tools.ui.typer.ZooUtils import ZooUtils
 from wildintel_tools.ui.typer.settings import Settings, SettingsManager, ZooniverseSettings, ZooniverseConnectorSettings
-from wildintel_tools.ui.typer.zooniverse import check_connection, get_workflows, get_subject_sets
+from wildintel_tools.ui.typer.zooniverse import (
+    check_connection,
+    get_workflows,
+    get_subject_sets,
+    update_subject_metadata_from_trapper,
+)
 from wildintel_tools.zooniverse.TrapperZooniverseConnector import TrapperZooniverseConnector
 from wildintel_tools.zooniverse.ZooniverseClient import ZooniverseClient
 from wildintel_tools.ui.typer.TyperUtils import TyperUtils
@@ -368,6 +373,74 @@ def subjects(
     except Exception as e:
         TyperUtils.error(str(e))
 app.command(name="sbj", hidden=True, help="Alias for subjects") (subjects)
+
+@app.command(
+    help=_(
+        "Update subject metadata in a Zooniverse subject set using Trapper data. "
+        "The command extracts media_id from each subject filename, queries Trapper "
+        "for that media in the selected classification project, and updates the "
+        "subject metadata with the returned media fields."
+    ),
+    short_help=_("Update subject metadata in a subject set (alias: um)"),
+)
+def update_metadata(
+    ctx: typer.Context,
+    ss_id: Annotated[int, typer.Argument(help=_("Subject set ID whose subjects will be updated"))],
+    classification_project: Annotated[
+        int,
+        typer.Option(
+            "--cp",
+            help=_("Trapper classification project ID used to look up media by media_id."),
+        ),
+    ] = ...,
+    config: Annotated[
+        Path,
+        typer.Option(hidden=True, help=_("Configuration file"), callback=callback_with_override),
+    ] = None,
+) -> None:
+    """
+    Update the metadata of all subjects in a Zooniverse subject set.
+
+    :param ctx: Typer context.
+    :param ss_id: Subject set ID.
+    :param classification_project: Trapper classification project ID.
+    :param config: Internal configuration option (dynamic callback).
+    """
+    settings: Settings = ctx.obj.get("settings", Settings())
+
+    zooniverse_client = ZooniverseClient(
+        project_id=settings.ZOONIVERSE.zooniverse_project_id,
+        username=settings.ZOONIVERSE.zooniverse_username,
+        password=settings.ZOONIVERSE.zooniverse_password.get_secret_value(),
+    )
+
+    trapper_client = TrapperClient(
+        base_url=str(settings.GENERAL.host),
+        user_name=settings.GENERAL.login,
+        user_password=settings.GENERAL.password.get_secret_value(),
+        access_token=None,
+    )
+
+    connector = TrapperZooniverseConnector(zooniverse_client, trapper_client)
+    TyperUtils.info(_(f"Updating metadata for subjects in subject set {ss_id} using Trapper data..."))
+
+    try:
+        report = update_subject_metadata_from_trapper(
+            tzc=connector,
+            subject_set_id=ss_id,
+            classification_project=classification_project,
+        )
+    except Exception as e:
+        TyperUtils.fatal(_(f"Failed to update metadata for subject set {ss_id}: {e}"))
+        return
+
+    TyperUtils.success(_(f"Metadata update completed for subject set {ss_id}."))
+    report_file = TyperUtils.save_report(report)
+    TyperUtils.console.print()
+    TyperUtils.display_report(report)
+    TyperUtils.success(_(f"Report saved at: {report_file}"))
+
+app.command(name="um", hidden=True, help=_("Alias for update-metadata")) (update_metadata)
 
 @app.command(
     help=_("Download subjects (images) from a Zooniverse subjetset (alias: dl_ss)."),
