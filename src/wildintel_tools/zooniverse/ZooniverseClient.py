@@ -372,7 +372,7 @@ class SubjectsComponent(ZooniverseClientComponent):
         self.client._ensure_connection()
         return Subject.find(id)
 
-    def get_by_subjectset(self, subject_set_id) -> List:
+    def get_by_subjectset(self, subject_set_id, to_list=True) -> List | SubjectSet:
         """
         Retrieve all subjects associated with a given SubjectSet.
 
@@ -394,7 +394,7 @@ class SubjectsComponent(ZooniverseClientComponent):
         subject_set = SubjectSet.find(subject_set_id)
 
         # Return the subjects as a list
-        return list(subject_set.subjects)
+        return list(subject_set.subjects) if to_list else subject_set.subjects
 
     def subject_exists(
         self,
@@ -588,8 +588,8 @@ class SubjectsComponent(ZooniverseClientComponent):
             subject_obj.metadata[k] = v
 
         # Mantener external_id consistente cuando venga en metadata.
-        if metadata.get("external_id"):
-            subject_obj.external_id = str(metadata["external_id"])
+        #if metadata.get("external_id"):
+        #    subject_obj.external_id = str(metadata["external_id"])
 
         subject_obj.save()
         return subject_obj

@@ -392,7 +392,28 @@ def update_metadata(
             "--cp",
             help=_("Trapper classification project ID used to look up media by media_id."),
         ),
-    ] = ...,
+    ] = None,
+    dry_run: Annotated[
+        bool,
+        typer.Option(
+            "--dry-run",
+            help=_("Simulate the process: metadata is resolved but no subject is updated in Zooniverse."),
+        ),
+    ] = False,
+    white_list: Annotated[
+        Optional[str],
+        typer.Option(
+            "--white-list",
+            help=_("Comma or space separated list of subject IDs to process. Only these subjects will be updated."),
+        ),
+    ] = None,
+    black_list: Annotated[
+        Optional[str],
+        typer.Option(
+            "--black-list",
+            help=_("Comma or space separated list of subject IDs to skip. These subjects will not be updated."),
+        ),
+    ] = None,
     config: Annotated[
         Path,
         typer.Option(hidden=True, help=_("Configuration file"), callback=callback_with_override),
@@ -424,11 +445,27 @@ def update_metadata(
     connector = TrapperZooniverseConnector(zooniverse_client, trapper_client)
     TyperUtils.info(_(f"Updating metadata for subjects in subject set {ss_id} using Trapper data..."))
 
+    white_list_ids = TyperUtils.parse_id_list(white_list, allow_stdin=False) if white_list else None
+    black_list_ids = TyperUtils.parse_id_list(black_list, allow_stdin=False) if black_list else None
+
+    if dry_run:
+        TyperUtils.console.print()
+        TyperUtils.console.print("[bold yellow]⚠  DRY-RUN mode: metadata will be resolved but no subject will be updated in Zooniverse.[/bold yellow]")
+    if white_list_ids:
+        TyperUtils.console.print(f"[cyan]⬜ White-list:[/cyan] only {len(white_list_ids)} subject(s) will be processed: {white_list_ids}")
+    if black_list_ids:
+        TyperUtils.console.print(f"[cyan]⬛ Black-list:[/cyan] {len(black_list_ids)} subject(s) will be skipped: {black_list_ids}")
+    if dry_run or white_list_ids or black_list_ids:
+        TyperUtils.console.print()
+
     try:
         report = update_subject_metadata_from_trapper(
             tzc=connector,
             subject_set_id=ss_id,
             classification_project=classification_project,
+            dry_run=dry_run,
+            white_list=white_list_ids,
+            black_list=black_list_ids,
         )
     except Exception as e:
         TyperUtils.fatal(_(f"Failed to update metadata for subject set {ss_id}: {e}"))
@@ -783,8 +820,6 @@ def wizard_command(
 
         TyperUtils.console.print()
         TyperUtils.console.print("[blue]ℹ[/blue] This wizard will guide you through Zooniverse connection settings. ")
-        TyperUtils.console.print("    into a Zooniverse subject set. As a general rule, only blank images and images ")
-        TyperUtils.console.print("    that contain animals will be imported.")
         TyperUtils.console.print()
 
         if typer.confirm("Continue?"):
