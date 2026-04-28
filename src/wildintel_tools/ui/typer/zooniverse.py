@@ -426,17 +426,66 @@ def build_subject_metadata_from_trapper(
     return per_subject_metadata
 
 
-def public_annotations(tzc : TrapperZooniverseConnector, cp_id:int, collection_id: int, subjectset_id: int
-                       , wf_id: int, observations_file:Path = None):
-    results = tzc.upload_annotations(
-        subjectset_id,
-        wf_id,
-        collection_id,
-        cp_id,
-        observations_file,
-        None,
-        None
-    )
+def public_annotations(tzc: TrapperZooniverseConnector, cp_id: int, collection_id: int, subjectset_id: int,
+                       wf_id: int, deployments: List[int] = None, observations_file: Path = None) -> Report:
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TextColumn("{task.completed}/{task.total}"),
+        TimeElapsedColumn(),
+    ) as progress:
+        task_registry: Dict[str, int] = {}
+
+        def get_or_create_task(task_name: str, total=None, description=None) -> int:
+            if task_name not in task_registry:
+                task_registry[task_name] = progress.add_task(
+                    description or task_name.replace("_", " ").title(), total=total
+                )
+            return task_registry[task_name]
+
+        def progress_callback(
+            task_name: str,
+            state: str,
+            advance: int = 1,
+            total: int | None = None,
+            description: str | None = None,
+            set_total: bool = False,
+            item_name: str | None = None,
+            item_status: Literal["start", "end", "fail"] | None = None,
+            item_description: str | None = None,
+        ):
+            task_id = get_or_create_task(task_name, total, description)
+            if set_total and total is not None:
+                progress.update(task_id, total=total)
+            if state == "start":
+                progress.update(task_id, description=f"[green]...[/green]  {description or task_name.replace('_', ' ').title()}")
+            elif state == "end":
+                progress.update(task_id,
+                                completed=progress.tasks[task_id].total or 1,
+                                description=f"[green]✔[/green]  {description or task_name.replace('_', ' ').title()}")
+                progress.stop_task(task_id)
+                return
+            elif state == "fail":
+                progress.update(task_id,
+                                description=f"[red]✘[/red]  {description or task_name.replace('_', ' ').title()}")
+                progress.stop_task(task_id)
+                return
+            if item_name is not None:
+                status_icon = {"start": "[yellow]→[/yellow]", "end": "[green]✓[/green]", "fail": "[red]✗[/red]"}.get(item_status, "")
+                msg = f"{status_icon} {item_name}" + (f": {item_description}" if item_description else "")
+                progress.log(msg)
+                progress.advance(task_id, advance)
+
+        results = tzc.upload_annotations(
+            subjectset_id,
+            wf_id,
+            collection_id,
+            cp_id,
+            output_dir=observations_file,
+            deployments=deployments,
+            progress_callback=progress_callback,
+        )
 
     return results
 

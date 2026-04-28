@@ -10,9 +10,11 @@ import yaml
 from docutils.nodes import status
 from pydantic import BaseModel, ValidationError
 from rich import box
+from rich.markup import escape
 from rich.panel import Panel
 from rich.prompt import Prompt
 from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
+from rich.text import Text as RichText
 from typer_config import conf_callback_factory
 
 from wildintel_tools.ui.typer.i18n import _
@@ -538,6 +540,106 @@ class TyperUtils:
                 return value
             except ValidationError as e:
                 typer.echo(f"Invalid input: {e.errors()[0]['msg']}. Please try again.")
+
+
+    @staticmethod
+    def select_box(items, id_attr, name_attr, label="Seleccione uno o varios proyectos", sort_by_name=True, multi_select: bool = True):
+        """
+        Display a selection box for the user to pick one or more items.
+
+        :param items: List of items (dicts or objects) to choose from.
+        :param id_attr: Attribute or key name that holds the item identifier.
+        :param name_attr: Attribute or key name that holds the item display name.
+        :param label: Label shown above the selection box.
+        :param sort_by_name: If True, items are sorted alphabetically by name.
+        :param multi_select: If True (default), allows selecting multiple items via
+            comma-separated numbers, ranges (e.g. 3-5) or 'all'.
+            If False, only a single number is accepted and a single item is returned.
+        :returns: A list of selected items when ``multi_select=True``,
+            or a single item when ``multi_select=False``.
+        """
+
+        def get_val(obj, attr):
+            return obj.get(attr) if isinstance(obj, dict) else getattr(obj, attr)
+
+        if sort_by_name:
+            items = sorted(items, key=lambda x: str(get_val(x, name_attr)).lower())
+
+        TyperUtils.console.print(f"\n[bold blue]{escape(label)}[/bold blue]")
+        TyperUtils.console.print()
+
+        table = Table(
+            box=None,
+            show_header=False,
+            pad_edge=False,
+            padding=(0, 1)
+        )
+
+        table.add_column("Indent", width=2)
+        table.add_column("Index", justify="right", style="cyan")
+        table.add_column("Content", style="white")
+
+        for idx, item in enumerate(items, 1):
+            name = escape(str(get_val(item, name_attr)))
+            id_val = escape(str(get_val(item, id_attr)))
+            content = RichText.from_markup(f"{name} [dim green]({id_val})[/dim green]")
+            table.add_row("", f"{idx}.", content)
+
+        TyperUtils.console.print(table)
+
+        TyperUtils.console.print("  [dim]─────────────────────────────────────────────────────[/dim]")
+
+        if multi_select:
+            help_text = RichText("  Use numbers (1, 2), ranges (5-8) or 'all'", style="dim italic")
+        else:
+            help_text = RichText("  Enter a single number", style="dim italic")
+        TyperUtils.console.print(help_text)
+
+        while True:
+            entrada = Prompt.ask("\n  [bold yellow]>[/bold yellow]").strip().lower()
+
+            if not entrada:
+                continue
+
+            if multi_select:
+                indices = set()
+                if entrada in ("all", "*"):
+                    indices = set(range(1, len(items) + 1))
+                else:
+                    try:
+                        partes = entrada.replace(" ", "").split(",")
+                        for p in partes:
+                            if not p:
+                                continue
+                            if "-" in p:
+                                start, end = map(int, p.split("-"))
+                                indices.update(range(start, end + 1))
+                            elif p.isdigit():
+                                indices.add(int(p))
+                    except ValueError:
+                        TyperUtils.console.print("  [red]❌ Invalid format (e.g.: 1, 3-5)[/red]")
+                        continue
+
+                seleccionados = [items[i - 1] for i in sorted(indices) if 1 <= i <= len(items)]
+
+                if not seleccionados:
+                    TyperUtils.console.print("  [red]⚠️ Selection empty or out of range.[/red]")
+                    continue
+
+                return seleccionados
+
+            else:
+                # Single selection
+                if not entrada.isdigit():
+                    TyperUtils.console.print("  [red]❌ Please enter a single number.[/red]")
+                    continue
+
+                idx = int(entrada)
+                if not (1 <= idx <= len(items)):
+                    TyperUtils.console.print(f"  [red]⚠️ Number out of range (1–{len(items)}).[/red]")
+                    continue
+
+                return items[idx - 1]
 
     @staticmethod
     def select_from_list(

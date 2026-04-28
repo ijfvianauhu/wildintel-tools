@@ -34,7 +34,7 @@ from zoneinfo import ZoneInfo
 
 from dynaconf import Dynaconf
 from dynaconf import loaders
-from pydantic import BaseModel, Field, HttpUrl, EmailStr, ValidationError, SecretStr, \
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, EmailStr, ValidationError, SecretStr, \
     TypeAdapter, field_validator, field_serializer
 
 
@@ -50,6 +50,8 @@ class LoggerSettings(BaseModel):
     )
 
 class GeneralSettings(BaseModel):
+    model_config = ConfigDict(validate_default=True)
+
     host: HttpUrl = Field(
         default="https://wildintel-trap.uhu.es/",
         description="Base URL of the Trapper server (must include trailing slash).",
@@ -97,6 +99,8 @@ class GeneralSettings(BaseModel):
         return p
 
 class WildIntelSettings(BaseModel):
+    model_config = ConfigDict(validate_default=True)
+
     rp_name: str = Field(
         default="WildINTEL",
         description="Name of the WildINTEL research project used as a label in generated outputs.",

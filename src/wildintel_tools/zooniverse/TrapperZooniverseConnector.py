@@ -1,5 +1,5 @@
 from collections import defaultdict
-from datetime import datetime, time, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Dict, Tuple, Any, Optional, Callable, Literal
 import logging, os
@@ -9,7 +9,6 @@ from urllib.error import URLError, HTTPError
 
 from pydantic import BaseModel, validator, HttpUrl
 from tenacity import stop_after_attempt, wait_fixed, before_sleep_log, retry, RetryError
-from trapper_client import Schemas
 from trapper_client.TrapperClient import TrapperClient
 from trapper_client.Schemas import (
     TrapperMediaList,
@@ -20,8 +19,8 @@ from trapper_client.Schemas import (
     TrapperResource,
 )
 
-from wildintel_tools.zooniverse.AnnotationsVoter import AnnotationsVoter
-from wildintel_tools.zooniverse.AnnotationsExtractor import AnnotationsExtractor
+from wildintel_tools.zooniverse.AnnotationsVoter.AnnotationsVoter import AnnotationsVoter
+from wildintel_tools.zooniverse.AnnotationsExtractor.AnnotationsExtractor import AnnotationsExtractor
 from wildintel_tools.reports import Report
 from wildintel_tools.zooniverse.Schemas import SubjectSetResults, WorkflowData, Zoo2TrapperObservation
 
@@ -563,158 +562,183 @@ class TrapperZooniverseConnector:
           collection_id: int,
           cp_id: int,
           output_dir: Path = None,
-          observation_map: Path = None,
-          species_map: Path = None,
+          deployments:List[int] = None,
+          blacklisted_deployments: Optional[List[int]] = None,
+          progress_callback: Optional[Callable[[str, str, int, Optional[int], Optional[str], bool, Optional[str], Optional[str]], None]] = None,
   ):
-      report = Report(f"Annotation from  {subjectset_id} to  classification project {cp_id}", type="DownloadAnnotations" )
-      self.logger.debug(f"Getting annotations for collection {cp_id} linked to {cp_id} classification project")
-      self.zoo.connect()
-      annotations: SubjectSetResults = self.zoo.annotations.get_by_workflow(wf_id)
+        """
+        Gerenates csv file with annotations from Zooniverse ready to import y Trapper.
 
-      if len(annotations.workflows) == 0:
-          raise ValueError(f"No annotations found for subjectset {subjectset_id}")
+        :param subjectset_id:
+        :param wf_id:
+        :param collection_id:
+        :param cp_id:
+        :param output_dir:
+        :param deployments:
+        :param blacklisted_deployments:
+        :param progress_callback:
+        :return:
+        """
+        all_deployments_mode = deployments is None and not blacklisted_deployments
 
-      self.logger.debug(f"Obtained {len(annotations.workflows)} workflows linked to subjectset {subjectset_id}")
+        if not all_deployments_mode:
+            deployments = list(deployments) if deployments is not None else None
 
-      wf = self.zoo.workflows.get_by_id(wf_id)
-      wf_key = f"{wf.id}:{wf.display_name}:{wf.version}"
-      #if wf_key not in annotations.workflows:
-      #    raise ValueError(f"Workflow key {wf_key} not found in annotations")
-      #annotations: WorkflowData = annotations.workflows[wf_key]
+            if deployments is None:
+                depl = self.trapper.deployments.get_all(query={"classification_project":cp_id})
+                depl = depl.results
+                depl = {
+                    item.pk: item.deployment_id
+                    for item in depl
+                    if item.pk is not None and item.deployment_id
+                }
+                collection_obj = self.trapper.collections.get_by_id(collection_id)
+                if len(collection_obj.results) > 0:
+                    collection_obj = collection_obj.results[0]
+                    prefix =f"{collection_obj.name}-".lower()
+                    deployments = list({pk: name for pk, name in depl.items() if name.lower().startswith(prefix)}.keys())
 
-      #annotations: WorkflowData = next(iter(annotations.workflows.values()))
-      #print(annotations.data.keys())
-      #print(len(annotations.data))
-      #print(annotations.summary)
+            deployments = deployments or []
 
-      #self.logger.debug(
-      #    f"Obtained annotations fp{len(annotations.data)} annotations for subjectset {subjectset_id} and workflow {wf_id}"
-      #)
+            if blacklisted_deployments:
+                blacklist = set(blacklisted_deployments)
+                original_total = len(deployments)
+                deployments = [dep for dep in deployments if dep not in blacklist]
+                skipped = original_total - len(deployments)
+                if skipped:
+                    self.logger.info(f"Skipping {skipped} deployments due to blacklist")
 
-      query = {"camtrapdp": "False"}
+        report = Report(f"Annotation from  {subjectset_id} to  classification project {cp_id}", type="DownloadAnnotations" )
 
-      trapper_observations : Schemas.TrapperClassificationResultsList = self.trapper.observations.results.get_by_collection(cp_id, collection_id, query=query)
+        self._notify(progress_callback, "fetching_annotations", "start",
+                     description="Fetching Zooniverse annotations...")
+        self.zoo.connect()
+        zoo_annotations: SubjectSetResults = self.zoo.annotations.get_by_workflow(wf_id)
 
-      self.logger.debug(
-          f"Obtained {len(trapper_observations.results)} observations for collection {collection_id} and research project {cp_id}")
+        if len(zoo_annotations.workflows) == 0:
+            self._notify(progress_callback, "fetching_annotations", "fail",
+                         description="No annotations found")
+            raise ValueError(f"No annotations found for subjectset {subjectset_id}")
 
-      (extractor, voter) = self._get_extrator_vote(wf.id)
+        wf = self.zoo.workflows.get_by_id(wf_id)
+        wf_key = f"{wf.id}:{wf.display_name}"
 
-      flat_results : List[TrapperObservationResultsTrapper]= []
+        if wf_key not in zoo_annotations.workflows:
+            self._notify(progress_callback, "fetching_annotations", "fail",
+                         description=f"Workflow key {wf_key} not found")
+            raise ValueError(f"Workflow key {wf_key} not found in annotations")
 
-      for wf_fullid, wf_data in annotations.workflows.items():
-          # for each subject-media annotation, extract observations and vote
+        wf_annotations: WorkflowData = zoo_annotations.workflows[wf_key]
+        self._notify(progress_callback, "fetching_annotations", "end",
+                     description=f"Fetched {len(wf_annotations.data)} subjects")
 
-          for key, user_opinions in wf_data.data.items():
-              try:
-                  subject_id, media_id = key.split(":")
-                  self.logger.debug(f"Obteniendo las trapper observations para media {media_id} vinculado al subject {subject_id}")
+        (extractor, voter) = self._get_extrator_vote(wf.id)
+        flat_results: List[TrapperObservationResultsTrapper] = []
 
-                  all_media_observations: List[TrapperObservationResultsTrapper] =\
-                          [o for o in trapper_observations.results if str(o.mediaID) == media_id]
+        n_subjects = len(wf_annotations.data)
+        self._notify(progress_callback, "processing_subjects", "start",
+                     total=n_subjects, set_total=True,
+                     description=f"Processing {n_subjects} subjects...")
 
-                  # fake block
-                  #if False and len(all_media_observations) == 0:
-                  if len(all_media_observations) == 0:
-                      self.logger.debug(f"No se han encontrado observaciones en Trapper para media {media_id} ")
-                      report.add_error(
-                          f"subject:{subject_id}",
-                          "get_observations",
-                          f"No observations found for resource {media_id} in Trapper classification project {cp_id}"
-                      )
-                  else:
-                      all_media_observations_ids = list({obj.id for obj in all_media_observations if obj.id is not None})
-                      # fake block
-                      """
-                      all_media_observations_ids = [10]
-                      inst = TrapperObservationResultsTrapper(
-                            _id="10",
-                            observationID=1,
-                            deploymentID="DEP-001",
-                            mediaID=10,
-                            eventID="EVT-001",
-                            eventStart="2024-05-01T12:00:00",
-                            eventEnd="2024-05-01T12:00:00",
-                            observationLevel="image",
-                            observationType="animal",
-                            cameraSetupType="standard",
-                            scientificName="Vulpes vulpes",
-                            count=1,
-                            lifeStage="adult",
-                            sex="unknown",
-                            behavior="standing",
-                            individualID=None,
-                            individualPositionRadius=None,
-                            individualPositionAngle=None,
-                            individualSpeed=None,
-                            classificationMethod="AI",
-                            classifiedBy="model_v1",
-                            classificationTimestamp="2024-05-01T12:00:00",
-                            classificationProbability=0.92,
-                            observationTags="fox,night",
-                            observationComments="Detected by model",
-                            # Campos adicionales de la clase extendida
-                            countNew=1,
-                            englishName="Red fox",
-                            bboxes=[[100.0, 150.0, 300.0, 400.0]],  # x1, y1, x2, y2
+        iter_deployments = [None] if all_deployments_mode else deployments
+        for depl in iter_deployments:
+            query = {"camtrapdp": "False"}
+            if depl is not None:
+                query["deployment"] = depl
+            collections = self.trapper.raw.get_all_pages(
+                endpoint=f"/media_classification/api/project/{cp_id}/collections"
+            )
+            collection_inter_id = [r["pk"] for r in collections["results"] if r["collection_pk"] == collection_id]
+            query["collection"] = ",".join(map(str, collection_inter_id))
+            trapper_observations = self.trapper.raw.get_all_pages(
+                endpoint=f"/media_classification/api/classifications/results/{cp_id}", query=query
+            )
+
+            for key, users_ss_opinions in wf_annotations.data.items():
+                subject_id, media_id = key.split(":")
+                if media_id.isdigit():
+                    all_media_observations: List[TrapperObservationResultsTrapper] = [
+                        TrapperObservationResultsTrapper.model_construct(
+                            **{("id" if k == "_id" else k): v for k, v in o.items()}
                         )
-                      all_media_observations = [inst]
-                      """
-                      # end fake block
-                      # Zooniverse decision
-                      self.logger.debug(f"Invocando al extractor con {user_opinions}")
-                      opinions = extractor.run(user_opinions)
-                      self.logger.debug(f"Invocando al voter con {opinions}")
-                      decisions : List[Zoo2TrapperObservation] = voter.run(opinions)
-                      if not decisions:
-                          report.add_error(f"subject:{subject_id}",
-                                             "getting_decision",
-                                             f"No decision found for subject {subject_id}")
-                          self.logger.debug(f"No hay decision para subject_id {subject_id}")
-                          continue
-                      self.logger.debug(f"Asignando las decisiones {decisions} a las classifications en trapper {all_media_observations_ids}")
-                      for decision in decisions:
-                          for id in all_media_observations_ids:
-                              new_obs: TrapperObservationResultsTrapper = all_media_observations[0].copy(
-                                    update={
-                                        **decision.model_dump(),
-                                        "_id": id,
-                                        "bboxes": None,
-                                        "classificationTimestamp": datetime.now(timezone.utc),
-                                        "classifiedBy": self.trapper.user_name,
-                                        "classificationMethod": "human",
-                                        "observationComments": f"Automatically classified by Zooniverse in workflow {wf_key} for subject {subject_id}",
-                                    }
-                              )
-                              report.add_success(
-                                    f"subject:{subject_id}",
-                                    "getting_decision",
-                                    f"Added an observation for resource {media_id} with {decision.scientificName}",
-                              )
+                        for o in trapper_observations["results"]
+                        if str(o["mediaID"]) == media_id
+                    ]
+                    all_media_observations_ids = list(
+                        {obj.id for obj in all_media_observations if obj.id is not None}
+                    )
 
-                              flat_results.append(new_obs)
+                    if len(all_media_observations_ids) == 0:
+                        report.add_error(
+                            f"subject:{subject_id}",
+                            "getting_decision",
+                            f"No Trapper observations found for media {media_id} in collection {collection_id}",
+                        )
+                        self._notify(progress_callback, "processing_subjects", "progress",
+                                     advance=1, item_name=f"media:{media_id}",
+                                     item_status="fail",
+                                     item_description="No Trapper observations found")
+                        continue
 
-              except Exception as e:
-                self.logger.error("unknown", f"Error processing subject-media {key}: {e}")
+                    extracted_user_opinions = extractor.run(users_ss_opinions)
+                    decisions: List[Zoo2TrapperObservation] = voter.run(extracted_user_opinions)
 
-          self.logger.debug(
-            f"Generadas {len(flat_results)} observaciones para importar en Trapper por subject: "
-          )
+                    if not decisions:
+                        report.add_error(
+                            f"subject:{subject_id}",
+                            "getting_decision",
+                            f"No decisions produced for media {media_id} from Zooniverse votes",
+                        )
+                        self._notify(progress_callback, "processing_subjects", "progress",
+                                     advance=1, item_name=f"media:{media_id}",
+                                     item_status="fail",
+                                     item_description="No decisions from voter")
+                        continue
 
-          # Guardar CSV si se indicó output_dir
-          if output_dir:
-            self.logger.debug(f"Saving observations to CSV in {output_dir}")
-            self._trapper_observations_to_csv(flat_results,
-                                              Path(output_dir),
-                                                   ["observationType", "scientificName",
-                                                            "count", "classifiedBy","classificationMethod",
-                                                            "observationComments",
-                                                            "_id"
-                                                    ])
+                    base_fields = {
+                        k: v for k, v in all_media_observations[0].__dict__.items()
+                        if not k.startswith("_")
+                    }
+                    for decision in decisions:
+                        for obser_id in all_media_observations_ids:
+                            new_obs = TrapperObservationResultsTrapper.model_construct(
+                                **base_fields,
+                                **decision.model_dump(),
+                                id=obser_id,
+                                bboxes=None,
+                                classificationTimestamp=datetime.now(timezone.utc),
+                                classifiedBy=self.trapper.user_name,
+                                classificationMethod="human",
+                                observationComments=f"Automatically classified by Zooniverse in workflow {wf_key} for subject {subject_id}",
+                            )
+                            report.add_success(
+                                f"subject:{subject_id}",
+                                "getting_decision",
+                                f"Added an observation for resource {media_id} with {decision.scientificName}",
+                            )
+                            flat_results.append(new_obs)
 
-      return report
+                    self._notify(progress_callback, "processing_subjects", "progress",
+                                 advance=1, item_name=f"media:{media_id}",
+                                 item_status="end",
+                                 item_description=f"{len(decisions)} decision(s)")
 
-        #TODO subir usando el browser
+        self._notify(progress_callback, "processing_subjects", "end",
+                     description=f"Processed {n_subjects} subjects")
+
+        if output_dir:
+            csv_path = Path(output_dir)
+            if csv_path.is_dir():
+                csv_path = csv_path / f"annotations_{subjectset_id}_{wf_id}.csv"
+            self.logger.debug(f"Saving observations to CSV in {csv_path}")
+            self._trapper_observations_to_csv(
+                flat_results,
+                csv_path,
+                ["observationType", "scientificName", "count", "classifiedBy",
+                 "classificationMethod", "observationComments", "_id"],
+            )
+
+        return report
 
     def _get_zoo_filename(self, media):
         return f"{media['mediaID']}_x_{media['deploymentID']}_x_{media['fileName']}"
@@ -766,8 +790,8 @@ class TrapperZooniverseConnector:
         extractor_class_name = f"Workflow{workflow_id}AnnotationExtractor"
         voter_class_name = f"Workflow{workflow_id}AnnotationsVoter"
 
-        extractor_module = importlib.import_module(f"trapper_zooniverse.AnnotationsExtractor.{extractor_class_name}")
-        voter_module = importlib.import_module(f"trapper_zooniverse.AnnotationsVoter.{voter_class_name}")
+        extractor_module = importlib.import_module(f"wildintel_tools.zooniverse.AnnotationsExtractor.{extractor_class_name}")
+        voter_module = importlib.import_module(f"wildintel_tools.zooniverse.AnnotationsVoter.{voter_class_name}")
 
         ExtractorClass = getattr(extractor_module, extractor_class_name)
         VoterClass = getattr(voter_module, voter_class_name)

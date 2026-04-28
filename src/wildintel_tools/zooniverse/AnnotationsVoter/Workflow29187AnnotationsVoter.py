@@ -7,16 +7,44 @@ from typing import List, Optional
 from wildintel_tools.zooniverse.AnnotationsVoter.AnnotationsVoter import AnnotationsVoter
 from wildintel_tools.zooniverse.Schemas import Zoo2TrapperObservation
 
-class Workflow29186AnnotationsVoter(AnnotationsVoter):
+class Workflow29187AnnotationsVoter(AnnotationsVoter):
 
+    """    observationType: Literal["animal", "human", "vehicle", "blank", "unclassified", "unknown"] """
     observationTypeMap = {
-        "UNRECOGNIZABLE": "black",
-        "NOANIMAL": "human",
-        "HUMAN": "human",
+        "UNRECOGNIZABLE": "unknown",
+        "NOANIMAL" : "black",
+        "OTHERSPECIES" : "animalia",
+        "HUMANORVEHICLE" : "human",
+    }
+
+
+    speciesMap = {
+        "BROWNBEAR": "Ursus arctos",
+        "CERVIDREDORROEDEER" : "Cervidae",
+        "CHAMOIS" : "Rupicapra rupicapra",
+        "DOMESTICCAT" : "Felis catus",
+        "DOMESTICDOG" : "Canis familiaris",
+        "EUROPEANHARE" : "Lepus europaeus",
+        "EUROPEANBADGER": "Meles meles",
+        "EURASIANLYNX": "Lynx lynx",
+        "MARMOT" : "Marmota marmota",
+        "MARTENPINEORSTONEMARTEN": "Martes",
+        "PINEMARTEN": "Martes martes",
+        "REDFOX": "Vulpes vulpes",
+        "REDDEER": "Cervus elaphus",
+        "REDSQUIRREL" : "Sciurus vulgaris",
+        "ROEDEER" : "Capreolus capreolus",
+        "MUSTELID": "Mustelidae",
+        "STOAT": "Mustela erminea",
+        "STONEMARTEN": "Martes foina",
+        "WILDBOAR": "Sus scrofa",
+        "WEASEL": "Mustela nivalis",
+        "WOLF": "Canis lupus",
+        "BIRD": "Aves"
     }
 
     """
-    Extrae las anotaciones específicas del workflow 17553 (IberianCameraTrapR1_1_2_3).
+    Extrae las anotaciones específicas del workflow 29187 (Tatra).
     """
     @staticmethod
     def run(observations: List[Any]) -> Optional[List[Zoo2TrapperObservation]]:
@@ -58,17 +86,12 @@ class Workflow29186AnnotationsVoter(AnnotationsVoter):
                 confidence = votes / (votes + votes_next)
 
             # Mapear observationType
+            observationType = "animal"
 
-            if species == "Homo sapiens":
-                observationType = "human"
-            elif species in ["vehicle", "blank", "unclassified", "unknown"]:
+            if species.lower() in ["animal", "human", "vehicle", "blank", "unclassified", "unknown"]:
                 observationType = species
-                species = ""
-            elif species == "animal":
-                observationType = "animal"
-                species = ""
-            else:
-                observationType = "animal"
+                species = "" if species.lower() != "human" else "Homo Sapiens"
+            species = species
 
             obs = Zoo2TrapperObservation(
                 observationType=observationType,

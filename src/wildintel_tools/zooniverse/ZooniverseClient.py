@@ -1010,11 +1010,11 @@ class AnnotationsComponent(ZooniverseClientComponent):
         )
 
         for row in rows:
-
             wname = row.get("workflow_name") or "unknown_workflow"
             wid = row.get("workflow_id") or "unknown_id"
-            wver = row.get("workflow_version") or ""
-            workflow_key = f"{wid}:{wname}:{wver}"
+            #wver = row.get("workflow_version") or ""
+            #workflow_key = f"{wid}:{wname}:{wver}"
+            workflow_key = f"{wid}:{wname}"
 
             subject_ids = AnnotationsComponent._parse_subject_ids(row.get("subject_ids", ""))
 

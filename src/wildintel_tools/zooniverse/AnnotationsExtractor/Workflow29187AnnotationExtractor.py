@@ -3,12 +3,12 @@ import re
 from statistics import multimode
 from typing import List, Any
 import logging
-from trapper_zooniverse.Schemas import ClassificationInfo
-from trapper_zooniverse.AnnotationsExtractor.AnnotationsExtractor import AnnotationsExtractor
+from wildintel_tools.zooniverse.Schemas import ClassificationInfo
+from wildintel_tools.zooniverse.AnnotationsExtractor.AnnotationsExtractor import AnnotationsExtractor
 
 logger = logging.getLogger(__name__)
 
-class Workflow29186AnnotationExtractor(AnnotationsExtractor):
+class Workflow29187AnnotationExtractor(AnnotationsExtractor):
     """
     Extract annotations specific to workflow 29187 (Tatra National Park  │ 91.8).
 
@@ -61,7 +61,8 @@ class Workflow29186AnnotationExtractor(AnnotationsExtractor):
         """
 
         def trapper_name(choice):
-            return Workflow29186AnnotationExtractor.zoo_to_trapper.get(choice, "unknown")
+            return Workflow29187AnnotationExtractor.zoo_to_trapper.get(choice, "unknown")
+
         choices = []
         k_list = []
         k_max = 3  # max number of choices allowed per user and subject (photo)
@@ -75,8 +76,8 @@ class Workflow29186AnnotationExtractor(AnnotationsExtractor):
             k_list.append(len(matches))
             sid = classifications_x_user.sid
 
-            results = [(choice, ast.literal_eval(answers)) for choice, answers in matches]
-            #results = [(trapper_name(choice), ast.literal_eval(answers)) for choice, answers in matches]
+            #results = [(choice, ast.literal_eval(answers)) for choice, answers in matches]
+            results = [(trapper_name(choice), ast.literal_eval(answers)) for choice, answers in matches]
             choices.extend(results)
 
         logger.debug(f"valores de k {k_list}")

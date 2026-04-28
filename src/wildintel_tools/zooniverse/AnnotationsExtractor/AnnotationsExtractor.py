@@ -83,7 +83,11 @@ class AnnotationsExtractor:
 ]
     It could extract the following list of choices and answers:
 
-    [('OTHERSPECIES', {}), ('OTHERSPECIES', {}),('Genetta genetta', {'HOWMANY': '1'})]
+    [
+        ('OTHERSPECIES', {}),
+        ('OTHERSPECIES', {}),
+        ('Genetta genetta', {'HOWMANY': '1'})
+    ]
 
     As shown in the example above, the class processes each classification,
     extracts the choices made by users along with any associated answers,

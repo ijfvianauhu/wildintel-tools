@@ -14,7 +14,7 @@ class ClassificationInfo(BaseModel):
 
 class Zoo2TrapperObservation(BaseModel):
     """Anotacion individual extraída de zoo para poder ser importada en Trapper."""
-    observationType: Literal["animal", "human", "vehicle", "black", "unclassified", "unknown"]
+    observationType: Literal["animal", "human", "vehicle", "blank", "unclassified", "unknown"]
     scientificName: Optional[str] = None
     count: Optional[int] = None
     countNew: Optional[int] = None

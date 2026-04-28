@@ -16,6 +16,7 @@ from wildintel_tools.ui.typer.zooniverse import (
     get_workflows,
     get_subject_sets,
     update_subject_metadata_from_trapper,
+    public_annotations,
 )
 from wildintel_tools.zooniverse.TrapperZooniverseConnector import TrapperZooniverseConnector
 from wildintel_tools.zooniverse.ZooniverseClient import ZooniverseClient
@@ -479,6 +480,129 @@ def update_metadata(
 
 app.command(name="um", hidden=True, help=_("Alias for update-metadata")) (update_metadata)
 
+
+@app.command(
+    name="export",
+    short_help=_("Export Zooniverse annotations back to Trapper (alias: exp)."),
+    help=_(
+        "Export the classification results of a Zooniverse subject set back to Trapper as observations. "
+        "Requires a workflow ID (--wf), a subject set ID (--ss), a collection ID (--collection) "
+        "and a classification project ID (--cp)."
+    ),
+)
+def export_annotations(
+    ctx: typer.Context,
+    wf_id: Annotated[
+        int,
+        typer.Option(
+            "--wf",
+            help=_("Zooniverse workflow ID whose classifications will be exported."),
+        ),
+    ] = ...,
+    ss_id: Annotated[
+        int,
+        typer.Option(
+            "--ss",
+            help=_("Zooniverse subject set ID to export annotations from."),
+        ),
+    ] = ...,
+    classification_project: Annotated[
+        int,
+        typer.Option(
+            "--cp",
+            help=_("Trapper classification project ID where observations will be created."),
+        ),
+    ] = ...,
+    collection: Annotated[
+        int,
+        typer.Option(
+            "--collection",
+            help=_("Trapper collection ID linked to the classification project."),
+        ),
+    ] = ...,
+    deployments: Annotated[
+        List[int],
+        typer.Option(
+            "--deployments",
+            help=_("Trapper deployments ID linked to the classification project."),
+        ),
+    ] = None,
+
+    observations_file: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--observations-file",
+            "-o",
+            help=_("Optional path to save the raw observations file before uploading to Trapper."),
+        ),
+    ] = None,
+    config: Annotated[
+        Path,
+        typer.Option(hidden=True, help=_("Configuration file"), callback=callback_with_override),
+    ] = None,
+) -> None:
+    """
+    Export Zooniverse annotations to Trapper.
+
+    Reads the classification results for *ss_id* / *wf_id* from Zooniverse and
+    pushes them as observations into the Trapper *classification_project* /
+    *collection*.
+
+    :param ctx: Typer context.
+    :param wf_id: Zooniverse workflow ID.
+    :param ss_id: Zooniverse subject set ID.
+    :param classification_project: Trapper classification project ID.
+    :param collection: Trapper collection ID.
+    :param observations_file: Optional path to persist the raw observations file.
+    :param config: Internal configuration option (dynamic callback).
+    """
+    settings: Settings = ctx.obj.get("settings", Settings())
+
+    zooniverse_client = ZooniverseClient(
+        project_id=settings.ZOONIVERSE.zooniverse_project_id,
+        username=settings.ZOONIVERSE.zooniverse_username,
+        password=settings.ZOONIVERSE.zooniverse_password.get_secret_value(),
+    )
+
+    trapper_client = TrapperClient(
+        base_url=str(settings.GENERAL.host),
+        user_name=settings.GENERAL.login,
+        user_password=settings.GENERAL.password.get_secret_value(),
+        access_token=None,
+    )
+
+    connector = TrapperZooniverseConnector(zooniverse_client, trapper_client)
+
+    TyperUtils.info(
+        _(
+            f"Exporting annotations — workflow {wf_id}, subject set {ss_id}, "
+            f"collection {collection}, classification project {classification_project}…"
+        )
+    )
+
+    try:
+        report = public_annotations(
+            tzc=connector,
+            cp_id=classification_project,
+            collection_id=collection,
+            subjectset_id=ss_id,
+            wf_id=wf_id,
+            observations_file=observations_file,
+        )
+    except Exception as e:
+        TyperUtils.fatal(_(f"Failed to export annotations: {e}"))
+        return
+
+    TyperUtils.success(_(f"Annotations exported successfully from subject set {ss_id}."))
+    report_file = TyperUtils.save_report(report)
+    TyperUtils.console.print()
+    TyperUtils.display_report(report)
+    TyperUtils.success(_(f"Report saved at: {report_file}"))
+
+
+app.command(name="exp", hidden=True, help=_("Alias for export")) (export_annotations)
+
+
 @app.command(
     help=_("Download subjects (images) from a Zooniverse subjetset (alias: dl_ss)."),
     short_help=_("Download a subjectset (alias: dl_ss)"))
@@ -703,6 +827,7 @@ from enum import Enum
 class Wizard(str, Enum):
     importation = "import"
     setup       = "setup"
+    export      = "export"
 
 @app.command("wizard",
          short_help=_("Run a wizard to guide you through completing a task."),
@@ -815,7 +940,177 @@ def wizard_command(
                 typer.echo("Aborted.")
         else:
             typer.echo("Aborted.")
-    elif Wizard.setup == wizard :
+    elif Wizard.export == wizard:
+        print_section("Export annotations from a Zooniverse subject set to Trapper")
+
+        TyperUtils.console.print()
+        TyperUtils.console.print("[blue]ℹ[/blue] This wizard will guide you through exporting Zooniverse classification")
+        TyperUtils.console.print("    results back to Trapper as observations. You will need to select")
+        TyperUtils.console.print("    the subject set, the research project and the classification project.")
+        TyperUtils.console.print()
+
+        if typer.confirm("Continue?"):
+            zooniverse_client = ZooniverseClient(
+                project_id=settings.ZOONIVERSE.zooniverse_project_id,
+                username=settings.ZOONIVERSE.zooniverse_username,
+                password=settings.ZOONIVERSE.zooniverse_password.get_secret_value(),
+            )
+
+            # 5. Select workflow
+            TyperUtils.console.print()
+            TyperUtils.info("Retrieving workflows from Zooniverse...")
+            wfs = get_workflows(zooniverse_client)
+            if not wfs:
+                TyperUtils.fatal("No workflows found in the Zooniverse project. Cannot continue.")
+
+            wf_selected = TyperUtils.select_box(
+                wfs,
+                id_attr="id",
+                name_attr="display_name",
+                label="Select a workflow",
+                multi_select=False,
+            )
+
+            TyperUtils.console.print(
+                f"[green]✓[/green] Workflow selected: [bold]{wf_selected.display_name}[/bold] (id: {wf_selected.id})"
+            )
+
+            # 1. Select subject set
+            TyperUtils.console.print()
+            TyperUtils.info("Retrieving subject sets from Zooniverse...")
+            subject_sets = get_subject_sets(zooniverse_client)
+            if not subject_sets:
+                TyperUtils.fatal("No subject sets found in the Zooniverse project. Cannot continue.")
+
+            ss_selected = TyperUtils.select_box(
+                subject_sets,
+                id_attr="id",
+                name_attr="display_name",
+                label="Select a subject set",
+                multi_select=False,
+            )
+
+            TyperUtils.console.print(
+                f"[green]✓[/green] Subject set selected: "
+                f"[bold]{ss_selected.display_name}[/bold] (id: {ss_selected.id})"
+            )
+
+            # 2. Select research project
+            TyperUtils.console.print()
+            rp = trapper_client.research_projects.get_all()
+            if not rp.results:
+                TyperUtils.fatal("No research projects found in Trapper. Cannot continue.")
+
+            rp_selected = TyperUtils.select_box(
+                rp.results,
+                id_attr="pk",
+                name_attr="name",
+                label="Select a research project",
+                multi_select=False,
+            )
+            TyperUtils.console.print(
+                f"[green]✓[/green] Subject set selected: [bold]{rp_selected.name}[/bold] (id: {rp_selected.pk})"
+            )
+            #rp_selected, _ = TyperUtils.select_from_list(rp.results, title="Select a research project")
+
+            # 3. Select classification project
+            cp = trapper_client.classification_projects.get_by_research_project(rp_selected.pk)
+            if not cp.results:
+                TyperUtils.fatal(
+                    f"No classification projects found in research project "
+                    f"{rp_selected.name} ({rp_selected.pk}). Cannot continue."
+                )
+
+            TyperUtils.console.print()
+            cp_selected = TyperUtils.select_box(
+                cp.results,
+                id_attr="pk",
+                name_attr="name",
+                label="Select a classification project",
+                multi_select=False,
+            )
+            TyperUtils.console.print(
+                f"[green]✓[/green] Classification project selected: "
+                f"[bold]{cp_selected.name}[/bold] (id: {cp_selected.pk})"
+            )
+
+            # 4. Select collection
+            collections = trapper_client.collections.get_by_classification_project(cp_selected.pk)
+            if not collections.results:
+                TyperUtils.fatal(
+                    f"No collections found in classification project "
+                    f"{cp_selected.name} ({cp_selected.pk}). Cannot continue."
+                )
+
+            TyperUtils.console.print()
+            collection_selected = TyperUtils.select_box(
+                collections.results,
+                id_attr="collection_pk",
+                name_attr="name",
+                label="Select a collection",
+                multi_select=False,
+            )
+
+            # 5. Select deployments
+
+            deployments: TrapperDeploymentList = trapper_client.deployments.get_all(
+                query={"research_project": rp_selected.pk}
+            )
+
+            prefixes = f"{collection_selected.name}-".lower()
+
+            filtered = [d for d in deployments.results if d.deployment_id.lower().startswith(prefixes)]
+
+            if not filtered:
+                TyperUtils.fatal(
+                    f"No deployments found in collection  {collection_selected.name.lower()}"
+                    f". Cannot continue."
+                )
+
+            TyperUtils.console.print()
+            deployment_selected = TyperUtils.select_box(
+                filtered, id_attr="pk", name_attr="deployment_id", label="Select deployment", multi_select=True
+            )
+
+            # Summary & confirm
+            deployments_str_list = [f"{d.deployment_id} ({d.pk})" for d in deployment_selected]
+            TyperUtils.console.print()
+            msg = (
+                f"We are going to export the annotations from subject set "
+                f"{ss_selected.display_name} ({ss_selected.id}) "
+                f"using workflow {wf_selected.display_name} ({wf_selected.id}) "
+                f"into deployment { ",".join(deployments_str_list) }"
+                f"from collection {collection_selected.name} ({collection_selected.collection_pk}) "
+                f"of classification project {cp_selected.name} ({cp_selected.pk}) "
+                f"within research project {rp_selected.name} ({rp_selected.pk}). "
+                f"Are you sure?"
+            )
+
+            if typer.confirm(msg):
+                connector = TrapperZooniverseConnector(zooniverse_client, trapper_client)
+                try:
+                    report = public_annotations(
+                        tzc=connector,
+                        cp_id=cp_selected.pk,
+                        collection_id=collection_selected.collection_pk,
+                        subjectset_id=ss_selected.id,
+                        wf_id=wf_selected.id,
+                    )
+                    TyperUtils.success(
+                        f"Annotations exported successfully from subject set "
+                        f"'{ss_selected.display_name}' to Trapper."
+                    )
+                    report_file = TyperUtils.save_report(report)
+                    TyperUtils.console.print()
+                    TyperUtils.display_report(report)
+                    TyperUtils.success(_(f"Report saved at: {report_file}"))
+                except Exception as e:
+                    TyperUtils.fatal(_(f"Failed to export annotations: {e}"))
+            else:
+                typer.echo("Aborted.")
+        else:
+            typer.echo("Aborted.")
+    elif Wizard.setup == wizard:
         print_section("Configure zooniverse module")
 
         TyperUtils.console.print()
