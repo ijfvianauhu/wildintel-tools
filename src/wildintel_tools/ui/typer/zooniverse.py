@@ -261,6 +261,8 @@ def update_subject_metadata_from_trapper(
     dry_run: bool = False,
     white_list: Optional[List[int]] = None,
     black_list: Optional[List[int]] = None,
+    attempts: int = 3,
+    delay_seconds: int = 5,
 ) -> Report:
     """
     Update subject metadata in Zooniverse using Trapper as source, with progress UI.
@@ -325,6 +327,8 @@ def update_subject_metadata_from_trapper(
             dry_run=dry_run,
             white_list=white_list,
             black_list=black_list,
+            attempts=attempts,
+            delay_seconds=delay_seconds,
         )
 
     return report

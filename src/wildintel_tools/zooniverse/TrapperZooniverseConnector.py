@@ -3,8 +3,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Dict, Tuple, Any, Optional, Callable, Literal
 import logging, os
+import time as time_module
 import tempfile
 import re
+import threading
 from urllib.error import URLError, HTTPError
 
 from pydantic import BaseModel, validator, HttpUrl
@@ -400,6 +402,8 @@ class TrapperZooniverseConnector:
         dry_run: bool = False,
         white_list: Optional[List[int]] = None,
         black_list: Optional[List[int]] = None,
+        attempts: int = 3,
+        delay_seconds: int = 5,
     ) -> Report:
         """
         Update metadata of all subjects in a Zooniverse SubjectSet using Trapper media info.
@@ -412,16 +416,10 @@ class TrapperZooniverseConnector:
             type="UpdateSubjectMetadataReport",
         )
 
-        self._notify(
-            progress_callback,
-            "getting_subjects",
-            state="start",
-            description=f"Getting subjects from subjectset {subjectset_id}...",
-        )
+        attempts = max(1, int(attempts))
+        delay_seconds = max(0, int(delay_seconds))
 
-        subjects = self.zoo.subjects.get_by_subjectset(subjectset_id, to_list=False)
-
-        self._notify(progress_callback, "getting_subjects", state="end")
+        subjects_iter = self.zoo.subjects.get_by_subjectset(subjectset_id, to_list=False)
 
         self._notify(
             progress_callback,
@@ -430,117 +428,91 @@ class TrapperZooniverseConnector:
             description=f"Updating metadata for subjects in subjectset {subjectset_id}...",
         )
 
-        for s in subjects:
+        report_lock = threading.Lock()
+
+        def _is_selected_subject(s) -> bool:
+            sid = str(getattr(s, "id", "unknown"))
+            try:
+                sid_int = int(sid)
+            except Exception:
+                sid_int = None
+
+            if white_list is not None and sid_int not in white_list:
+                self.logger.debug(f"Subject {sid} skipped: not in white_list")
+                return False
+            if black_list is not None and sid_int in black_list:
+                self.logger.debug(f"Subject {sid} skipped: in black_list")
+                return False
+            return True
+
+        def _process_subject_once(s):
+            sid = str(getattr(s, "id", "unknown"))
+            resource_id = self._get_trapper_resource_id_from_subjec(s)
+            if resource_id is None:
+                raise ValueError(f"Could not find media_id in subject {sid}")
+
+            self._notify(
+                progress_callback,
+                "updating_subjects",
+                state="running",
+                advance=0,
+                item_name=sid,
+                item_status="start",
+                item_description=f"Resolving resource {resource_id} from Trapper",
+            )
+
+            resource_list = self.trapper.resources.get_by_pk(resource_id)
+            if not resource_list.results:
+                raise ValueError(f"Could not find resource with id {resource_id} in Trapper")
+
+            resource: TrapperResource = resource_list.results[0]
+            deployment_id = resource.name.split("-")[0] if resource.name and "-" in resource.name else ""
+            zoo_name = self._get_zoo_filename(
+                {
+                    "mediaID": resource_id,
+                    "deploymentID": deployment_id,
+                    "fileName": resource.name,
+                }
+            )
+
+            new_metadata = self._build_subject_metadata(resource_id, zoo_name)
+            new_metadata["Filename"] = zoo_name
+
+            if dry_run:
+                with report_lock:
+                    report.add_success(f"{sid}@subject", "update_metadata_simulated", **{"media_id": resource_id})
+            else:
+                self.zoo.subjects.update_one_metadata(s.id, new_metadata)
+                with report_lock:
+                    report.add_success(f"{sid}@subject", "update_metadata", **{"media_id": resource_id})
+
+            self._notify(
+                progress_callback,
+                "updating_subjects",
+                state="running",
+                advance=1,
+                item_name=sid,
+                item_status="end",
+                item_description=f"Metadata updated from resource {resource_id}",
+            )
+
+        def _process_subject(s):
             sid = str(getattr(s, "id", "unknown"))
 
-            if white_list is not None and int(sid) not in white_list:
-                self.logger.debug(f"Subject {sid} skipped: not in white_list")
-                continue
-            if black_list is not None and int(sid) in black_list:
-                self.logger.debug(f"Subject {sid} skipped: in black_list")
-                continue
+            @retry(
+                stop=stop_after_attempt(attempts),
+                wait=wait_fixed(delay_seconds),
+                reraise=True,
+                before_sleep=before_sleep_log(self.logger, logging.WARNING),
+            )
+            def _run_with_retry():
+                return _process_subject_once(s)
 
             try:
-                # Extract resource_id from subject metadata: Filename → image_name → external_id
-                metadata = (s.raw or {}).get("metadata") or {}
-                resource_id = None
-
-                filename = metadata.get("Filename") or metadata.get("filename")
-                if filename:
-                    m = re.match(r"^(\d+)_x_", filename)
-                    if m:
-                        resource_id = int(m.group(1))
-
-                if resource_id is None:
-                    image_name = metadata.get("image_name")
-                    if image_name:
-                        m = re.match(r"^(\d+)_x_", image_name)
-                        if m:
-                            resource_id = int(m.group(1))
-
-                if resource_id is None:
-                    external_id = metadata.get("external_id")
-                    if external_id:
-                        m = re.search(r":(\d+)$", external_id)
-                        if m:
-                            resource_id = int(m.group(1))
-
-                if resource_id is not None:
-                    self._notify(
-                        progress_callback,
-                        "updating_subjects",
-                        state="running",
-                        advance=0,
-                        item_name=sid,
-                        item_status="start",
-                        item_description=f"Resolving resource {resource_id} from Trapper",
-                    )
-
-                    resource_list = self.trapper.resources.get_by_pk(resource_id)
-                    if resource_list.results:
-                        resource: TrapperResource = resource_list.results[0]
-                        deployment_id = resource.name.split("-")[0] if resource.name and "-" in resource.name else ""
-                        zoo_name = self._get_zoo_filename(
-                            {
-                                "mediaID": resource_id,
-                                "deploymentID": deployment_id,
-                                "fileName": resource.name,
-                            }
-                        )
-
-                        new_metadata = self._build_subject_metadata(resource_id, zoo_name)
-                        new_metadata["Filename"] = zoo_name
-
-                        if dry_run:
-                            report.add_success(
-                                f"{sid}@subject", "update_metadata_simulated", **{"media_id": resource_id}
-                            )
-                        else:
-                            self.zoo.subjects.update_one_metadata(s.id, new_metadata)
-                            report.add_success(f"{sid}@subject", "update_metadata", **{"media_id": resource_id})
-
-                        self._notify(
-                            progress_callback,
-                            "updating_subjects",
-                            state="running",
-                            advance=1,
-                            item_name=sid,
-                            item_status="end",
-                            item_description=f"Metadata updated from resource {resource_id}",
-                        )
-                    else:
-                        report.add_error(
-                            f"{s.id}@subject",
-                            "get_media_resource",
-                            f"Could not find resource with id {resource_id} in Trapper",
-                        )
-                        self._notify(
-                            progress_callback,
-                            "updating_subjects",
-                            state="running",
-                            advance=1,
-                            item_name=sid,
-                            item_status="fail",
-                            item_description=f"Resource {resource_id} not found in Trapper",
-                        )
-                else:
-                    report.add_error(
-                        f"{s.id}@subject",
-                        "get_media_id",
-                        f"Could not find media_id in subject {s.id}",
-                    )
-                    self._notify(
-                        progress_callback,
-                        "updating_subjects",
-                        state="running",
-                        advance=1,
-                        item_name=sid,
-                        item_status="fail",
-                        item_description="Could not extract resource_id from subject metadata",
-                    )
-
-            except Exception as e:
-                report.add_error(f"{sid}@subject", "update_metadata", str(e))
+                _run_with_retry()
+            except Exception as last_error:
+                with report_lock:
+                    report.add_error(f"{sid}@subject", "update_metadata", str(last_error))
                 self._notify(
                     progress_callback,
                     "updating_subjects",
@@ -548,8 +520,13 @@ class TrapperZooniverseConnector:
                     advance=1,
                     item_name=sid,
                     item_status="fail",
-                    item_description=str(e),
+                    item_description=str(last_error),
                 )
+
+        for s in subjects_iter:
+            if not _is_selected_subject(s):
+                continue
+            _process_subject(s)
 
         self._notify(progress_callback, "updating_subjects", state="end")
         report.finish()
@@ -701,15 +678,18 @@ class TrapperZooniverseConnector:
                     }
                     for decision in decisions:
                         for obser_id in all_media_observations_ids:
-                            new_obs = TrapperObservationResultsTrapper.model_construct(
+                            merged_fields = {
                                 **base_fields,
                                 **decision.model_dump(),
-                                id=obser_id,
-                                bboxes=None,
-                                classificationTimestamp=datetime.now(timezone.utc),
-                                classifiedBy=self.trapper.user_name,
-                                classificationMethod="human",
-                                observationComments=f"Automatically classified by Zooniverse in workflow {wf_key} for subject {subject_id}",
+                                "id": obser_id,
+                                "bboxes": None,
+                                "classificationTimestamp": datetime.now(timezone.utc),
+                                "classifiedBy": self.trapper.user_name,
+                                "classificationMethod": "human",
+                                "observationComments": f"Automatically classified by Zooniverse in workflow {wf_key} for subject {subject_id}",
+                            }
+                            new_obs = TrapperObservationResultsTrapper.model_construct(
+                                **merged_fields
                             )
                             report.add_success(
                                 f"subject:{subject_id}",
@@ -1024,6 +1004,32 @@ class TrapperZooniverseConnector:
             deployment = row.get('deploymentID', 'unknown')
             groups[deployment].append(row)
         return groups
+
+    def _get_trapper_resource_id_from_subjec(self, s:"Subject"):
+        metadata = (s.raw or {}).get("metadata") or {}
+        resource_id = None
+
+        filename = metadata.get("Filename") or metadata.get("filename")
+        if isinstance(filename, str):
+            m = re.match(r"^(\d+)_x_", filename)
+            if m:
+                resource_id = int(m.group(1))
+
+        if resource_id is None:
+            image_name = metadata.get("image_name")
+            if isinstance(image_name, str):
+                m = re.match(r"^(\d+)_x_", image_name)
+                if m:
+                    resource_id = int(m.group(1))
+
+        if resource_id is None:
+            external_id = metadata.get("external_id")
+            if isinstance(external_id, str):
+                m = re.search(r":(\d+)$", external_id)
+                if m:
+                    resource_id = int(m.group(1))
+
+        return resource_id
 
     def _trapper_observations_to_csv(self, observations: List[TrapperObservationResultsTrapper]
                                      , path: Path,

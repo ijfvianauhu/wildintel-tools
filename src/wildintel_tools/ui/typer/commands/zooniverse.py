@@ -393,7 +393,7 @@ def update_metadata(
             "--cp",
             help=_("Trapper classification project ID used to look up media by media_id."),
         ),
-    ] = None,
+    ] = ...,
     dry_run: Annotated[
         bool,
         typer.Option(
@@ -401,6 +401,14 @@ def update_metadata(
             help=_("Simulate the process: metadata is resolved but no subject is updated in Zooniverse."),
         ),
     ] = False,
+    attempts: Annotated[
+        int,
+        typer.Option("--attempts", help=_("Maximum retry attempts per subject when resolving/updating metadata.")),
+    ] = 3,
+    delay_seconds: Annotated[
+        int,
+        typer.Option("--delay-seconds", help=_("Seconds to wait between retries for a failed subject.")),
+    ] = 5,
     white_list: Annotated[
         Optional[str],
         typer.Option(
@@ -426,6 +434,8 @@ def update_metadata(
     :param ctx: Typer context.
     :param ss_id: Subject set ID.
     :param classification_project: Trapper classification project ID.
+    :param attempts: Retry attempts per subject.
+    :param delay_seconds: Delay between retries in seconds.
     :param config: Internal configuration option (dynamic callback).
     """
     settings: Settings = ctx.obj.get("settings", Settings())
@@ -467,6 +477,8 @@ def update_metadata(
             dry_run=dry_run,
             white_list=white_list_ids,
             black_list=black_list_ids,
+            attempts=attempts,
+            delay_seconds=delay_seconds,
         )
     except Exception as e:
         TyperUtils.fatal(_(f"Failed to update metadata for subject set {ss_id}: {e}"))

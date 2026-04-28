@@ -1,101 +1,52 @@
+import ast
+import re
+from statistics import multimode
 from typing import List, Any
+import logging
 
 from wildintel_tools.zooniverse.Schemas import ClassificationInfo
 
+logger = logging.getLogger(__name__)
+
+
 class AnnotationsExtractor:
     """
-    This class extracts annotations from Zooniverse classifications. It
-    receives a list of ClassificationInfo objects for a specific subject
-    and processes them to extract information that will be analysed by
-    the AnnotationsVoter.
+    Base class for extracting annotations from Zooniverse classifications.
 
-    Also, this class should convert the species names from Zooniverse to Trapper. Each choice should be assigned its
-    scientific name when applicable—whether it refers to an animal or a human. In other cases, we should use
-    ‘vehicle’, ‘blank’, ‘unclassified’, or ‘unknown’.
-
-    It is important to note that this class does not perform any voting or
-    aggregation of annotations; its sole purpose is to extract and format
-    the raw annotation data from the classifications.
-
-
-    For example, given the following classifications for the subject 'oth sp_4.jpeg':
-
-    [
-  ClassificationInfo(
-    classification_id='664345585',
-    user_name='zenscientist',
-    user_id='2710015',
-    annotations=[
-      {
-        'task': 'T0',
-        'value': [
-          {
-            'choice': 'OTHERSPECIES',
-            'answers': {},
-            'filters': {}
-          }
-        ]
-      }
-    ],
-    subject_name='oth sp_4.jpeg',
-    retired=True,
-    retirement_reason='classification_count',
-    sid = 12345
-  ),
-
-  ClassificationInfo(
-    classification_id='673798541',
-    user_name='not-logged-in-ecb4b0fc5337a0d6f1b3',
-    user_id='',
-    annotations=[
-      {
-        'task': 'T0',
-        'value': [
-          {
-            'choice': 'COMMONGENET',
-            'answers': {'HOWMANY': '1'},
-            'filters': {}
-          }
-        ]
-      }
-    ],
-    subject_name='oth sp_4.jpeg',
-    retired=True,
-    retirement_reason='classification_count',
-    sid = 12345
-  ),
-
-  ClassificationInfo(
-    classification_id='674120196',
-    user_name='not-logged-in-1f4e165e287ada726e08',
-    user_id='',
-    annotations=[
-      {
-        'task': 'T0',
-        'value': []
-      }
-    ],
-    subject_name='oth sp_4.jpeg',
-    retired=True,
-    retirement_reason='classification_count'
-    sid = 12345
-  )
-]
-    It could extract the following list of choices and answers:
-
-    [
-        ('OTHERSPECIES', {}),
-        ('OTHERSPECIES', {}),
-        ('Genetta genetta', {'HOWMANY': '1'})
-    ]
-
-    As shown in the example above, the class processes each classification,
-    extracts the choices made by users along with any associated answers,
-    and compiles them into a list of tuples for further analysis. Note that choice COMMONGENET has been converted to its
-     scientific name "Genetta genetta" and  OTHERSPECIES to "unknown" as per the mapping rules.
-
+    Subclasses must define `zoo_to_trapper` and may override `extract_matches`
+    and `trapper_name` when the annotation format or species-name mapping differs.
     """
 
-    @staticmethod
-    def run(classifications:List[ClassificationInfo]) -> List[Any]:
-        pass
+    zoo_to_trapper: dict = {}
+
+    def __init__(self, k_max: int = 3):
+        self.k_max = k_max
+
+    def trapper_name(self, choice: str) -> str:
+        return self.zoo_to_trapper.get(choice, "unknown")
+
+    def extract_matches(self, annotations_str: str) -> list:
+        pattern = r"'choice':\s*'([^']+)'.*?'answers':\s*(\{[^}]*\})"
+        return re.findall(pattern, annotations_str)
+
+    def run(self, classifications: List[ClassificationInfo]) -> List[Any]:
+        choices = []
+        k_list = []
+        sid = None
+
+        for classifications_x_user in classifications:
+            matches = self.extract_matches(str(classifications_x_user.annotations))
+            if len(matches) == 0 or len(matches) > self.k_max:
+                logger.debug(
+                    f"Discarding classification from {classifications_x_user.sid}: "
+                    f"{len(matches)} matches (k_max={self.k_max})"
+                )
+                continue
+            k_list.append(len(matches))
+            sid = classifications_x_user.sid
+            results = [(self.trapper_name(choice), ast.literal_eval(answers)) for choice, answers in matches]
+            choices.extend(results)
+
+        logger.debug(f"valores de k {k_list}")
+        k_majority = max([m for m in multimode(k_list) if m <= self.k_max])
+        return [(k_majority, sid, choices)]

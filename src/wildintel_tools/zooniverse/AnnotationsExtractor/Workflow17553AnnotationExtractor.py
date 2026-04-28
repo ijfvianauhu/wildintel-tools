@@ -1,4 +1,4 @@
-from trapper_zooniverse.AnnotationsExtractor.Workflow29186AnnotationExtractor import Workflow29186AnnotationExtractor
+from wildintel_tools.zooniverse.AnnotationsExtractor.Workflow29186AnnotationExtractor import Workflow29186AnnotationExtractor
 
 class Workflow17553AnnotationExtractor(Workflow29186AnnotationExtractor):
     """
