@@ -5,18 +5,17 @@ from typing import Annotated, Optional, Any, List
 
 import typer
 from panoptes_client.panoptes import PanoptesAPIException
-from pydantic import SecretStr
-from trapper_client.Schemas import TrapperDeploymentList
 from trapper_client.TrapperClient import TrapperClient
 
 from wildintel_tools.ui.typer.ZooUtils import ZooUtils
-from wildintel_tools.ui.typer.settings import Settings, SettingsManager, ZooniverseSettings, ZooniverseConnectorSettings
+from wildintel_tools.ui.typer.settings import Settings
 from wildintel_tools.ui.typer.zooniverse import (
     check_connection,
     get_workflows,
     get_subject_sets,
     update_subject_metadata_from_trapper,
     public_annotations,
+    download_subjectsets,
 )
 from wildintel_tools.zooniverse.TrapperZooniverseConnector import TrapperZooniverseConnector
 from wildintel_tools.zooniverse.ZooniverseClient import ZooniverseClient
@@ -81,11 +80,7 @@ def test_connection(ctx: typer.Context,
                         None, help=_("Zooniverse project ID to connect to (e.g., '12345' or 'owner/project-name')")
                     ),
 
-                    config: Annotated[
-                        Path,
-                        typer.Option(
-                            hidden=True,
-                            help=_("File to save the report"),
+                    config: Annotated[Path,typer.Option(hidden=True,help=_("File to save the report"),
                             callback=callback_with_override
                         )
                     ] = None,
@@ -548,6 +543,10 @@ def export_annotations(
             help=_("Optional path to save the raw observations file before uploading to Trapper."),
         ),
     ] = None,
+    verbose: Annotated[
+        bool,
+        typer.Option("--verbose/--no-verbose", help=_("Show detail for each processed media in the progress bar")),
+    ] = True,
     config: Annotated[
         Path,
         typer.Option(hidden=True, help=_("Configuration file"), callback=callback_with_override),
@@ -592,6 +591,12 @@ def export_annotations(
         )
     )
 
+    if observations_file is None:
+        observations_file = Path(
+            f"zoo_annotations_{wf_id}_{ss_id}_{classification_project}_{collection}"
+            f"_{datetime.now():%Y%m%d%H%M}.csv"
+        )
+
     try:
         report = public_annotations(
             tzc=connector,
@@ -600,6 +605,8 @@ def export_annotations(
             subjectset_id=ss_id,
             wf_id=wf_id,
             observations_file=observations_file,
+            deployments=deployments,
+            verbose=verbose,
         )
     except Exception as e:
         TyperUtils.fatal(_(f"Failed to export annotations: {e}"))
@@ -611,79 +618,65 @@ def export_annotations(
     TyperUtils.display_report(report)
     TyperUtils.success(_(f"Report saved at: {report_file}"))
 
+    import_url = str(settings.GENERAL.host).rstrip("/") + "/media_classification/classification/import/"
+    TyperUtils.console.print()
+    TyperUtils.console.print(f"[bold]CSV file:[/bold] [cyan]{observations_file}[/cyan]")
+    TyperUtils.console.print(f"[bold]Import it at:[/bold] [link={import_url}]{import_url}[/link]")
+
 
 app.command(name="exp", hidden=True, help=_("Alias for export")) (export_annotations)
 
 
 @app.command(
-    help=_("Download subjects (images) from a Zooniverse subjetset (alias: dl_ss)."),
-    short_help=_("Download a subjectset (alias: dl_ss)"))
+    help=_("Download subjects (images) from one or more Zooniverse subject sets (alias: dl_ss)."),
+    short_help=_("Download subject set(s) (alias: dl_ss)"),
+)
 def download_ss(
     ctx: typer.Context,
-    ss_ids: Annotated[List[int], typer.Argument(help=_("Subjectset ID"))] = ...,
-    out_put_dir: Annotated[Path, typer.Option(help=_("Directory where the downloaded images will be saved"))] = None,
-    max_workers: Annotated[int, typer.Option(help=_("Maximum number of threads to use"))] = 4,
-    overwrite: Annotated[bool, typer.Option(help=_("Maximum number of threads to use"))] = False,
-    config: Annotated[
-        Path, typer.Option(hidden=True, help=_("File to save the report"), callback=callback_with_override)
+    ss_ids: Annotated[List[int], typer.Argument(help=_("One or more subject set IDs"))],
+    out_put_dir: Annotated[
+        Optional[Path],
+        typer.Option("--output-dir", "-o", help=_("Directory where downloaded images will be saved")),
     ] = None,
-):
-    """
-    Download subjects from a Zooniverse subject set.
+    max_workers: Annotated[int, typer.Option("--max-workers", help=_("Number of parallel download threads"))] = 4,
+    overwrite: Annotated[bool, typer.Option("--overwrite", help=_("Overwrite existing files"))] = False,
+    verbose: Annotated[bool, typer.Option("--verbose/--no-verbose", help=_("Show detail for each downloaded subject"))] = True,
+    config: Annotated[
+        Path, typer.Option(hidden=True, help=_("Configuration file"), callback=callback_with_override)
+    ] = None,
+) -> None:
+    settings: Settings = ctx.obj.get("settings", Settings())
 
-    :param ctx: Typer context.
-    :type ctx: typer.Context
-    :param ss_id: Subjectset ID to download subjects from.
-    :type ss_id: int
-    :param out_put_dir: Directory to save downloaded subjects. If not provided, a temporary directory is used.
-    :type out_put_dir: pathlib.Path | None
-    :param max_workers: Maximum number of threads to use for downloading subjects.
-    :type max_workers: int
-    :param config: Internal configuration option (dynamic callback).
-    :type config: pathlib.Path | None
-    :raises Exception: If retrieval fails a fatal message is logged.
-    """
-    settings = ctx.obj.get("settings", {})
-    trapper_client = ctx.obj.get("trapper_client")
-    zooniverse_client = ctx.obj.get("zooniverse_client")
-    reports_files = []
-
-    TyperUtils.debug(f"Downloading subjectsets {ss_ids} from Zooniverse project {zooniverse_client.project_id}")
+    zooniverse_client = ZooniverseClient(
+        project_id=settings.ZOONIVERSE.zooniverse_project_id,
+        username=settings.ZOONIVERSE.zooniverse_username,
+        password=settings.ZOONIVERSE.zooniverse_password.get_secret_value(),
+    )
 
     if out_put_dir is None:
-        out_put_dir = tempfile.mkdtemp(prefix="bulk_download_")
-    else:
-        out_put_dir.mkdir(parents=True, exist_ok=True)
+        out_put_dir = Path(tempfile.mkdtemp(prefix="bulk_download_"))
 
-    for ss_id in ss_ids:
-        try:
-            TyperUtils.info(_(f"Retrieving subjects from {zooniverse_client.project_id}, subject set {ss_id}..."))
-            ss = zooniverse_client.subjectsets.get_by_id(ss_id)
+    TyperUtils.info(_(f"Downloading {len(ss_ids)} subject set(s) into {out_put_dir}…"))
 
-            try:
-                num_subjects = int(getattr(ss, "set_member_subjects_count", 0) or 0)
-                total = num_subjects if num_subjects > 0 else None
-            except Exception:
-                total = None
+    try:
+        reports = download_subjectsets(
+            zooniverse_client,
+            ss_ids=ss_ids,
+            out_put_dir=out_put_dir,
+            max_workers=max_workers,
+            overwrite=overwrite,
+            verbose=verbose,
+        )
+    except Exception as e:
+        TyperUtils.fatal(_(f"Download failed: {e}"))
+        return
 
-            TyperUtils.info(_(f"Subjectset {ss_id} has {total} subjects."))
+    report_files = []
+    for report in reports:
+        report_files.append(TyperUtils.save_report(report))
+        TyperUtils.display_report(report)
 
-            report = TyperUtils.progress_bar(
-                zooniverse_client.subjectsets.download,
-                (ss_id, Path(out_put_dir) / str(ss_id), max_workers, overwrite),
-                None,
-                _(f"[cyan]Downloading subjects from subjectset {ss_id}..."),
-                total=total,
-                use_subtasks=False,
-            )
-
-            TyperUtils.success(_(f"Subjects downloaded successfully in {out_put_dir}!"))
-            report_output_file = TyperUtils.report_save(report)
-            reports_files.append(report_output_file)
-        except Exception as e:
-            TyperUtils.error(str(e))
-
-        TyperUtils.success(_(f"Reports saved in  {', '.join(map(str, reports_files))}!"))
+    TyperUtils.success(_(f"Downloads complete. Reports saved in: {', '.join(str(f) for f in report_files)}"))
 
 app.command(name="dl_ss", hidden=True, help=_("Alias for download_ss")) (download_ss)
 
@@ -691,7 +684,6 @@ app.command(name="dl_ss", hidden=True, help=_("Alias for download_ss")) (downloa
 @app.command("import",
          short_help=_("Import all media (images) from a Trapper collection to a Zooniverse subject set"),
          help=_("Import all media (images) from a specific Trapper collection to a designated Zooniverse subject set"))
-# @use_yaml_config(section=["upload_collection"], default_value=config_manager.ensure_config_file())
 def importation(
     ctx: typer.Context,
     collection: Annotated[int, typer.Argument(help=("Collection ID"))] = ...,
@@ -803,8 +795,6 @@ def importation(
         TyperUtils.console.print("[bold yellow]⚠  DRY-RUN mode: no images will be downloaded, no subject set will be created and nothing will be uploaded to Zooniverse.[/bold yellow]")
         TyperUtils.console.print()
 
-    #logger.debug(f"Using subjectset name: {subjectset_name}")
-
     import wildintel_tools.ui.typer.zooniverse
 
     try:
@@ -834,434 +824,6 @@ def importation(
         raise e
         TyperUtils.error(f"Error uploading collection {collection}: {str(e)}")
 
-from enum import Enum
 
-class Wizard(str, Enum):
-    importation = "import"
-    setup       = "setup"
-    export      = "export"
-
-@app.command("wizard",
-         short_help=_("Run a wizard to guide you through completing a task."),
-         help=_("Run a wizard to guide you through completing a task."))
-# @use_yaml_config(section=["upload_collection"], default_value=config_manager.ensure_config_file())
-def wizard_command(
-    ctx: typer.Context,
-    wizard: Annotated[Wizard, typer.Argument(help=("Collection ID"))] = ...,
-    config: Annotated[Path, typer.Option(hidden=True, callback=callback_with_override)] = None,
-) -> None:
-    settings: Settings = ctx.obj.get("settings", Settings())
-    settings_manager: SettingsManager = ctx.obj.get("setting_manager", Settings())
-
-    def print_section(title: str):
-        """Print a section header."""
-        TyperUtils.console.print()
-        TyperUtils.console.print(f"[green]{'━' * 67}[/green]")
-        TyperUtils.console.print(f"[green]  {title}[/green]")
-        TyperUtils.console.print(f"[green]{'━' * 67}[/green]")
-
-    trapper_client = TrapperClient(
-        base_url=str(settings.GENERAL.host),
-        user_name=settings.GENERAL.login,
-        user_password=settings.GENERAL.password.get_secret_value(),
-        access_token=None
-    )
-
-    if (wizard == Wizard.importation):
-
-        print_section("Import images from Trapper to Zooniverse")
-
-        TyperUtils.console.print()
-        TyperUtils.console.print("[blue]ℹ[/blue] This wizard will guide you through the process of importing a Trapper collection ")
-        TyperUtils.console.print("    into a Zooniverse subject set. As a general rule, only blank images and images ")
-        TyperUtils.console.print("    that contain animals will be imported.")
-        TyperUtils.console.print()
-
-        if typer.confirm("Continue?"):
-            # select research_project
-            rp = trapper_client.research_projects.get_all()
-            TyperUtils.console.print()
-            rp_selected, key = TyperUtils.select_from_list(rp.results, title="Select a research project")
-            # select cp
-            cp = trapper_client.classification_projects.get_by_research_project(rp_selected.pk)
-            if len(cp.results) == 0:
-                TyperUtils.fatal(f"No classification project found in research project {rp_selected.name} ({rp_selected.pk}). Cannot continue.")
-
-            TyperUtils.console.print()
-            cp_selected, key = TyperUtils.select_from_list(cp.results, title="Select a classification project")
-            # select collection
-            collections = trapper_client.collections.get_by_classification_project(cp_selected.pk)
-            TyperUtils.console.print()
-
-            collection_selected, key = TyperUtils.select_from_list(collections.results, id_attr="collection_pk", title="Select a collection")
-            # select deployments
-            TyperUtils.console.print()
-            deployments : TrapperDeploymentList = trapper_client.deployments.get_all(query={"research_project": rp_selected.pk})
-
-            prefixes = f"{collection_selected.name}-".lower()
-
-            filtered = [
-                d for d in deployments.results if d.deployment_id.lower().startswith(prefixes)
-            ]
-            TyperUtils.console.print()
-            deployment_selected, key = TyperUtils.select_from_list(filtered,name_attr="deployment_id",title="Select a deployment", multi_select=True)
-
-            if not deployment_selected:
-                TyperUtils.fatal("No deployment selected.")
-
-            deployment_pks = [str(d.pk) for d in deployment_selected]
-            deployments_str = ",".join(deployment_pks)
-            deployments_info = ", ".join(
-                [f"{d.deployment_id} ({d.pk})" for d in deployment_selected]
-            )
-
-            msg = (
-                f"We are going to import the images taken during deployments {deployments_info} "
-                f"from collection {collection_selected.name} ({collection_selected.collection_pk}) "
-                f"into Zooniverse, using detection data from classification project "
-                f"{cp_selected.name} ({cp_selected.pk}) "
-                f"within research project {rp_selected.name} ({rp_selected.pk}). "
-                f"Are you sure?"
-            )
-
-            TyperUtils.console.print()
-
-            if typer.confirm(msg):
-                TyperUtils.console.print()
-                dry_run = typer.confirm(
-                    "Do you want to run in DRY-RUN mode? "
-                    "(No images will be downloaded, no subject set will be created and nothing will be uploaded to Zooniverse)",
-                    default=False,
-                )
-                if dry_run:
-                    TyperUtils.console.print("[bold yellow]⚠  DRY-RUN mode enabled.[/bold yellow]")
-                TyperUtils.console.print()
-
-                importation(ctx,
-                            collection=collection_selected.collection_pk,
-                            research_project=rp_selected.pk,
-                            classification_project=cp_selected.pk,
-                            deployments_input=deployments_str,
-                            n_images_seq=settings.ZOONIVERSE_CONNECTOR.upload_collection_n_images_seq,
-                            max_interval=settings.ZOONIVERSE_CONNECTOR.upload_collection_max_interval,
-                            dry_run=dry_run,
-                )
-
-                typer.echo("Continuing...")
-            else:
-                typer.echo("Aborted.")
-        else:
-            typer.echo("Aborted.")
-    elif Wizard.export == wizard:
-        print_section("Export annotations from a Zooniverse subject set to Trapper")
-
-        TyperUtils.console.print()
-        TyperUtils.console.print("[blue]ℹ[/blue] This wizard will guide you through exporting Zooniverse classification")
-        TyperUtils.console.print("    results back to Trapper as observations. You will need to select")
-        TyperUtils.console.print("    the subject set, the research project and the classification project.")
-        TyperUtils.console.print()
-
-        if typer.confirm("Continue?"):
-            zooniverse_client = ZooniverseClient(
-                project_id=settings.ZOONIVERSE.zooniverse_project_id,
-                username=settings.ZOONIVERSE.zooniverse_username,
-                password=settings.ZOONIVERSE.zooniverse_password.get_secret_value(),
-            )
-
-            # 5. Select workflow
-            TyperUtils.console.print()
-            TyperUtils.info("Retrieving workflows from Zooniverse...")
-            wfs = get_workflows(zooniverse_client)
-            if not wfs:
-                TyperUtils.fatal("No workflows found in the Zooniverse project. Cannot continue.")
-
-            wf_selected = TyperUtils.select_box(
-                wfs,
-                id_attr="id",
-                name_attr="display_name",
-                label="Select a workflow",
-                multi_select=False,
-            )
-
-            TyperUtils.console.print(
-                f"[green]✓[/green] Workflow selected: [bold]{wf_selected.display_name}[/bold] (id: {wf_selected.id})"
-            )
-
-            # 1. Select subject set
-            TyperUtils.console.print()
-            TyperUtils.info("Retrieving subject sets from Zooniverse...")
-            subject_sets = get_subject_sets(zooniverse_client)
-            if not subject_sets:
-                TyperUtils.fatal("No subject sets found in the Zooniverse project. Cannot continue.")
-
-            ss_selected = TyperUtils.select_box(
-                subject_sets,
-                id_attr="id",
-                name_attr="display_name",
-                label="Select a subject set",
-                multi_select=False,
-            )
-
-            TyperUtils.console.print(
-                f"[green]✓[/green] Subject set selected: "
-                f"[bold]{ss_selected.display_name}[/bold] (id: {ss_selected.id})"
-            )
-
-            # 2. Select research project
-            TyperUtils.console.print()
-            rp = trapper_client.research_projects.get_all()
-            if not rp.results:
-                TyperUtils.fatal("No research projects found in Trapper. Cannot continue.")
-
-            rp_selected = TyperUtils.select_box(
-                rp.results,
-                id_attr="pk",
-                name_attr="name",
-                label="Select a research project",
-                multi_select=False,
-            )
-            TyperUtils.console.print(
-                f"[green]✓[/green] Subject set selected: [bold]{rp_selected.name}[/bold] (id: {rp_selected.pk})"
-            )
-            #rp_selected, _ = TyperUtils.select_from_list(rp.results, title="Select a research project")
-
-            # 3. Select classification project
-            cp = trapper_client.classification_projects.get_by_research_project(rp_selected.pk)
-            if not cp.results:
-                TyperUtils.fatal(
-                    f"No classification projects found in research project "
-                    f"{rp_selected.name} ({rp_selected.pk}). Cannot continue."
-                )
-
-            TyperUtils.console.print()
-            cp_selected = TyperUtils.select_box(
-                cp.results,
-                id_attr="pk",
-                name_attr="name",
-                label="Select a classification project",
-                multi_select=False,
-            )
-            TyperUtils.console.print(
-                f"[green]✓[/green] Classification project selected: "
-                f"[bold]{cp_selected.name}[/bold] (id: {cp_selected.pk})"
-            )
-
-            # 4. Select collection
-            collections = trapper_client.collections.get_by_classification_project(cp_selected.pk)
-            if not collections.results:
-                TyperUtils.fatal(
-                    f"No collections found in classification project "
-                    f"{cp_selected.name} ({cp_selected.pk}). Cannot continue."
-                )
-
-            TyperUtils.console.print()
-            collection_selected = TyperUtils.select_box(
-                collections.results,
-                id_attr="collection_pk",
-                name_attr="name",
-                label="Select a collection",
-                multi_select=False,
-            )
-
-            # 5. Select deployments
-
-            deployments: TrapperDeploymentList = trapper_client.deployments.get_all(
-                query={"research_project": rp_selected.pk}
-            )
-
-            prefixes = f"{collection_selected.name}-".lower()
-
-            filtered = [d for d in deployments.results if d.deployment_id.lower().startswith(prefixes)]
-
-            if not filtered:
-                TyperUtils.fatal(
-                    f"No deployments found in collection  {collection_selected.name.lower()}"
-                    f". Cannot continue."
-                )
-
-            TyperUtils.console.print()
-            deployment_selected = TyperUtils.select_box(
-                filtered, id_attr="pk", name_attr="deployment_id", label="Select deployment", multi_select=True
-            )
-
-            # Summary & confirm
-            deployments_str_list = [f"{d.deployment_id} ({d.pk})" for d in deployment_selected]
-            TyperUtils.console.print()
-            msg = (
-                f"We are going to export the annotations from subject set "
-                f"{ss_selected.display_name} ({ss_selected.id}) "
-                f"using workflow {wf_selected.display_name} ({wf_selected.id}) "
-                f"into deployment { ",".join(deployments_str_list) }"
-                f"from collection {collection_selected.name} ({collection_selected.collection_pk}) "
-                f"of classification project {cp_selected.name} ({cp_selected.pk}) "
-                f"within research project {rp_selected.name} ({rp_selected.pk}). "
-                f"Are you sure?"
-            )
-
-            if typer.confirm(msg):
-                connector = TrapperZooniverseConnector(zooniverse_client, trapper_client)
-                try:
-                    report = public_annotations(
-                        tzc=connector,
-                        cp_id=cp_selected.pk,
-                        collection_id=collection_selected.collection_pk,
-                        subjectset_id=ss_selected.id,
-                        wf_id=wf_selected.id,
-                    )
-                    TyperUtils.success(
-                        f"Annotations exported successfully from subject set "
-                        f"'{ss_selected.display_name}' to Trapper."
-                    )
-                    report_file = TyperUtils.save_report(report)
-                    TyperUtils.console.print()
-                    TyperUtils.display_report(report)
-                    TyperUtils.success(_(f"Report saved at: {report_file}"))
-                except Exception as e:
-                    TyperUtils.fatal(_(f"Failed to export annotations: {e}"))
-            else:
-                typer.echo("Aborted.")
-        else:
-            typer.echo("Aborted.")
-    elif Wizard.setup == wizard:
-        print_section("Configure zooniverse module")
-
-        TyperUtils.console.print()
-        TyperUtils.console.print("[blue]ℹ[/blue] This wizard will guide you through Zooniverse connection settings. ")
-        TyperUtils.console.print()
-
-        if typer.confirm("Continue?"):
-            project_name = str(ctx.obj.get("project", "default"))
-
-            try:
-                settings = settings_manager.load_settings(project_name)
-            except FileNotFoundError:
-                settings = None
-
-            # --- Zooniverse account ---
-            username_default = settings.ZOONIVERSE.zooniverse_username if settings else "myuser"
-            password_default = settings.ZOONIVERSE.zooniverse_password.get_secret_value() if settings else "mypassword"
-            project_id_default = settings.ZOONIVERSE.zooniverse_project_id if settings else "myprojectid"
-
-            zooniverse_username = TyperUtils.prompt_with_default(
-                "Enter your Zooniverse username",
-                username_default,
-                ZooniverseSettings,
-                "zooniverse_username"
-            )
-            zooniverse_password = TyperUtils.prompt_with_default(
-                "Enter your Zooniverse password",
-                password_default,
-                ZooniverseSettings,
-                "zooniverse_password",
-                show_default=False
-            )
-            zooniverse_project_id = TyperUtils.prompt_with_default(
-                "Enter your Zooniverse project ID",
-                project_id_default,
-                ZooniverseSettings,
-                "zooniverse_project_id"
-            )
-
-            # --- Upload parameters ---
-            seq_default = str(settings.ZOONIVERSE_CONNECTOR.upload_collection_n_images_seq if settings else 5)
-            max_interval_default = str(settings.ZOONIVERSE_CONNECTOR.upload_collection_max_interval if settings else 90)
-            attempts_default = str(settings.ZOONIVERSE_CONNECTOR.upload_collection_attempts if settings else 5)
-            delay_default = str(settings.ZOONIVERSE_CONNECTOR.upload_collection_delay if settings else 15)
-            max_per_subject_default = str(settings.ZOONIVERSE_CONNECTOR.upload_collection_max_attempts_per_subject
-                                          if settings else 5)
-            delay_per_subject_default = str(settings.ZOONIVERSE_CONNECTOR.upload_collection_delay_seconds_per_subject
-                                            if settings else 30)
-
-            upload_collection_n_images_seq = int(TyperUtils.prompt_with_default(
-                "Number of images per upload batch",
-                seq_default,
-                ZooniverseConnectorSettings,
-                "upload_collection_n_images_seq"
-            ))
-            upload_collection_max_interval = int(TyperUtils.prompt_with_default(
-                "Maximum interval between upload batches (seconds)",
-                max_interval_default,
-                ZooniverseConnectorSettings,
-                "upload_collection_max_interval"
-            ))
-            upload_collection_attempts = int(TyperUtils.prompt_with_default(
-                "Maximum upload attempts per batch",
-                attempts_default,
-                ZooniverseConnectorSettings,
-                "upload_collection_attempts"
-            ))
-            upload_collection_delay = int(TyperUtils.prompt_with_default(
-                "Delay between upload attempts (seconds)",
-                delay_default,
-                ZooniverseConnectorSettings,
-                "upload_collection_delay"
-            ))
-            upload_collection_max_attempts_per_subject = int(TyperUtils.prompt_with_default(
-                "Maximum attempts per subject",
-                max_per_subject_default,
-                ZooniverseConnectorSettings,
-                "upload_collection_max_attempts_per_subject"
-            ))
-            upload_collection_delay_seconds_per_subject = int(TyperUtils.prompt_with_default(
-                "Delay per subject (seconds)",
-                delay_per_subject_default,
-                ZooniverseConnectorSettings,
-                "upload_collection_delay_seconds_per_subject"
-            ))
-
-            # Crear los modelos con los valores introducidos
-            zooniverse_settings = ZooniverseSettings(
-                zooniverse_username=zooniverse_username,
-                zooniverse_password=SecretStr(zooniverse_password),
-                zooniverse_project_id=zooniverse_project_id
-            )
-
-            connector_settings = ZooniverseConnectorSettings(
-                upload_collection_n_images_seq=upload_collection_n_images_seq,
-                upload_collection_max_interval=upload_collection_max_interval,
-                upload_collection_attempts=upload_collection_attempts,
-                upload_collection_delay=upload_collection_delay,
-                upload_collection_max_attempts_per_subject=upload_collection_max_attempts_per_subject,
-                upload_collection_delay_seconds_per_subject=upload_collection_delay_seconds_per_subject
-            )
-
-            # Guardar en settings_manager
-            updates = {
-                "ZOONIVERSE.zooniverse_username":
-                    zooniverse_settings.zooniverse_username,
-                "ZOONIVERSE.zooniverse_password":
-                    zooniverse_settings.zooniverse_password.get_secret_value(),
-                "ZOONIVERSE.zooniverse_project_id":
-                    zooniverse_settings.zooniverse_project_id,
-                "ZOONIVERSE_CONNECTOR.upload_collection_n_images_seq":
-                    connector_settings.upload_collection_n_images_seq,
-                "ZOONIVERSE_CONNECTOR.upload_collection_max_interval":
-                    connector_settings.upload_collection_max_interval,
-                "ZOONIVERSE_CONNECTOR.upload_collection_attempts":
-                    connector_settings.upload_collection_attempts,
-                "ZOONIVERSE_CONNECTOR.upload_collection_delay":
-                    connector_settings.upload_collection_delay,
-                "ZOONIVERSE_CONNECTOR.upload_collection_max_attempts_per_subject":
-                    connector_settings.upload_collection_max_attempts_per_subject,
-                "ZOONIVERSE_CONNECTOR.upload_collection_delay_seconds_per_subject":
-                    connector_settings.upload_collection_delay_seconds_per_subject,
-            }
-
-            val = []
-
-            for key, value in updates.items():
-                val.append({"Setting": key, "Value": "********" if "password" in key.lower() else str(value)})
-
-            TyperUtils.show_table(val,"Settings to update")
-
-            # Confirmación antes de aplicar cambios
-            if typer.confirm("Do you want to apply these changes?"):
-                settings_manager.update_settings(project_name, updates)
-                TyperUtils.console.print(
-                    f"[bold green]Zooniverse configuration for project '{project_name}' "
-                    f"saved successfully![/bold green]"
-                )
-            else:
-                TyperUtils.console.print("[bold red]Aborted. No changes were made.[/bold red]")
-        else:
-            typer.echo("Aborted.")
+from wildintel_tools.ui.typer.commands.wizards.zooniverse import register_wizard_command
+register_wizard_command(app, callback_with_override)

@@ -7,6 +7,7 @@ import time as time_module
 import tempfile
 import re
 import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.error import URLError, HTTPError
 
 from pydantic import BaseModel, validator, HttpUrl
@@ -542,6 +543,7 @@ class TrapperZooniverseConnector:
           deployments:List[int] = None,
           blacklisted_deployments: Optional[List[int]] = None,
           progress_callback: Optional[Callable[[str, str, int, Optional[int], Optional[str], bool, Optional[str], Optional[str]], None]] = None,
+          max_workers: int = 4,
   ):
         """
         Gerenates csv file with annotations from Zooniverse ready to import y Trapper.
@@ -588,7 +590,7 @@ class TrapperZooniverseConnector:
         report = Report(f"Annotation from  {subjectset_id} to  classification project {cp_id}", type="DownloadAnnotations" )
 
         self._notify(progress_callback, "fetching_annotations", "start",
-                     description="Fetching Zooniverse annotations...")
+                     description=f"Fetching Zooniverse annotations for workflow {wf_id} and subjectb set {subjectset_id}...")
         self.zoo.connect()
         zoo_annotations: SubjectSetResults = self.zoo.annotations.get_by_workflow(wf_id)
 
@@ -607,7 +609,8 @@ class TrapperZooniverseConnector:
 
         wf_annotations: WorkflowData = zoo_annotations.workflows[wf_key]
         self._notify(progress_callback, "fetching_annotations", "end",
-                     description=f"Fetched {len(wf_annotations.data)} subjects")
+                     description=f"Fetched {len(wf_annotations.data)} Zooniverse annotations for workflow {wf_id} and subjectb set {subjectset_id}"
+                     )
 
         (extractor, voter) = self._get_extrator_vote(wf.id)
         flat_results: List[TrapperObservationResultsTrapper] = []
@@ -631,21 +634,27 @@ class TrapperZooniverseConnector:
                 endpoint=f"/media_classification/api/classifications/results/{cp_id}", query=query
             )
 
-            for key, users_ss_opinions in wf_annotations.data.items():
-                subject_id, media_id = key.split(":")
-                if media_id.isdigit():
-                    all_media_observations: List[TrapperObservationResultsTrapper] = [
-                        TrapperObservationResultsTrapper.model_construct(
-                            **{("id" if k == "_id" else k): v for k, v in o.items()}
-                        )
-                        for o in trapper_observations["results"]
-                        if str(o["mediaID"]) == media_id
-                    ]
-                    all_media_observations_ids = list(
-                        {obj.id for obj in all_media_observations if obj.id is not None}
-                    )
+            lock = threading.Lock()
 
-                    if len(all_media_observations_ids) == 0:
+            def _process_subject(item):
+                key, users_ss_opinions = item
+                subject_id, media_id = key.split(":")
+                if not media_id.isdigit():
+                    return
+
+                all_media_observations: List[TrapperObservationResultsTrapper] = [
+                    TrapperObservationResultsTrapper.model_construct(
+                        **{("id" if k == "_id" else k): v for k, v in o.items()}
+                    )
+                    for o in trapper_observations["results"]
+                    if str(o["mediaID"]) == media_id
+                ]
+                all_media_observations_ids = list(
+                    {obj.id for obj in all_media_observations if obj.id is not None}
+                )
+
+                if len(all_media_observations_ids) == 0:
+                    with lock:
                         report.add_error(
                             f"subject:{subject_id}",
                             "getting_decision",
@@ -655,12 +664,13 @@ class TrapperZooniverseConnector:
                                      advance=1, item_name=f"media:{media_id}",
                                      item_status="fail",
                                      item_description="No Trapper observations found")
-                        continue
+                    return
 
-                    extracted_user_opinions = extractor.run(users_ss_opinions)
-                    decisions: List[Zoo2TrapperObservation] = voter.run(extracted_user_opinions)
+                extracted_user_opinions = extractor.run(users_ss_opinions)
+                decisions: List[Zoo2TrapperObservation] = voter.run(extracted_user_opinions)
 
-                    if not decisions:
+                if not decisions:
+                    with lock:
                         report.add_error(
                             f"subject:{subject_id}",
                             "getting_decision",
@@ -670,38 +680,47 @@ class TrapperZooniverseConnector:
                                      advance=1, item_name=f"media:{media_id}",
                                      item_status="fail",
                                      item_description="No decisions from voter")
-                        continue
+                    return
 
-                    base_fields = {
-                        k: v for k, v in all_media_observations[0].__dict__.items()
-                        if not k.startswith("_")
-                    }
-                    for decision in decisions:
-                        for obser_id in all_media_observations_ids:
-                            merged_fields = {
-                                **base_fields,
-                                **decision.model_dump(),
-                                "id": obser_id,
-                                "bboxes": None,
-                                "classificationTimestamp": datetime.now(timezone.utc),
-                                "classifiedBy": self.trapper.user_name,
-                                "classificationMethod": "human",
-                                "observationComments": f"Automatically classified by Zooniverse in workflow {wf_key} for subject {subject_id}",
-                            }
-                            new_obs = TrapperObservationResultsTrapper.model_construct(
-                                **merged_fields
-                            )
-                            report.add_success(
-                                f"subject:{subject_id}",
-                                "getting_decision",
-                                f"Added an observation for resource {media_id} with {decision.scientificName}",
-                            )
-                            flat_results.append(new_obs)
+                base_fields = {
+                    k: v for k, v in all_media_observations[0].__dict__.items()
+                    if not k.startswith("_")
+                }
+                local_obs = []
+                for decision in decisions:
+                    for obser_id in all_media_observations_ids:
+                        merged_fields = {
+                            **base_fields,
+                            **decision.model_dump(),
+                            "id": obser_id,
+                            "bboxes": None,
+                            "classificationTimestamp": datetime.now(timezone.utc),
+                            "classifiedBy": self.trapper.user_name,
+                            "classificationMethod": "human",
+                            "observationComments": f"Automatically classified by Zooniverse in workflow {wf_key} for subject {subject_id}",
+                        }
+                        local_obs.append((
+                            TrapperObservationResultsTrapper.model_construct(**merged_fields),
+                            f"subject:{subject_id}",
+                            f"Added an observation for resource {media_id} with {decision.scientificName}",
+                        ))
 
+                with lock:
+                    for obs, subj_key, msg in local_obs:
+                        flat_results.append(obs)
+                        report.add_success(subj_key, "getting_decision", msg)
                     self._notify(progress_callback, "processing_subjects", "progress",
                                  advance=1, item_name=f"media:{media_id}",
                                  item_status="end",
                                  item_description=f"{len(decisions)} decision(s)")
+
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = [
+                    executor.submit(_process_subject, item)
+                    for item in wf_annotations.data.items()
+                ]
+                for future in as_completed(futures):
+                    future.result()
 
         self._notify(progress_callback, "processing_subjects", "end",
                      description=f"Processed {n_subjects} subjects")
@@ -776,7 +795,7 @@ class TrapperZooniverseConnector:
         ExtractorClass = getattr(extractor_module, extractor_class_name)
         VoterClass = getattr(voter_module, voter_class_name)
 
-        return ExtractorClass, VoterClass
+        return ExtractorClass(), VoterClass
 
     @retry(
         stop=stop_after_attempt(5),

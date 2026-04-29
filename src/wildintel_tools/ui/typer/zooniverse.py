@@ -431,7 +431,8 @@ def build_subject_metadata_from_trapper(
 
 
 def public_annotations(tzc: TrapperZooniverseConnector, cp_id: int, collection_id: int, subjectset_id: int,
-                       wf_id: int, deployments: List[int] = None, observations_file: Path = None) -> Report:
+                       wf_id: int, deployments: List[int] = None, observations_file: Path = None,
+                       verbose: bool = True) -> Report:
     with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
@@ -476,9 +477,11 @@ def public_annotations(tzc: TrapperZooniverseConnector, cp_id: int, collection_i
                 progress.stop_task(task_id)
                 return
             if item_name is not None:
-                status_icon = {"start": "[yellow]→[/yellow]", "end": "[green]✓[/green]", "fail": "[red]✗[/red]"}.get(item_status, "")
-                msg = f"{status_icon} {item_name}" + (f": {item_description}" if item_description else "")
-                progress.log(msg)
+                is_fail = item_status == "fail"
+                if verbose or is_fail:
+                    status_icon = {"start": "[yellow]→[/yellow]", "end": "[green]✓[/green]", "fail": "[red]✗[/red]"}.get(item_status, "")
+                    msg = f"{status_icon} {item_name}" + (f": {item_description}" if item_description else "")
+                    progress.log(msg)
                 progress.advance(task_id, advance)
 
         results = tzc.upload_annotations(
@@ -492,5 +495,62 @@ def public_annotations(tzc: TrapperZooniverseConnector, cp_id: int, collection_i
         )
 
     return results
+
+
+def download_subjectsets(
+    zooniverse_client: ZooniverseClient,
+    ss_ids: List[int],
+    out_put_dir: Path,
+    max_workers: int = 4,
+    overwrite: bool = False,
+    verbose: bool = True,
+) -> List[Report]:
+    reports = []
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TextColumn("{task.completed}/{task.total}"),
+        TimeElapsedColumn(),
+    ) as progress:
+
+        for ss_id in ss_ids:
+            ss = zooniverse_client.subjectsets.get_by_id(ss_id)
+            try:
+                total = int(getattr(ss, "set_member_subjects_count", 0) or 0) or None
+            except Exception:
+                total = None
+
+            task_id = progress.add_task(
+                f"[cyan]Downloading subject set {ss_id}…", total=total
+            )
+
+            def make_callback(tid):
+                def callback(event, sid, name, subject_total=None, step=None):
+                    if event == "start":
+                        if verbose:
+                            progress.log(f"[yellow]→[/yellow] {name}")
+                    elif event == "end":
+                        progress.advance(tid)
+                        if verbose:
+                            progress.log(f"[green]✓[/green] {name}")
+                    elif event == "fail":
+                        progress.advance(tid)
+                        progress.log(f"[red]✗[/red] {name}")
+                return callback
+
+            report = zooniverse_client.subjectsets.download(
+                ss_id,
+                out_put_dir / str(ss_id),
+                max_workers=max_workers,
+                overwrite=overwrite,
+                callback=make_callback(task_id),
+            )
+            progress.update(task_id, completed=total or 1,
+                            description=f"[green]✔[/green]  Subject set {ss_id}")
+            reports.append(report)
+
+    return reports
 
 

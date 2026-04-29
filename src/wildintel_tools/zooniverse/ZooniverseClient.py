@@ -302,7 +302,6 @@ class SubjectSetsComponent(ZooniverseClientComponent):
 
         self.client._ensure_connection()
         self.client.logger.debug(f"Starting SubjectSet  {subject_set_id} download.")
-        print(max_workers)
         report: Report = Report(
             f"Bulk Download Report for subjectset {subject_set_id}, project {self.client.project_id}"
         )
