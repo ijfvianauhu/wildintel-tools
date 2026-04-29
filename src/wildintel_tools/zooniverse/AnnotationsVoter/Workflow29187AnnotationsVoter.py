@@ -27,7 +27,8 @@ class Workflow29187AnnotationsVoter(AnnotationsVoter):
             species for species, _ in user_opinions
             if not (k > 1 and species == "NOANIMAL")
         )
-        return species_count.most_common()[:max(1, k + 1)]
+        sorted_species = sorted(species_count.items(), key=lambda x: (-x[1], x[0]))
+        return sorted_species[:k]
 
     @staticmethod
     def _howmany_median(species_howmany: defaultdict, species: str) -> Optional[int]:
@@ -71,7 +72,7 @@ class Workflow29187AnnotationsVoter(AnnotationsVoter):
         k, sid, user_opinions = observations[0]
         # Contamos números de individuo por especie
         species_howmany = Workflow29187AnnotationsVoter._group_howmany(user_opinions)
-        # Contamos el número de votos que tienes cada especies y los quedamos con las k que tengan mśs
+        # Contamos el número de votos que tienes cada especie nos quedamos con las k que tengan mśs
         top_k_species = Workflow29187AnnotationsVoter._top_k_species(user_opinions, k)
 
         result = []

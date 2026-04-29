@@ -11,11 +11,10 @@ from trapper_client.TrapperClient import TrapperClient
 from wildintel_tools.ui.typer.settings import (
     Settings, SettingsManager, ZooniverseSettings, ZooniverseConnectorSettings,
 )
-from wildintel_tools.ui.typer.zooniverse import get_workflows, get_subject_sets, public_annotations
-from wildintel_tools.ui.typer.commands.zooniverse import download_ss
+from wildintel_tools.ui.typer.zooniverse import get_workflows, get_subject_sets
+from wildintel_tools.ui.typer.commands.zooniverse import download_ss, export_annotations
 from wildintel_tools.ui.typer.TyperUtils import TyperUtils
 from wildintel_tools.ui.typer.i18n import _
-from wildintel_tools.zooniverse.TrapperZooniverseConnector import TrapperZooniverseConnector
 from wildintel_tools.zooniverse.ZooniverseClient import ZooniverseClient
 
 
@@ -263,27 +262,28 @@ def run_export_wizard(ctx: typer.Context, settings: Settings) -> None:
     observations_file = Path(observations_filename)
 
     verbose = typer.confirm("Show detail for each processed media in the progress bar?", default=True)
+    save_zoo_annotations = typer.confirm(
+        "Save the raw Zooniverse annotations (extracted user opinions) as a separate CSV?", default=True
+    )
 
-    connector = TrapperZooniverseConnector(zooniverse_client, trapper_client)
-    try:
-        report = public_annotations(
-            tzc=connector,
-            cp_id=cp_selected.pk,
-            collection_id=collection_selected.collection_pk,
-            subjectset_id=ss_selected.id,
-            wf_id=wf_selected.id,
-            observations_file=observations_file,
-            verbose=verbose,
-        )
-        TyperUtils.success(
-            f"Annotations exported successfully from subject set '{ss_selected.display_name}' to Trapper."
-        )
-        report_file = TyperUtils.save_report(report)
-        TyperUtils.console.print()
-        TyperUtils.display_report(report)
-        TyperUtils.success(_(f"Report saved at: {report_file}"))
-    except Exception as e:
-        TyperUtils.fatal(_(f"Failed to export annotations: {e}"))
+    TyperUtils.console.print()
+    if not typer.confirm("Ready to export. Proceed?"):
+        typer.echo("Aborted.")
+        return
+    TyperUtils.console.print()
+
+    export_annotations(
+        ctx,
+        wf_id=wf_selected.id,
+        ss_id=ss_selected.id,
+        classification_project=cp_selected.pk,
+        collection=collection_selected.collection_pk,
+        deployments=[d.pk for d in deployment_selected],
+        observations_file=observations_file,
+        verbose=verbose,
+        save_zoo_annotations=save_zoo_annotations,
+    )
+    typer.echo("Continuing...")
 
 
 def run_setup_wizard(ctx: typer.Context, settings: Settings, settings_manager: SettingsManager) -> None:

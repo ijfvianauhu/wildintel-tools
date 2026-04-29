@@ -502,35 +502,35 @@ def export_annotations(
     wf_id: Annotated[
         int,
         typer.Option(
-            "--wf",
+            "--wf", "--workflow",
             help=_("Zooniverse workflow ID whose classifications will be exported."),
         ),
     ] = ...,
     ss_id: Annotated[
         int,
         typer.Option(
-            "--ss",
+            "--ss", "--subject-set",
             help=_("Zooniverse subject set ID to export annotations from."),
         ),
     ] = ...,
     classification_project: Annotated[
         int,
         typer.Option(
-            "--cp",
+            "--cp", "--classification-project",
             help=_("Trapper classification project ID where observations will be created."),
         ),
     ] = ...,
     collection: Annotated[
         int,
         typer.Option(
-            "--collection",
+            "--collection", "--c",
             help=_("Trapper collection ID linked to the classification project."),
         ),
     ] = ...,
     deployments: Annotated[
         List[int],
         typer.Option(
-            "--deployments",
+            "--deployments", "--d",
             help=_("Trapper deployments ID linked to the classification project."),
         ),
     ] = None,
@@ -539,13 +539,20 @@ def export_annotations(
         Optional[Path],
         typer.Option(
             "--observations-file",
-            "-o",
+            "-of",
             help=_("Optional path to save the raw observations file before uploading to Trapper."),
         ),
     ] = None,
     verbose: Annotated[
         bool,
         typer.Option("--verbose/--no-verbose", help=_("Show detail for each processed media in the progress bar")),
+    ] = True,
+    save_zoo_annotations: Annotated[
+        bool,
+        typer.Option(
+            "--save-zoo-annotations/--no-save-zoo-annotations",
+            help=_("Save the raw Zooniverse annotations (extracted user opinions) as a separate CSV alongside the observations file."),
+        ),
     ] = True,
     config: Annotated[
         Path,
@@ -607,6 +614,7 @@ def export_annotations(
             observations_file=observations_file,
             deployments=deployments,
             verbose=verbose,
+            save_zoo_annotations=save_zoo_annotations,
         )
     except Exception as e:
         TyperUtils.fatal(_(f"Failed to export annotations: {e}"))
@@ -622,6 +630,9 @@ def export_annotations(
     TyperUtils.console.print()
     TyperUtils.console.print(f"[bold]CSV file:[/bold] [cyan]{observations_file}[/cyan]")
     TyperUtils.console.print(f"[bold]Import it at:[/bold] [link={import_url}]{import_url}[/link]")
+    TyperUtils.console.print()
+    TyperUtils.console.print("[bold red]⚠  IMPORTANT:[/bold red] [bold]The import MUST be performed logged in as Trapper Zooniverse user[/bold] "                             
+                             f"Using a different account will cause the import to fail or produce incorrect results.")
 
 
 app.command(name="exp", hidden=True, help=_("Alias for export")) (export_annotations)

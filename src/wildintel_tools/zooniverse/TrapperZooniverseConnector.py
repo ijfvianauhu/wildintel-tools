@@ -544,6 +544,8 @@ class TrapperZooniverseConnector:
           blacklisted_deployments: Optional[List[int]] = None,
           progress_callback: Optional[Callable[[str, str, int, Optional[int], Optional[str], bool, Optional[str], Optional[str]], None]] = None,
           max_workers: int = 4,
+          save_zoo_annotations: bool = True,
+          max_subjects: Optional[int] = None,
   ):
         """
         Gerenates csv file with annotations from Zooniverse ready to import y Trapper.
@@ -614,25 +616,59 @@ class TrapperZooniverseConnector:
 
         (extractor, voter) = self._get_extrator_vote(wf.id)
         flat_results: List[TrapperObservationResultsTrapper] = []
+        all_zoo_opinions: List[tuple] = []
 
-        n_subjects = len(wf_annotations.data)
-        self._notify(progress_callback, "processing_subjects", "start",
-                     total=n_subjects, set_total=True,
-                     description=f"Processing {n_subjects} subjects...")
+        subject_items = list(wf_annotations.data.items())
+        if max_subjects is not None:
+            subject_items = subject_items[:max_subjects]
+        n_subjects = len(subject_items)
 
         iter_deployments = [None] if all_deployments_mode else deployments
         for depl in iter_deployments:
+            depl_label = "all" if depl is None else str(depl)
             query = {"camtrapdp": "False"}
             if depl is not None:
                 query["deployment"] = depl
+            self._notify(
+                progress_callback, "fetching_trapper_classifications", "start",
+                description=f"Fetching Trapper classifications — cp {cp_id}, collection {collection_id}, deployment {depl_label}...",
+            )
             collections = self.trapper.raw.get_all_pages(
                 endpoint=f"/media_classification/api/project/{cp_id}/collections"
             )
             collection_inter_id = [r["pk"] for r in collections["results"] if r["collection_pk"] == collection_id]
             query["collection"] = ",".join(map(str, collection_inter_id))
-            trapper_observations = self.trapper.raw.get_all_pages(
+            raw_observations = self.trapper.raw.get_all_pages(
                 endpoint=f"/media_classification/api/classifications/results/{cp_id}", query=query
             )
+            self._notify(
+                progress_callback, "fetching_trapper_classifications", "end",
+                description=f"Fetched {len(raw_observations['results'])} Trapper classifications — cp {cp_id}, collection {collection_id}, deployment {depl_label}",
+            )
+            self._notify(progress_callback, "processing_subjects", "start",
+                         total=n_subjects, set_total=True,
+                         description=f"Processing {n_subjects} subjects...")
+            _valid_keys = (
+                set(TrapperObservationResultsTrapper.model_fields)
+                | {info.alias for info in TrapperObservationResultsTrapper.model_fields.values() if info.alias}
+            )
+            trapper_observations_by_media: Dict[str, List[TrapperObservationResultsTrapper]] = defaultdict(list)
+            for _o in raw_observations["results"]:
+                filtered = {k: v for k, v in _o.items() if k in _valid_keys}
+                if "bboxes" in filtered:
+                    import json as _json
+                    bboxes_val = filtered["bboxes"]
+                    if isinstance(bboxes_val, str) and bboxes_val not in ("", "null"):
+                        try:
+                            bboxes_val = _json.loads(bboxes_val)
+                        except Exception:
+                            bboxes_val = None
+                    if isinstance(bboxes_val, list):
+                        bboxes_val = [b for b in bboxes_val if b is not None] or None
+                    filtered["bboxes"] = bboxes_val
+                trapper_observations_by_media[str(_o["mediaID"])].append(
+                    TrapperObservationResultsTrapper.model_validate(filtered)
+                )
 
             lock = threading.Lock()
 
@@ -642,13 +678,8 @@ class TrapperZooniverseConnector:
                 if not media_id.isdigit():
                     return
 
-                all_media_observations: List[TrapperObservationResultsTrapper] = [
-                    TrapperObservationResultsTrapper.model_construct(
-                        **{("id" if k == "_id" else k): v for k, v in o.items()}
-                    )
-                    for o in trapper_observations["results"]
-                    if str(o["mediaID"]) == media_id
-                ]
+                all_media_observations: List[TrapperObservationResultsTrapper] = \
+                    trapper_observations_by_media.get(media_id, [])
                 all_media_observations_ids = list(
                     {obj.id for obj in all_media_observations if obj.id is not None}
                 )
@@ -697,7 +728,7 @@ class TrapperZooniverseConnector:
                             "classificationTimestamp": datetime.now(timezone.utc),
                             "classifiedBy": self.trapper.user_name,
                             "classificationMethod": "human",
-                            "observationComments": f"Automatically classified by Zooniverse in workflow {wf_key} for subject {subject_id}",
+                            #"observationComments": f"Automatically classified by Zooniverse in workflow {wf_key} for subject {subject_id}",
                         }
                         local_obs.append((
                             TrapperObservationResultsTrapper.model_construct(**merged_fields),
@@ -706,6 +737,7 @@ class TrapperZooniverseConnector:
                         ))
 
                 with lock:
+                    all_zoo_opinions.extend(extracted_user_opinions)
                     for obs, subj_key, msg in local_obs:
                         flat_results.append(obs)
                         report.add_success(subj_key, "getting_decision", msg)
@@ -717,7 +749,7 @@ class TrapperZooniverseConnector:
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 futures = [
                     executor.submit(_process_subject, item)
-                    for item in wf_annotations.data.items()
+                    for item in subject_items
                 ]
                 for future in as_completed(futures):
                     future.result()
@@ -736,6 +768,10 @@ class TrapperZooniverseConnector:
                 ["observationType", "scientificName", "count", "classifiedBy",
                  "classificationMethod", "observationComments", "_id"],
             )
+            if save_zoo_annotations and all_zoo_opinions:
+                zoo_csv_path = csv_path.parent / f"zoo_annotations_{csv_path.name}"
+                self.logger.debug(f"Saving zoo annotations to CSV in {zoo_csv_path}")
+                self._zoo_opinions_to_csv(all_zoo_opinions, zoo_csv_path)
 
         return report
 
@@ -1078,6 +1114,25 @@ class TrapperZooniverseConnector:
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(data)
+
+    @staticmethod
+    def _zoo_opinions_to_csv(opinions: List[tuple], path: Path) -> None:
+        import csv, json
+        rows = []
+        for k_majority, sid, choices in opinions:
+            for name, answers in choices:
+                rows.append({
+                    "subject_id": sid,
+                    "k_majority": k_majority,
+                    "scientific_name": name,
+                    "answers": json.dumps(answers) if isinstance(answers, dict) else str(answers),
+                })
+        if not rows:
+            return
+        with path.open("w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=["subject_id", "k_majority", "scientific_name", "answers"])
+            writer.writeheader()
+            writer.writerows(rows)
 
     @staticmethod
     def _load_uploaded_files_list(path: str) -> list[str]:

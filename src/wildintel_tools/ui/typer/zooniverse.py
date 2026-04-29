@@ -432,7 +432,7 @@ def build_subject_metadata_from_trapper(
 
 def public_annotations(tzc: TrapperZooniverseConnector, cp_id: int, collection_id: int, subjectset_id: int,
                        wf_id: int, deployments: List[int] = None, observations_file: Path = None,
-                       verbose: bool = True) -> Report:
+                       verbose: bool = True, save_zoo_annotations: bool = True) -> Report:
     with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
@@ -492,6 +492,7 @@ def public_annotations(tzc: TrapperZooniverseConnector, cp_id: int, collection_i
             output_dir=observations_file,
             deployments=deployments,
             progress_callback=progress_callback,
+            save_zoo_annotations=save_zoo_annotations,
         )
 
     return results
