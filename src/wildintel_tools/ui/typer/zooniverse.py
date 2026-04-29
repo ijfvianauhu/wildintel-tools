@@ -381,6 +381,7 @@ def download_subjectsets(
     max_workers: int = 4,
     overwrite: bool = False,
     verbose: bool = True,
+    exclude_subjects: List[int] = None,
 ) -> List[Report]:
     reports = []
 
@@ -417,6 +418,7 @@ def download_subjectsets(
                 max_workers=max_workers,
                 overwrite=overwrite,
                 callback=make_callback(task_id),
+                exclude_subjects=exclude_subjects,
             )
             progress.update(task_id, completed=total or 1,
                             description=f"[green]✔[/green]  Subject set {ss_id}")

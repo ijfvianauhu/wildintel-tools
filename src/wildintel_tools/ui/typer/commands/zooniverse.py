@@ -652,6 +652,13 @@ def download_ss(
     max_workers: Annotated[int, typer.Option("--max-workers", help=_("Number of parallel download threads"))] = 4,
     overwrite: Annotated[bool, typer.Option("--overwrite", help=_("Overwrite existing files"))] = False,
     verbose: Annotated[bool, typer.Option("--verbose/--no-verbose", help=_("Show detail for each downloaded subject"))] = True,
+    exclude_subjects: Annotated[
+        Optional[str],
+        typer.Option(
+            "--exclude-subjects",
+            help=_("Comma or space separated list of subject IDs to skip during download."),
+        ),
+    ] = None,
     config: Annotated[
         Path, typer.Option(hidden=True, help=_("Configuration file"), callback=callback_with_override)
     ] = None,
@@ -667,7 +674,11 @@ def download_ss(
     if out_put_dir is None:
         out_put_dir = Path(tempfile.mkdtemp(prefix="bulk_download_"))
 
+    excluded_ids = TyperUtils.parse_id_list(exclude_subjects, allow_stdin=False) if exclude_subjects else None
+
     TyperUtils.info(_(f"Downloading {len(ss_ids)} subject set(s) into {out_put_dir}…"))
+    if excluded_ids:
+        TyperUtils.console.print(f"[cyan]⛔ Excluding {len(excluded_ids)} subject(s):[/cyan] {excluded_ids}")
 
     try:
         reports = download_subjectsets(
@@ -677,6 +688,7 @@ def download_ss(
             max_workers=max_workers,
             overwrite=overwrite,
             verbose=verbose,
+            exclude_subjects=excluded_ids,
         )
     except Exception as e:
         TyperUtils.fatal(_(f"Download failed: {e}"))
@@ -702,14 +714,14 @@ def importation(
     research_project: Annotated[
         int,
         typer.Option(
-            "--rp",
+            "--rp", "--research-project",
             help=_("ID of the research project linked to the classificarion project."),
         ),
     ] = None,
     classification_project: Annotated[
         int,
         typer.Option(
-            "--cp",
+            "--cp", "--classification-project",
         help=_("ID of the classification project linked to the collection."),
     ),
     ] = None,
@@ -718,7 +730,7 @@ def importation(
         Optional[str],
         typer.Option(
             "--deployments",
-            "-d",
+            "--d",
             help=_("Deployment IDs (comma or space separated). Use '-' to read from stdin."),
         ),
     ] = None,
@@ -726,7 +738,7 @@ def importation(
         Optional[str],
         typer.Option(
             "--exclude-deployments",
-            "-x",
+            "--ed",
             help=_("Deployment IDs to skip (same format as --deployments)."),
         ),
     ] = None,

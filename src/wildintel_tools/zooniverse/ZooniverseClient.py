@@ -298,7 +298,8 @@ class SubjectSetsComponent(ZooniverseClientComponent):
         return self.with_results()
 
     def download(self, subject_set_id: int, output_folder: Path,
-                 max_workers: int = 4, overwrite: bool = False,callback: callable = None) -> Report:
+                 max_workers: int = 4, overwrite: bool = False, callback: callable = None,
+                 exclude_subjects: List[int] = None) -> Report:
 
         self.client._ensure_connection()
         self.client.logger.debug(f"Starting SubjectSet  {subject_set_id} download.")
@@ -354,10 +355,20 @@ class SubjectSetsComponent(ZooniverseClientComponent):
                 self.client.logger.warning(f"Error downloading subject {sid}: {exc}")
                 return None
 
-        self.client.logger.debug(f"Preparing pool for {max_workers} workers and {subject_set.subjects} subjects")
+        excluded_set = set(exclude_subjects or [])
+        subjects_to_download = [
+            s for s in subject_set.subjects
+            if getattr(s, "id", None) not in excluded_set
+        ]
+        if excluded_set:
+            self.client.logger.debug(
+                f"Excluding {len(subject_set.subjects) - len(subjects_to_download)} subject(s): {excluded_set}"
+            )
+
+        self.client.logger.debug(f"Preparing pool for {max_workers} workers and {len(subjects_to_download)} subjects")
 
         with ThreadPoolExecutor(max_workers=max_workers) as pool:
-            for _ in pool.map(download_one, subject_set.subjects):
+            for _ in pool.map(download_one, subjects_to_download):
                pass
 
         return report
