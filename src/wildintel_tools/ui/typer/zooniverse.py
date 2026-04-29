@@ -1,15 +1,76 @@
 from pathlib import Path
-from typing import Literal, List, Any, Optional, Dict
+from typing import Callable, Literal, List, Any, Optional, Dict
 import re
 
 from panoptes_client import Workflow
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn, TaskID
 from trapper_client.TrapperClient import TrapperClient
 
 from wildintel_tools.zooniverse.TrapperZooniverseConnector import TrapperZooniverseConnector
 from wildintel_tools.reports import Report
 from wildintel_tools.ui.typer.TyperUtils import TyperUtils
 from wildintel_tools.zooniverse.ZooniverseClient import ZooniverseClient
+
+
+def make_progress() -> Progress:
+    return Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TextColumn("{task.completed}/{task.total}"),
+        TimeElapsedColumn(),
+    )
+
+
+def make_progress_callback(progress: Progress, verbose: bool = True) -> Callable:
+    task_registry: Dict[str, TaskID] = {}
+
+    def get_or_create_task(task_name: str, total=None, description=None) -> TaskID:
+        if task_name not in task_registry:
+            task_registry[task_name] = progress.add_task(
+                description or task_name.replace("_", " ").title(), total=total
+            )
+        return task_registry[task_name]
+
+    def callback(
+        task_name: str,
+        state: str,
+        advance: int = 1,
+        total: int | None = None,
+        description: str | None = None,
+        set_total: bool = False,
+        item_name: str | None = None,
+        item_status: Literal["start", "end", "fail"] | None = None,
+        item_description: str | None = None,
+    ):
+        task_id = get_or_create_task(task_name, total, description)
+        label = description or task_name.replace("_", " ").title()
+
+        if set_total and total is not None:
+            progress.update(task_id, total=total)
+
+        if state == "start":
+            progress.update(task_id, description=f"🟢  {label}")
+        elif state == "end":
+            completed = next((t.total for t in progress.tasks if t.id == task_id), None) or 1
+            progress.update(task_id, completed=completed, description=f"✔️  {label}")
+            progress.stop_task(task_id)
+            return
+        elif state == "fail":
+            progress.update(task_id, description=f"❌  {label}")
+            progress.stop_task(task_id)
+            return
+
+        if item_name is not None:
+            is_fail = item_status == "fail"
+            if verbose or is_fail:
+                icons = {"start": "[yellow]→[/yellow]", "end": "[green]✓[/green]", "fail": "[red]✗[/red]"}
+                icon = icons.get(item_status, "") if item_status else ""
+                msg = f"{icon} {item_name}" + (f": {item_description}" if item_description else "")
+                progress.log(msg)
+            progress.advance(task_id, advance)
+
+    return callback
 
 
 def check_connection(zooniverse_client: ZooniverseClient):
@@ -105,87 +166,8 @@ def upload_collection( tzc : TrapperZooniverseConnector,
 ) -> Report :
 
     TyperUtils.debug(f"Starting upload_collection with values:{locals().items()}")
-    with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            TextColumn("{task.completed}/{task.total}"),
-            TimeElapsedColumn(),
-    ) as progress:
-
-        # Registro dinámico de tareas
-        task_registry = {}
-
-        def get_or_create_task(task_name: str, total=None, description=None):
-            """
-            Crea la tarea si no existe. Si existe, la devuelve.
-            """
-            if task_name not in task_registry:
-                desc = description or task_name.replace("_", " ").title()
-                task_id = progress.add_task(desc, total=total)
-                task_registry[task_name] = task_id
-            return task_registry[task_name]
-
-        def progress_callback(
-                task_name: str,
-                state: str,
-                advance: int = 1,
-                total: int | None = None,
-                description: str | None = None,
-                set_total: bool = False,
-                item_name:str = None,
-                item_status: Literal["start", "end", "fail"] | None = None,
-                item_description: str | None = None
-        ):
-            """
-            Callback flexible que soporta:
-            - tareas determinadas   (con total)
-            - tareas indeterminadas (total=None)
-            - cambio de total a posteriori
-            - añadir descripciones personalizadas
-            """
-            task_id = get_or_create_task(task_name, total, description)
-
-            if set_total and total is not None:
-                progress.update(task_id, total=total)
-
-            # --- Estados ---
-            if state == "start":
-                new_desc = f"🟢  {description or task_name.replace('_', ' ').title()}"
-                progress.update(task_id, description=new_desc)
-
-            elif state == "end":
-                new_desc = f"✔️  {description or task_name.replace('_', ' ').title()}"
-                progress.update(task_id, completed=progress.tasks[task_id].total or 1,
-                                description=new_desc)
-                progress.stop_task(task_id)
-
-            elif state == "fail":
-                new_desc = f"❌  {description or task_name.replace('_', ' ').title()}"
-                progress.update(task_id, description=new_desc)
-                progress.stop_task(task_id)
-                return  # no seguir avanzando
-
-            if item_name is not None:
-                status_messages = {
-                    "start": f"[yellow]→ {item_name}: {item_description}"
-                    if item_description
-                    else f"[yellow]→ Starting processing item {item_name}",
-                    "end": f"[green]✓ {item_name}: {item_description}"
-                    if item_description
-                    else f"[green]✓ Finished processing item {item_name}",
-                    "fail": f"[red]✗ {item_name}: {item_description}"
-                    if item_description
-                    else f"[red]✗ Failed processing {item_name}",
-                }
-
-                message = status_messages.get(item_status)
-
-                if message:
-                    progress.log(message)
-
-                progress.advance(task_id, advance)
-
+    with make_progress() as progress:
+        progress_callback = make_progress_callback(progress)
         report = tzc.upload_collection(
              subjectset_name=subjectset_name,
              collection=collection,
@@ -222,13 +204,7 @@ def update_subject_metadata(
     :returns: Report with successes and errors.
     :rtype: Report
     """
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        BarColumn(),
-        TextColumn("{task.completed}/{task.total}"),
-        TimeElapsedColumn(),
-    ) as progress:
+    with make_progress() as progress:
         task = progress.add_task("Updating subjects...", total=None)
 
         def _callback(event: str, sid, name, total=None, step=None):
@@ -267,59 +243,8 @@ def update_subject_metadata_from_trapper(
     """
     Update subject metadata in Zooniverse using Trapper as source, with progress UI.
     """
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        BarColumn(),
-        TextColumn("{task.completed}/{task.total}"),
-        TimeElapsedColumn(),
-    ) as progress:
-        task_registry: Dict[str, int] = {}
-
-        def get_or_create_task(task_name: str, total=None, description=None):
-            if task_name not in task_registry:
-                task_registry[task_name] = progress.add_task(description or task_name.replace("_", " ").title(), total=total)
-            return task_registry[task_name]
-
-        def progress_callback(
-            task_name: str,
-            state: str,
-            advance: int = 1,
-            total: int | None = None,
-            description: str | None = None,
-            set_total: bool = False,
-            item_name: str | None = None,
-            item_status: Literal["start", "end", "fail"] | None = None,
-            item_description: str | None = None,
-        ):
-            task_id = get_or_create_task(task_name, total, description)
-
-            if set_total and total is not None:
-                progress.update(task_id, total=total)
-
-            if state == "start":
-                progress.update(task_id, description=f"🟢  {description or task_name.replace('_', ' ').title()}")
-            elif state == "end":
-                progress.update(task_id, completed=progress.tasks[task_id].total or 1,
-                                description=f"✔️  {description or task_name.replace('_', ' ').title()}")
-                progress.stop_task(task_id)
-                return
-            elif state == "fail":
-                progress.update(task_id, description=f"❌  {description or task_name.replace('_', ' ').title()}")
-                progress.stop_task(task_id)
-                return
-
-            if item_name is not None:
-                status_messages = {
-                    "start": f"[yellow]→ {item_name}: {item_description}" if item_description else f"[yellow]→ Starting {item_name}",
-                    "end": f"[green]✓ {item_name}: {item_description}" if item_description else f"[green]✓ Finished {item_name}",
-                    "fail": f"[red]✗ {item_name}: {item_description}" if item_description else f"[red]✗ Failed {item_name}",
-                }
-                message = status_messages.get(item_status)
-                if message:
-                    progress.log(message)
-                progress.advance(task_id, advance)
-
+    with make_progress() as progress:
+        progress_callback = make_progress_callback(progress)
         report = tzc.update_subject_metadata(
             subjectset_id=subject_set_id,
             classification_project=classification_project,
@@ -433,57 +358,8 @@ def build_subject_metadata_from_trapper(
 def public_annotations(tzc: TrapperZooniverseConnector, cp_id: int, collection_id: int, subjectset_id: int,
                        wf_id: int, deployments: List[int] = None, observations_file: Path = None,
                        verbose: bool = True, save_zoo_annotations: bool = True) -> Report:
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        BarColumn(),
-        TextColumn("{task.completed}/{task.total}"),
-        TimeElapsedColumn(),
-    ) as progress:
-        task_registry: Dict[str, int] = {}
-
-        def get_or_create_task(task_name: str, total=None, description=None) -> int:
-            if task_name not in task_registry:
-                task_registry[task_name] = progress.add_task(
-                    description or task_name.replace("_", " ").title(), total=total
-                )
-            return task_registry[task_name]
-
-        def progress_callback(
-            task_name: str,
-            state: str,
-            advance: int = 1,
-            total: int | None = None,
-            description: str | None = None,
-            set_total: bool = False,
-            item_name: str | None = None,
-            item_status: Literal["start", "end", "fail"] | None = None,
-            item_description: str | None = None,
-        ):
-            task_id = get_or_create_task(task_name, total, description)
-            if set_total and total is not None:
-                progress.update(task_id, total=total)
-            if state == "start":
-                progress.update(task_id, description=f"[green]...[/green]  {description or task_name.replace('_', ' ').title()}")
-            elif state == "end":
-                progress.update(task_id,
-                                completed=progress.tasks[task_id].total or 1,
-                                description=f"[green]✔[/green]  {description or task_name.replace('_', ' ').title()}")
-                progress.stop_task(task_id)
-                return
-            elif state == "fail":
-                progress.update(task_id,
-                                description=f"[red]✘[/red]  {description or task_name.replace('_', ' ').title()}")
-                progress.stop_task(task_id)
-                return
-            if item_name is not None:
-                is_fail = item_status == "fail"
-                if verbose or is_fail:
-                    status_icon = {"start": "[yellow]→[/yellow]", "end": "[green]✓[/green]", "fail": "[red]✗[/red]"}.get(item_status, "")
-                    msg = f"{status_icon} {item_name}" + (f": {item_description}" if item_description else "")
-                    progress.log(msg)
-                progress.advance(task_id, advance)
-
+    with make_progress() as progress:
+        progress_callback = make_progress_callback(progress, verbose=verbose)
         results = tzc.upload_annotations(
             subjectset_id,
             wf_id,
@@ -508,13 +384,7 @@ def download_subjectsets(
 ) -> List[Report]:
     reports = []
 
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        BarColumn(),
-        TextColumn("{task.completed}/{task.total}"),
-        TimeElapsedColumn(),
-    ) as progress:
+    with make_progress() as progress:
 
         for ss_id in ss_ids:
             ss = zooniverse_client.subjectsets.get_by_id(ss_id)
