@@ -741,10 +741,11 @@ class TrapperZooniverseConnector:
                     for obs, subj_key, msg in local_obs:
                         flat_results.append(obs)
                         report.add_success(subj_key, "getting_decision", msg)
-                    self._notify(progress_callback, "processing_subjects", "progress",
-                                 advance=1, item_name=f"media:{media_id}",
-                                 item_status="end",
-                                 item_description=f"{len(decisions)} decision(s)")
+
+                self._notify(progress_callback, "processing_subjects", "progress",
+                             advance=1, item_name=f"media:{media_id}",
+                             item_status="end",
+                             item_description=f"{len(decisions)} decision(s)")
 
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 futures = [
