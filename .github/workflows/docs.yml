@@ -3,7 +3,7 @@ name: Build and Deploy Docs
 on:
   push:
     branches:
-      - main   # o "master" si tu rama principal se llama así
+      - main
 
 jobs:
   build:
@@ -18,18 +18,14 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install uv
-        run: pip install --upgrade uv
-
-      - name: Install project dependencies
-        run: uv sync --all-extras --dev
+      - name: Install MkDocs and dependencies
+        run: pip install mkdocs mkdocs-material
 
       - name: Build documentation
-        run: |
-          uv run utils/docs.py build
+        run: mkdocs build
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.PAT_TOKEN }}
-          publish_dir: ./docs/build/html
+          publish_dir: ./site

@@ -34,9 +34,8 @@ dev = [
     "pyright>=1.1.407",
     "pytest>=8.4.2",
     "ruff>=0.14.3",
-    "sphinx>=8.2.3",
-    "sphinx-autodoc-typehints>=3.5.2",
-    "sphinx-rtd-theme>=3.0.2",
+    "mkdocs>=1.6.0",
+    "mkdocs-material>=9.5.0",
 ]
 
 [project.scripts]
