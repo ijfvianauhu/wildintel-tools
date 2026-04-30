@@ -1,6 +1,127 @@
 # zooniverse
 
-Commands for transferring data between [Trapper](https://trapper-project.org) and [Zooniverse](https://www.zooniverse.org/): upload media collections from Trapper to Zooniverse for citizen-science classification, then export the resulting annotations back to Trapper as observations.
+Automates the workflow between a [Trapper](https://trapper-project.org) instance and [Zooniverse](https://www.zooniverse.org/), covering two main stages:
+
+1. **Upload** — images with bounding boxes detected and approved in Trapper are loaded into Zooniverse subject sets for citizen-science classification.
+2. **Import annotations** — classifications collected in Zooniverse are exported back to Trapper as observations, following a configurable consensus process.
+
+To support this workflow, a set of auxiliary commands is provided for querying and inspecting Zooniverse resources such as subjects, subject sets, workflows, and exported classification data.
+
+---
+
+## Quick start
+
+The workflow starts in Trapper, where an AI model is used to detect animals (bounding boxes) in a collection of images. 
+Once those detections are approved, the images are uploaded to Zooniverse for citizen-science classification. 
+The resulting annotations are then imported back into Trapper as observations.
+
+### Step 0 — Configuration
+
+Before running any command, the connection to both Trapper and Zooniverse must be configured. The easiest way to do this 
+is through the interactive setup wizard:
+
+```bash
+wildintel zooniverse wizard setup
+```
+
+The wizard will guide you through the following questions:
+
+- **Zooniverse username and password** — credentials for your Zooniverse account.
+- **Zooniverse project ID** — numeric ID of the Zooniverse project where subjects will be uploaded. You can find it in the URL of your project's lab page: `https://www.zooniverse.org/lab/{project_id}`.
+- **Number of images per sequence** — how many images are sampled from each burst and uploaded as a single subject to Zooniverse. A burst (sequence) is a group of consecutive photos taken within the maximum interval. Default: `5`.
+- **Maximum interval between images in a sequence (seconds)** — maximum gap in seconds between two consecutive photos for them to be considered part of the same sequence. If the gap exceeds this value, a new sequence starts. Default: `90`.
+- **Maximum upload attempts per sequence** — number of times the upload of a sequence is retried if a transient error occurs (e.g. network timeout). Default: `5`.
+- **Delay between sequence upload attempts (seconds)** — seconds to wait before retrying a failed sequence upload. Default: `15`.
+- **Maximum attempts per subject** — number of times the upload of a single subject (image) to Zooniverse is retried after a failure. Default: `5`.
+- **Delay per subject retry (seconds)** — seconds to wait before retrying the upload of a single subject. Combined with the per-subject attempt limit, this controls the backoff for quota or connectivity errors at subject level. Default: `30`.
+
+Once the wizard completes, verify that the connection details are correct by running:
+
+```bash
+wildintel zooniverse test-connection
+```
+
+A successful response confirms that wildintel-tools can authenticate against Zooniverse and is ready to use.
+
+### Step 1 — Run AI detection in Trapper
+
+As a general rule, images containing humans or vehicles are **not** uploaded to Zooniverse. To determine whether an image contains such content, an AI detector must first be run: it calculates bounding boxes and labels each image with the type of content detected (animal, human, vehicle). Only images labelled as animals — or with no detections — are eligible for upload. This detection process is carried out as follows:
+
+1. In your Trapper instance, go to **Classification → Classification Projects** and click the magnifier icon on the classification project you want to use.
+2. Click **Classification Results**.
+3. In the form that appears, fill in the **Collections** field with the names of the collections whose images you want to process, then click **Filter**.
+4. Click **Select filtered** to mark all images.
+5. Under **Actions**, click **More** and select **Classify AI**. Choose the AI model to run.
+6. After the detection job finishes (duration depends on the number of images), return to the Classification Results page and select **AI Classifications**.
+7. Filter by collection, deployment, and/or AI provider, then click **Filter**. The detection results from the previous step should appear.
+8. Click **Select filtered**, then under **Actions → More** click **Approve selected**.
+9. In the confirmation form, enable the following options: **Mark as approved**, **Overwrite attributes**, **Copy bounding boxes**, **Observation type**.
+
+At this point the images are approved in Trapper with their bounding boxes and are ready to be uploaded to Zooniverse.
+
+### Step 2 — Upload images to Zooniverse
+
+To upload images use the `wildintel zooniverse importation` command. This command requires the Trapper collection ID you
+want to upload:
+
+```bash
+wildintel zooniverse importation <collection_id>   
+```
+After execution, the application reports the process status and concludes by presenting a summary of the generated results.
+The full report details can be accessed by running
+
+```bash
+wildintel zooniverse reports view   
+```
+
+By default, the command creates a new subject set in Zooniverse with an auto-generated name. To specify a custom name or 
+reuse an existing subject set, pass the `SUBJECTSET_NAME` argument:
+
+```bash
+wildintel zooniverse importation <collection_id> "My subject set name"
+```
+
+In some cases, a single collection could be linked to multiple classification projects. You can specify the classification 
+project to use with the `--cp` option:
+
+```bash
+wildintel zooniverse importation <collection_id> "My subject set name" --cp 123
+```
+
+If the collections contains many images, you can filter them by deployment using the `--deployments` option:
+
+```bash
+wildintel zooniverse importation <collection_id>  --deployments 123,456
+``` 
+Also, if you want to exclude some deployments, use the `--exclude-deployments` option:
+
+```bashwildintel zooniverse importation <collection_id>  --exclude-deployments 789,101
+```
+
+If the command was interrupted or some images were already uploaded in a previous run, you can pass a Zooniverse subjects
+export file to skip those images and avoid duplicates using `--exclude-subjects` option :
+
+```bashwildintel zooniverse importation <collection_id>  --exclude-deployments 789,101 --subjects-subjects subjects_export.tsv
+```
+You can download the subjects export file from **https://www.zooniverse.org/lab/{project_id}/data-exports** under 
+**Request new subject export**. Use the [`uploaded-media`](#uploaded-media) command to inspect the file and verify which
+media IDs have already been uploaded before running `importation`.
+
+### Step 3 — Collect classifications in Zooniverse
+
+Once the subject set is live, citizen scientists classify the images through the Zooniverse workflow. When enough classifications have been collected, proceed to the next step.
+
+### Step 4 — Import annotations back to Trapper
+
+Use the [`public-annotations`](#public-annotations) command to export the Zooniverse classifications and import them into Trapper as observations:
+
+```bash
+wildintel zooniverse public-annotations \
+  --cp <classification_project_id> \
+  --collection <collection_id> \
+  --ss-id <subject_set_id> \
+  --wf-id <workflow_id>
+```
 
 ---
 
