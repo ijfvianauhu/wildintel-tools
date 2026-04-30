@@ -1,3 +1,6 @@
+import csv
+import json
+import re
 import tempfile
 from datetime import datetime
 from pathlib import Path
@@ -26,6 +29,57 @@ app = typer.Typer(
     help=_("Includes command to upload medias from Trapper to Zooniverse and import Annotations from Zooniverse to "
            "Trapper"),
     short_help=_("Utilities for managing and validating WildIntel data"))
+
+_MEDIA_ID_RE = re.compile(r":media:(\d+)\s*$")
+
+
+def _extract_media_id_from_url(url: str) -> Optional[int]:
+    """Extract Trapper media_id from an origin/external_id URL like ``https://host/:media:12345``."""
+    if not url:
+        return None
+    m = _MEDIA_ID_RE.search(url.strip())
+    return int(m.group(1)) if m else None
+
+
+def _iter_subject_rows(csv_path: Path, subject_set_id: Optional[int] = None):
+    """Yield parsed rows from a Zooniverse subjects export (CSV or TSV), optionally filtered by subject_set_id."""
+    with open(csv_path, newline="", encoding="utf-8") as f:
+        first_line = f.readline()
+        f.seek(0)
+        delimiter = "\t" if "\t" in first_line else ","
+        reader = csv.DictReader(f, delimiter=delimiter)
+        for row in reader:
+            if subject_set_id is not None:
+                try:
+                    if int(row.get("subject_set_id", "").strip()) != subject_set_id:
+                        continue
+                except (ValueError, TypeError):
+                    continue
+            yield row
+
+
+def _media_id_from_row(row: dict) -> Optional[int]:
+    """Return the Trapper media_id from a subject row, checking origin then external_id."""
+    raw = row.get("metadata", "")
+    try:
+        metadata = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return None
+    for key in ("origin", "external_id"):
+        mid = _extract_media_id_from_url(metadata.get(key, "") or "")
+        if mid is not None:
+            return mid
+    return None
+
+
+def _parse_uploaded_media_ids(csv_path: Path, subject_set_id: Optional[int] = None) -> set[int]:
+    """Read a Zooniverse subjects export and return the set of Trapper media IDs already uploaded."""
+    return {
+        mid
+        for row in _iter_subject_rows(csv_path, subject_set_id)
+        if (mid := _media_id_from_row(row)) is not None
+    }
+
 
 def make_dynaconf_callback(override_mapping: dict | None = None):
     def callback(ctx, param: typer.CallbackParam, value: Any):
@@ -753,13 +807,18 @@ def importation(
             help=_("Simulate the process: no images are downloaded, no subject set is created and nothing is uploaded to Zooniverse."),
         ),
     ] = False,
-    skip_if_exists: Annotated[
-        bool,
+    exclude_subjects: Annotated[
+        Optional[Path],
         typer.Option(
-            "--skip-if-exists",
-            help=_("Skip upload if the subject already exists in the subject set (matched by origin metadata)."),
+            "--exclude-subjects",
+            help=_(
+                "Path to a Zooniverse subjects export CSV/TSV. Media whose Trapper media_id is found in the "
+                "'origin' or 'external_id' field of this file will not be uploaded. "
+                "Obtain it at https://www.zooniverse.org/lab/{project_id}/data-exports "
+                "under 'Request new subject export'."
+            ),
         ),
-    ] = False,
+    ] = None,
     config: Annotated[Path, typer.Option(hidden=True, callback=callback_with_override)] = None,
 ) -> None:
     """
@@ -825,6 +884,13 @@ def importation(
         TyperUtils.console.print("[bold yellow]⚠  DRY-RUN mode: no images will be downloaded, no subject set will be created and nothing will be uploaded to Zooniverse.[/bold yellow]")
         TyperUtils.console.print()
 
+    uploaded_media_ids: set[int] = set()
+    if exclude_subjects is not None:
+        if not exclude_subjects.exists():
+            TyperUtils.fatal(f"Exclude-subjects file not found: {exclude_subjects}")
+        uploaded_media_ids = _parse_uploaded_media_ids(exclude_subjects)
+        TyperUtils.info(_(f"Excluding {len(uploaded_media_ids)} already-uploaded media IDs from {exclude_subjects.name}"))
+
     import wildintel_tools.ui.typer.zooniverse
 
     try:
@@ -842,7 +908,7 @@ def importation(
             max_attempts_per_subject=5,
             delay_seconds_per_subject=15,
             dry_run=dry_run,
-            skip_if_exists=skip_if_exists,
+            uploaded_media_ids=uploaded_media_ids or None,
         )
 
         TyperUtils.success(f"Collection {collection} uploaded to Zooniverse subject set '{subjectset_name}'")
@@ -854,6 +920,91 @@ def importation(
     except Exception as e:
         raise e
         TyperUtils.error(f"Error uploading collection {collection}: {str(e)}")
+
+
+@app.command(
+    help=_("List Trapper media IDs already uploaded to a subject set, from a Zooniverse subjects export file."),
+    short_help=_("List uploaded media IDs from a subjects export"),
+)
+def uploaded_media(
+    ctx: typer.Context,
+    subjects_csv: Annotated[
+        Path,
+        typer.Argument(help=_(
+            "Path to the Zooniverse subjects export CSV/TSV file. "
+            "To obtain it, go to https://www.zooniverse.org/lab/{project_id}/data-exports "
+            "(replace {project_id} with your Zooniverse project ID), "
+            "click 'Request new subject export' and download the generated file."
+        )),
+    ],
+    subject_set_id: Annotated[
+        Optional[int],
+        typer.Option("--subject-set-id", "--ss-id", help=_("Filter by subject set ID. If omitted, all rows are included.")),
+    ] = None,
+    pipeline: Annotated[
+        bool,
+        typer.Option("--pipeline", help=_("Output only media IDs separated by newlines (for shell pipelines).")),
+    ] = False,
+    unresolved: Annotated[
+        bool,
+        typer.Option("--unresolved", help=_("Show only subjects for which no media_id could be extracted.")),
+    ] = False,
+) -> None:
+    """
+    Read a Zooniverse subjects export file and print the Trapper media IDs that have already been uploaded.
+
+    Media IDs are extracted from the ``origin`` or ``external_id`` field in ``metadata`` using the pattern ``/:media:<id>``.
+    Use --unresolved to list subjects for which no media_id could be found.
+    """
+    if not subjects_csv.exists():
+        TyperUtils.fatal(f"File not found: {subjects_csv}")
+
+    resolved: list[int] = []
+    unresolved_rows: list[dict] = []
+
+    for row in _iter_subject_rows(subjects_csv, subject_set_id):
+        mid = _media_id_from_row(row)
+        if mid is not None:
+            resolved.append(mid)
+        else:
+            unresolved_rows.append(row)
+
+    resolved.sort()
+    ss_label = f" — subject set {subject_set_id}" if subject_set_id else ""
+
+    if unresolved:
+        if pipeline:
+            for row in unresolved_rows:
+                typer.echo(row.get("subject_id", ""))
+            return
+
+        from rich.table import Table
+        table = Table(title=f"[yellow]Subjects without media_id{ss_label}[/yellow]", show_lines=False)
+        table.add_column("subject_id", style="yellow", justify="right")
+        table.add_column("subject_set_id", style="dim", justify="right")
+        table.add_column("metadata", style="dim")
+        for row in unresolved_rows:
+            table.add_row(
+                row.get("subject_id", ""),
+                row.get("subject_set_id", ""),
+                row.get("metadata", "")[:80],
+            )
+        TyperUtils.console.print(table)
+        TyperUtils.console.print(f"[yellow]{len(unresolved_rows)} subjects without resolvable media_id[/yellow]")
+        return
+
+    if pipeline:
+        for mid in resolved:
+            typer.echo(mid)
+        return
+
+    from rich.table import Table
+    table = Table(title=f"Uploaded media IDs{ss_label}", show_lines=False)
+    table.add_column("media_id", style="cyan", justify="right")
+    for mid in resolved:
+        table.add_row(str(mid))
+    TyperUtils.console.print(table)
+    TyperUtils.info(_(f"{len(resolved)} media IDs found"))
 
 
 from wildintel_tools.ui.typer.commands.wizards.zooniverse import register_wizard_command

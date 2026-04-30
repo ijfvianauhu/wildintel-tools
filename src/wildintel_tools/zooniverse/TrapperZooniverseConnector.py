@@ -149,6 +149,7 @@ class TrapperZooniverseConnector:
             progress_callback: Optional[Callable[[str, str, int, Optional[int], Optional[str], bool, Optional[str], Optional[str]], None]] = None,
             dry_run: bool = False,
             skip_if_exists: bool = False,
+            uploaded_media_ids: Optional[set] = None,
     ) -> Report:
 
         deployments = list(deployments) if deployments is not None else None
@@ -269,6 +270,14 @@ class TrapperZooniverseConnector:
                         media_id = media['mediaID']
                         name = self._get_zoo_filename(media)
                         local_path = os.path.join(temp_dir, name)
+
+                        if uploaded_media_ids and media_id in uploaded_media_ids:
+                            self._notify(progress_callback, "synchronizing_images",
+                                         state="running", advance=1,
+                                         item_name=f"{media_id}", item_status="end",
+                                         item_description="Already uploaded, skipped")
+                            report.add_success(f"{media_id}@media", "upload_skipped", **{"reason": "already uploaded"})
+                            continue
 
                         self._notify(progress_callback, "synchronizing_images"
                                            , state="running"
