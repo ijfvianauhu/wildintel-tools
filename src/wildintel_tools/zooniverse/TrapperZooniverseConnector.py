@@ -2,6 +2,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Dict, Tuple, Any, Optional, Callable, Literal
+import csv, json
 import logging, os
 import time as time_module
 import tempfile
@@ -335,17 +336,9 @@ class TrapperZooniverseConnector:
                                     item_name=f"{media_id}",
                                     item_status="start",
                                 )
-                                #origin = f"{self.trapper.base_url}:media:{media_id}"
-                                subject_metadata = {
-                                    # "origin": origin
-                                    "external_id": f"{self.trapper.base_url}:media:{media_id}",
-                                    "preview": f"{self.trapper.base_url}storage/resource/media/{media_id}/pfile/",
-                                    "link": f"{self.trapper.base_url}storage/resource/media/{media_id}/file/",
-                                    "thumbnail": f"{self.trapper.base_url}storage/resource/media/{media_id}/tfile/",
-                                    "origin": f"{self.trapper.base_url}",
-                                    "license": "http://creativecommons.org/licenses/by-nc/4.0/legalcode",
-                                    "image_name": media["fileName"],
-                                }
+                                subject_metadata = self._build_metadata_from_trapper(
+                                    self.trapper, media_id, media["fileName"]
+                                )
 
                                 subject = self.zoo.subjects.create(
                                     local_path,
@@ -415,6 +408,7 @@ class TrapperZooniverseConnector:
         black_list: Optional[List[int]] = None,
         attempts: int = 3,
         delay_seconds: int = 5,
+        max_workers: int = 1,
     ) -> Report:
         """
         Update metadata of all subjects in a Zooniverse SubjectSet using Trapper media info.
@@ -430,6 +424,9 @@ class TrapperZooniverseConnector:
         attempts = max(1, int(attempts))
         delay_seconds = max(0, int(delay_seconds))
 
+        included_set = set(white_list) if white_list else None
+        excluded_set = set(black_list or [])
+
         subjects_iter = self.zoo.subjects.get_by_subjectset(subjectset_id, to_list=False)
 
         self._notify(
@@ -442,17 +439,10 @@ class TrapperZooniverseConnector:
         report_lock = threading.Lock()
 
         def _is_selected_subject(s) -> bool:
-            sid = str(getattr(s, "id", "unknown"))
-            try:
-                sid_int = int(sid)
-            except Exception:
-                sid_int = None
-
-            if white_list is not None and sid_int not in white_list:
-                self.logger.debug(f"Subject {sid} skipped: not in white_list")
+            sid = getattr(s, "id", None)
+            if sid in excluded_set:
                 return False
-            if black_list is not None and sid_int in black_list:
-                self.logger.debug(f"Subject {sid} skipped: in black_list")
+            if included_set is not None and sid not in included_set:
                 return False
             return True
 
@@ -534,10 +524,14 @@ class TrapperZooniverseConnector:
                     item_description=str(last_error),
                 )
 
-        for s in subjects_iter:
-            if not _is_selected_subject(s):
-                continue
-            _process_subject(s)
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {
+                executor.submit(_process_subject, s): s
+                for s in subjects_iter
+                if _is_selected_subject(s)
+            }
+            for f in as_completed(futures):
+                pass
 
         self._notify(progress_callback, "updating_subjects", state="end")
         report.finish()
@@ -815,11 +809,11 @@ class TrapperZooniverseConnector:
             return int(fallback.group(1))
         return None
 
-    def _build_subject_metadata(self, media_id: int, image_name: str) -> Dict[str, Any]:
-        base_url = str(self.trapper.base_url)
+    @staticmethod
+    def _build_metadata_from_trapper(trapper_client: TrapperClient, media_id: int, image_name: str) -> Dict[str, Any]:
+        base_url = str(trapper_client.base_url)
         if not base_url.endswith("/"):
             base_url = base_url + "/"
-
         return {
             "external_id": f"{base_url}:media:{media_id}",
             "preview": f"{base_url}storage/resource/media/{media_id}/pfile/",
@@ -829,6 +823,9 @@ class TrapperZooniverseConnector:
             "license": "http://creativecommons.org/licenses/by-nc/4.0/legalcode",
             "image_name": image_name,
         }
+
+    def _build_subject_metadata(self, media_id: int, image_name: str) -> Dict[str, Any]:
+        return self._build_metadata_from_trapper(self.trapper, media_id, image_name)
 
     def _get_extrator_vote(self, workflow_id) -> Tuple[AnnotationsExtractor, AnnotationsVoter]:
         import importlib
@@ -1156,3 +1153,262 @@ class TrapperZooniverseConnector:
             return []
         with open(path, 'r', encoding='utf-8') as f:
             return [line.strip() for line in f if line.strip()]
+
+    # ------------------------------------------------------------------
+    # Subject-export analysis helpers
+    # ------------------------------------------------------------------
+
+    _MEDIA_ID_RE = re.compile(r":media:(\d+)\s*$")
+
+    @staticmethod
+    def _iter_subject_export_rows(csv_path: Path, subject_set_id: Optional[int] = None):
+        """Yield parsed rows from a Zooniverse subjects export (CSV or TSV), optionally filtered by subject_set_id."""
+        with open(csv_path, newline="", encoding="utf-8") as f:
+            first_line = f.readline()
+            f.seek(0)
+            delimiter = "\t" if "\t" in first_line else ","
+            reader = csv.DictReader(f, delimiter=delimiter)
+            for row in reader:
+                if subject_set_id is not None:
+                    try:
+                        if int(row.get("subject_set_id", "").strip()) != subject_set_id:
+                            continue
+                    except (ValueError, TypeError):
+                        continue
+                yield row
+
+    @classmethod
+    def _media_id_from_subject_row(cls, row: dict) -> Optional[int]:
+        """Return the Trapper media_id from a subject export row, checking origin then external_id."""
+        raw = row.get("metadata", "")
+        try:
+            metadata = json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            return None
+        for key in ("origin", "external_id"):
+            value = metadata.get(key) or ""
+            m = cls._MEDIA_ID_RE.search(value.strip())
+            if m:
+                return int(m.group(1))
+        return None
+
+    @classmethod
+    def uploaded_media_id(
+        cls,
+        csv_path: Path,
+        subject_set_id: Optional[int] = None,
+    ) -> dict[int, int]:
+        """Return a mapping of media_id → subject_id from a Zooniverse subjects export.
+
+        Only rows for which a media_id can be extracted are included.
+        When the same media_id appears more than once the last subject_id wins;
+        use :meth:`duplicated_media_id` to detect those cases beforehand.
+        """
+        result: dict[int, int] = {}
+        for row in cls._iter_subject_export_rows(csv_path, subject_set_id):
+            mid = cls._media_id_from_subject_row(row)
+            if mid is None:
+                continue
+            try:
+                sid = int(row.get("subject_id", "").strip())
+            except (ValueError, TypeError):
+                continue
+            result[mid] = sid
+        return result
+
+    @classmethod
+    def unmatched_subject_id(
+        cls,
+        csv_path: Path,
+        subject_set_id: Optional[int] = None,
+    ) -> list[int]:
+        """Return the list of subject_ids for which no media_id could be extracted."""
+        result: list[int] = []
+        for row in cls._iter_subject_export_rows(csv_path, subject_set_id):
+            if cls._media_id_from_subject_row(row) is not None:
+                continue
+            try:
+                sid = int(row.get("subject_id", "").strip())
+            except (ValueError, TypeError):
+                continue
+            result.append(sid)
+        return result
+
+    @classmethod
+    def duplicated_media_id(
+        cls,
+        csv_path: Path,
+        subject_set_id: Optional[int] = None,
+    ) -> dict[int, list[int]]:
+        """Return a mapping of media_id → [subject_id, ...] for media_ids that appear more than once."""
+        counts: dict[int, list[int]] = defaultdict(list)
+        for row in cls._iter_subject_export_rows(csv_path, subject_set_id):
+            mid = cls._media_id_from_subject_row(row)
+            if mid is None:
+                continue
+            try:
+                sid = int(row.get("subject_id", "").strip())
+            except (ValueError, TypeError):
+                continue
+            counts[mid].append(sid)
+        return {mid: sids for mid, sids in counts.items() if len(sids) > 1}
+
+    def validate_subject_set(
+        self,
+        subjects_csv: Path,
+        collection: int,
+        classification_project: int,
+        subject_set_id: Optional[int] = None,
+        deployments: Optional[List[int]] = None,
+        blacklisted_deployments: Optional[List[int]] = None,
+        n_images_seq: int = 5,
+        max_interval: int = 90,
+        progress_callback: Optional[Callable] = None,
+    ) -> dict:
+        """Compare what Trapper expects to upload against what is in a subjects export CSV.
+
+        Returns a dict with keys:
+          - expected (set[int]): media_ids that should be in the subject set
+          - uploaded (dict[int, int]): media_id → subject_id from the CSV
+          - missing (set[int]): expected but absent from the CSV
+          - extra (set[int]): present in the CSV but not expected from Trapper
+          - metadata_issues (list[dict]): subjects whose metadata failed validation
+        """
+        deployments = list(deployments) if deployments is not None else None
+
+        if deployments is None:
+            depl = self.trapper.deployments.get_all(query={"classification_project": classification_project})
+            depl = {
+                item.pk: item.deployment_id
+                for item in depl.results
+                if item.pk is not None and item.deployment_id
+            }
+            collection_obj = self.trapper.collections.get_by_id(collection)
+            if collection_obj.results:
+                collection_obj = collection_obj.results[0]
+                prefix = f"{collection_obj.name}-".lower()
+                deployments = [pk for pk, name in depl.items() if name.lower().startswith(prefix)]
+
+        deployments = deployments or []
+
+        if blacklisted_deployments:
+            blacklist = set(blacklisted_deployments)
+            deployments = [dep for dep in deployments if dep not in blacklist]
+
+        expected: set[int] = set()
+
+        for deployment in deployments:
+            self._notify(progress_callback, "getting_media", state="start",
+                         description=f"Getting media for deployment {deployment}...")
+            media = self.trapper.media.get_by_collection(
+                classification_project, collection,
+                {"deployment": deployment, "private_human": "False", "private_vehicle": "False"},
+            )
+            self._notify(progress_callback, "getting_media", state="end",
+                         set_total=True, total=len(media.results))
+
+            self._notify(progress_callback, "getting_observations", state="start",
+                         description=f"Getting observations for deployment {deployment}...")
+            observations = self.trapper.observations.results.get_by_collection(
+                classification_project, collection, query={"deployment": deployment}
+            )
+            self._notify(progress_callback, "getting_observations", state="end",
+                         set_total=True, total=len(observations.results))
+
+            filtered = [
+                obs for obs in observations.results
+                if obs.observationType and obs.observationType != "unclassified"
+            ]
+            observations = TrapperClassificationResultsList(
+                results=filtered,
+                pagination=Pagination(page=1, page_size=len(filtered), pages=1, count=len(filtered)),
+            )
+
+            media_map = self._merge_media_and_observations(media, observations)
+            public_media_map = {mid: entry for mid, entry in media_map.items() if entry.filePublic}
+            sequences = self._generate_zoo_images_from_media_map(
+                public_media_map, max_interval, n_images_seq, filter_middle_humans=True
+            )
+            for seq in sequences:
+                for item in seq:
+                    expected.add(item["mediaID"])
+
+        uploaded = self.uploaded_media_id(subjects_csv, subject_set_id)
+        uploaded_set = set(uploaded.keys())
+
+        all_metadata = self.check_subject_metadata(subjects_csv, subject_set_id, self.trapper)
+
+        return {
+            "expected": expected,
+            "uploaded": uploaded,
+            "missing": expected - uploaded_set,
+            "extra": uploaded_set - expected,
+            "metadata_issues": [r for r in all_metadata if r["issues"]],
+        }
+
+    REQUIRED_METADATA_FIELDS: tuple[str, ...] = (
+        "external_id", "preview", "link", "thumbnail", "origin", "license", "image_name",
+    )
+
+    @classmethod
+    def check_subject_metadata(
+        cls,
+        csv_path: Path,
+        subject_set_id: Optional[int] = None,
+        trapper_client: Optional["TrapperClient"] = None,
+    ) -> list[dict]:
+        """Validate metadata for each subject in a Zooniverse subjects export.
+
+        When *trapper_client* is provided the expected metadata is built with
+        :meth:`_build_metadata_from_trapper` and every field except ``image_name``
+        is compared against the actual value stored in the CSV.  Without it only
+        presence of required fields and media_id extractability are checked.
+
+        Returns a list of dicts with keys:
+          - subject_id (int)
+          - subject_set_id (str)
+          - media_id (int | None)
+          - issues (list[str]) — empty when the subject passes all checks
+        """
+        results: list[dict] = []
+        for row in cls._iter_subject_export_rows(csv_path, subject_set_id):
+            try:
+                sid = int(row.get("subject_id", "").strip())
+            except (ValueError, TypeError):
+                continue
+
+            ssid = row.get("subject_set_id", "")
+            raw = row.get("metadata", "")
+            issues: list[str] = []
+
+            try:
+                metadata: dict = json.loads(raw) if raw else {}
+            except (json.JSONDecodeError, TypeError):
+                results.append({"subject_id": sid, "subject_set_id": ssid, "media_id": None,
+                                 "issues": ["metadata is not valid JSON"]})
+                continue
+
+            missing = [f for f in cls.REQUIRED_METADATA_FIELDS if not metadata.get(f)]
+            if missing:
+                issues.append(f"missing fields: {', '.join(missing)}")
+
+            media_id = cls._media_id_from_subject_row(row)
+            if media_id is None:
+                issues.append("no media_id extractable from external_id or origin")
+            elif trapper_client is not None:
+                expected = cls._build_metadata_from_trapper(trapper_client, media_id, "")
+                for field, expected_value in expected.items():
+                    if field == "image_name":
+                        continue
+                    actual = metadata.get(field, "")
+                    if actual != expected_value:
+                        issues.append(f"{field}: expected '{expected_value}', got '{actual}'")
+
+            results.append({
+                "subject_id": sid,
+                "subject_set_id": ssid,
+                "media_id": media_id,
+                "issues": issues,
+            })
+
+        return results

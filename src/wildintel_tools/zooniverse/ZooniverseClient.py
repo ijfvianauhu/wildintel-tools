@@ -3,7 +3,7 @@ import tempfile
 import time
 import logging
 from collections import defaultdict
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 from queue import Queue
@@ -299,7 +299,8 @@ class SubjectSetsComponent(ZooniverseClientComponent):
 
     def download(self, subject_set_id: int, output_folder: Path,
                  max_workers: int = 4, overwrite: bool = False, callback: callable = None,
-                 exclude_subjects: List[int] = None) -> Report:
+                 exclude_subjects: List[int] = None,
+                 include_subjects: List[int] = None) -> Report:
 
         self.client._ensure_connection()
         self.client.logger.debug(f"Starting SubjectSet  {subject_set_id} download.")
@@ -356,20 +357,24 @@ class SubjectSetsComponent(ZooniverseClientComponent):
                 return None
 
         excluded_set = set(exclude_subjects or [])
-        subjects_to_download = [
-            s for s in subject_set.subjects
-            if getattr(s, "id", None) not in excluded_set
-        ]
-        if excluded_set:
-            self.client.logger.debug(
-                f"Excluding {len(subject_set.subjects) - len(subjects_to_download)} subject(s): {excluded_set}"
-            )
+        included_set = set(include_subjects) if include_subjects else None
 
-        self.client.logger.debug(f"Preparing pool for {max_workers} workers and {len(subjects_to_download)} subjects")
+        def _is_selected(s) -> bool:
+            sid = getattr(s, "id", None)
+            if sid in excluded_set:
+                return False
+            if included_set is not None and sid not in included_set:
+                return False
+            return True
 
         with ThreadPoolExecutor(max_workers=max_workers) as pool:
-            for _ in pool.map(download_one, subjects_to_download):
-               pass
+            futures = {
+                pool.submit(download_one, s): s
+                for s in subject_set.subjects
+                if _is_selected(s)
+            }
+            for f in as_completed(futures):
+                pass
 
         return report
 #

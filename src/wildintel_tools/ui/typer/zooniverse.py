@@ -241,6 +241,7 @@ def update_subject_metadata_from_trapper(
     black_list: Optional[List[int]] = None,
     attempts: int = 3,
     delay_seconds: int = 5,
+    max_workers: int = 1,
 ) -> Report:
     """
     Update subject metadata in Zooniverse using Trapper as source, with progress UI.
@@ -256,6 +257,7 @@ def update_subject_metadata_from_trapper(
             black_list=black_list,
             attempts=attempts,
             delay_seconds=delay_seconds,
+            max_workers=max_workers,
         )
 
     return report
@@ -384,6 +386,7 @@ def download_subjectsets(
     overwrite: bool = False,
     verbose: bool = True,
     exclude_subjects: List[int] = None,
+    include_subjects: List[int] = None,
 ) -> List[Report]:
     reports = []
 
@@ -421,6 +424,7 @@ def download_subjectsets(
                 overwrite=overwrite,
                 callback=make_callback(task_id),
                 exclude_subjects=exclude_subjects,
+                include_subjects=include_subjects,
             )
             progress.update(task_id, completed=total or 1,
                             description=f"[green]✔[/green]  Subject set {ss_id}")
