@@ -16,7 +16,7 @@ wildintel reports list
 
 ## info
 
-Load and display the contents of a specific report file. If no filename is given, the most recent report is shown.
+Show a formatted summary of a report file rendered with Rich panels and tables. If no filename is given, the most recent report is shown.
 
 ```bash
 wildintel reports info [FILENAME]
@@ -29,11 +29,32 @@ wildintel reports info [FILENAME]
 **Example**
 
 ```bash
-# Show the latest report
 wildintel reports info
+wildintel reports info report_20240501_123456.yaml
+```
+
+---
+
+## view
+
+Display the raw YAML contents of a specific report file. If no filename is given, the most recent report is shown.
+
+```bash
+wildintel reports view [FILENAME]
+```
+
+| Argument | Type | Default | Description |
+|---|---|---|---|
+| `FILENAME` | str | `None` | Name of the YAML report file to display. Defaults to the most recent report. |
+
+**Example**
+
+```bash
+# Show the latest report
+wildintel reports view
 
 # Show a specific report
-wildintel reports info report_20240501_123456.yaml
+wildintel reports view report_20240501_123456.yaml
 ```
 
 ---

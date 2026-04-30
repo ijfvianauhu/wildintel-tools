@@ -16,7 +16,7 @@ from panoptes_client.panoptes import PanoptesAPIException
 from wildintel_tools.zooniverse.Schemas import SubjectSetResults
 from pathlib import PurePath
 #from wildintel_tools.i18n import setup_i18n, _
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type, RetryError
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception, RetryError
 import panoptes_client as pc
 from wildintel_tools.reports import Report
 
@@ -528,9 +528,17 @@ class SubjectsComponent(ZooniverseClientComponent):
             except ValueError:
                 pass
 
+        _PERMANENT_KEYWORDS = ("maximum", "quota", "limit", "not authorized", "forbidden")
+
+        def _should_retry(exc: BaseException) -> bool:
+            if isinstance(exc, PanoptesAPIException):
+                return not any(kw in str(exc).lower() for kw in _PERMANENT_KEYWORDS)
+            return True
+
         @retry(
             stop=stop_after_attempt(attempts),
             wait=wait_exponential(multiplier=delay_seconds, min=delay_seconds),
+            retry=retry_if_exception(_should_retry),
             reraise=False,
         )
         def _upload_subject():
@@ -563,7 +571,7 @@ class SubjectsComponent(ZooniverseClientComponent):
             return _upload_subject()
         except RetryError as e:
             cause = e.last_attempt.exception() if e.last_attempt else e
-            raise UploadingException(f"Failed Uploading {path}") from cause
+            raise UploadingException(f"Failed Uploading {path}: {cause}") from cause
 
     def update_one_metadata(
         self,

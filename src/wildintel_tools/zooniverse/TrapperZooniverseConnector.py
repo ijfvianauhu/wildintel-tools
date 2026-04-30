@@ -148,6 +148,7 @@ class TrapperZooniverseConnector:
             delay_seconds_per_subject=30,
             progress_callback: Optional[Callable[[str, str, int, Optional[int], Optional[str], bool, Optional[str], Optional[str]], None]] = None,
             dry_run: bool = False,
+            skip_if_exists: bool = False,
     ) -> Report:
 
         deployments = list(deployments) if deployments is not None else None
@@ -343,7 +344,7 @@ class TrapperZooniverseConnector:
                                     subject_metadata,
                                     max_attempts_per_subject,
                                     delay_seconds_per_subject,
-                                    skip_if_exists=False
+                                    skip_if_exists=skip_if_exists,
                                 )
 
                                 report.add_success(f"{media_id}@media", "upload",
@@ -381,9 +382,9 @@ class TrapperZooniverseConnector:
                                     "synchronizing_images",
                                     state="running",
                                     advance=1,
-                                    item_description=f"Uploading media {subject.id} ↑",
+                                    item_description=f"Uploading media {media_id} ↑",
                                     item_name=f"{media_id}",
-                                    item_status="false",
+                                    item_status="fail",
                                 )
                             report.add_error(f"{media_id}@media", "upload", str(e),
                                             **{"path": local_path})

@@ -753,6 +753,13 @@ def importation(
             help=_("Simulate the process: no images are downloaded, no subject set is created and nothing is uploaded to Zooniverse."),
         ),
     ] = False,
+    skip_if_exists: Annotated[
+        bool,
+        typer.Option(
+            "--skip-if-exists",
+            help=_("Skip upload if the subject already exists in the subject set (matched by origin metadata)."),
+        ),
+    ] = False,
     config: Annotated[Path, typer.Option(hidden=True, callback=callback_with_override)] = None,
 ) -> None:
     """
@@ -835,6 +842,7 @@ def importation(
             max_attempts_per_subject=5,
             delay_seconds_per_subject=15,
             dry_run=dry_run,
+            skip_if_exists=skip_if_exists,
         )
 
         TyperUtils.success(f"Collection {collection} uploaded to Zooniverse subject set '{subjectset_name}'")

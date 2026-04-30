@@ -163,6 +163,7 @@ def upload_collection( tzc : TrapperZooniverseConnector,
         max_attempts_per_subject: int,
         delay_seconds_per_subject: int,
         dry_run: bool = False,
+        skip_if_exists: bool = False,
 ) -> Report :
 
     TyperUtils.debug(f"Starting upload_collection with values:{locals().items()}")
@@ -182,6 +183,7 @@ def upload_collection( tzc : TrapperZooniverseConnector,
              delay_seconds_per_subject=delay_seconds_per_subject,
              progress_callback=progress_callback,
              dry_run=dry_run,
+             skip_if_exists=skip_if_exists,
         )
 
     return report

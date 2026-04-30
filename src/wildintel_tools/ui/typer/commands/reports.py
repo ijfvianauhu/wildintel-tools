@@ -74,9 +74,9 @@ def list(
     results_dir = TyperUtils.get_default_report_dir()
     TyperUtils.print_reports_in_directory(results_dir)
 
-@app.command(help=_("Validate and show current project settings"),
-             short_help=_("Validate and show current project settings"))
-def info(ctx: typer.Context,
+@app.command(help=_("Display the contents of a report file"),
+             short_help=_("Display the contents of a report file"))
+def view(ctx: typer.Context,
     filename: Annotated[
         str,
         typer.Argument(help=_("Name of the YAML report file to display (optional)"))
@@ -104,6 +104,36 @@ def info(ctx: typer.Context,
     target_file = _choose_report_file(results_dir, filename)
     report = Report.from_yaml(target_file)
     TyperUtils.display_report(report, True)
+
+@app.command(help=_("Show a formatted summary of a report file"),
+             short_help=_("Show a formatted summary of a report file"))
+def info(ctx: typer.Context,
+    filename: Annotated[
+        str,
+        typer.Argument(help=_("Name of the YAML report file to display (optional)"))
+    ] = None,
+):
+    """
+    Load and display a formatted summary of a report file.
+
+    Unlike ``view``, which dumps the raw YAML, this command renders the report
+    as a Rich-formatted summary with panels and tables.
+
+    If `filename` is not provided, the most recent report file from the
+    default reports directory is selected.
+
+    :param ctx: Typer context (expects `setting_manager`, `project`, `logger`).
+    :type ctx: typer.Context
+    :param filename: Optional YAML filename to display.
+    :type filename: str | None
+    :raises SystemExit: Exits with a fatal message if no reports are found or
+        if the requested file does not exist.
+    :return: None
+    """
+    results_dir = TyperUtils.get_default_report_dir()
+    target_file = _choose_report_file(results_dir, filename)
+    report = Report.from_yaml(target_file)
+    TyperUtils.display_report(report)
 
 @app.command(help=_("Archive old reports"),
              short_help=_("Archive old reports"))
