@@ -1,4 +1,5 @@
 name: Build and Deploy Docs
+
 on:
   push:
     branches:
@@ -8,10 +9,13 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # necesario para mike
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
@@ -33,4 +37,4 @@ jobs:
             mike deploy --push development
           fi
         env:
-          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
