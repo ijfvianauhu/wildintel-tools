@@ -33,6 +33,7 @@ jobs:
         run: |
           if [ "${{ github.ref_name }}" == "main" ]; then
             mike deploy --push --update-aliases stable latest
+            mike set-default --push latest
           else
             mike deploy --push development
           fi
