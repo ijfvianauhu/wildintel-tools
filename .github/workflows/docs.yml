@@ -1,31 +1,36 @@
 name: Build and Deploy Docs
-
 on:
   push:
     branches:
       - main
+      - development
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # necesario para mike
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Install MkDocs and dependencies
-        run: pip install mkdocs mkdocs-material
+      - name: Install dependencies
+        run: pip install mkdocs mkdocs-material mike
 
-      - name: Build documentation
-        run: mkdocs build
+      - name: Configure git
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
 
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.PAT_TOKEN }}
-          publish_dir: ./site
+      - name: Deploy with mike
+        run: |
+          if [ "${{ github.ref_name }}" == "main" ]; then
+            mike deploy --push --update-aliases stable latest
+          else
+            mike deploy --push development
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}

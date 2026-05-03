@@ -48,7 +48,6 @@ def setup_logging(app:str, verbosity: int, logger_file:Path=None) -> None:
             logger.info("This is an info message.")
     """
 
-    # Map verbosity to logging level
     log_levels = {
         0: logging.WARNING,
         1: logging.INFO,
@@ -56,28 +55,23 @@ def setup_logging(app:str, verbosity: int, logger_file:Path=None) -> None:
     }
     log_level = log_levels.get(verbosity, logging.INFO)
 
-    # Configure root logger
-    
-    logging_conf = {
-       "level": log_level,
-        #"format":"%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        "format":"[%(levelname)s] %(name)s: %(message)s",
-        "datefmt":"%Y-%m-%d %H:%M:%S",
-    }
+    root_logger = logging.getLogger()
+    root_logger.setLevel(log_level)
 
-    if logger_file:
-        logging_conf["filename"]=str(logger_file)
-        logging_conf["filemode"]="a"
-    
-    logging.basicConfig(**logging_conf)
-    
-    # Set level for this module's logger
+    # basicConfig is a no-op when handlers already exist (e.g. added by third-party
+    # libraries during import), so we replace them explicitly.
+    root_logger.handlers.clear()
+
+    fmt = logging.Formatter("[%(levelname)s] %(name)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+    handler: logging.Handler = (
+        logging.FileHandler(str(logger_file), mode="a") if logger_file else logging.StreamHandler()
+    )
+    handler.setFormatter(fmt)
+    root_logger.addHandler(handler)
+
     logger.setLevel(log_level)
-
-    # Set level for trapper_tools modules
     logging.getLogger(app).setLevel(log_level)
 
-    # Quiet some noisy modules
     logging.getLogger("urllib3").setLevel(logging.WARNING)
     logging.getLogger("PIL").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)
