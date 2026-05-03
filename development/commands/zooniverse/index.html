@@ -1,0 +1,1886 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Utilities for validating and preparing wildlife monitoring data for the WildINTEL project and Trapper platform">
+      
+      
+      
+        <link rel="canonical" href="https://ijfvianauhu.github.io/wildintel-tools/development/commands/zooniverse/">
+      
+      
+        <link rel="prev" href="../epicollect/">
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>zooniverse - wildintel-tools</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extras.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="light-green">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#zooniverse-module" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="wildintel-tools" class="md-header__button md-logo" aria-label="wildintel-tools" data-md-component="logo">
+      
+  <img src="../../imgs/logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            wildintel-tools
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              zooniverse
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="light-green"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="green" data-md-color-accent="light-green"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/ijfvianauhu/wildintel-tools" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    wildintel-tools
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../installation/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Installation
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../configuration/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Configuration
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../config/" class="md-tabs__link">
+          
+  
+  
+  Commands
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="wildintel-tools" class="md-nav__button md-logo" aria-label="wildintel-tools" data-md-component="logo">
+      
+  <img src="../../imgs/logo.png" alt="logo">
+
+    </a>
+    wildintel-tools
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/ijfvianauhu/wildintel-tools" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    wildintel-tools
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Commands
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Commands
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../logger/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    logger
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../helpers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    helpers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../wildintel/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    wildintel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../epicollect/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    epicollect
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    zooniverse
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    zooniverse
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#sequencediagram-autonumber-participant-trapper-participant-wildinteltools-participant-zooniverse-loop-detection-revision-trapper-trapper-detect-bounding-boxes-trapper-trapper-approve-detections-review-end-trapper-wildinteltools-detections-are-ready-wildinteltools-trapper-fetch-images-per-deployment-wildinteltools-wildinteltools-build-sequences-n-images-no-humans-wildinteltools-zooniverse-upload-sequences-as-subject-set-loop-citizen-science-annotations-zooniverse-zooniverse-users-classify-subjects-end-zooniverse-wildinteltools-export-classifications-wildinteltools-wildinteltools-apply-consensus-wildinteltools-trapper-send-csv-with-observations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sequenceDiagram autonumber participant Trapper participant WildIntelTools participant Zooniverse loop Detection &amp; Revision Trapper-&gt;&gt;Trapper: Detect bounding boxes Trapper-&gt;&gt;Trapper: Approve detections (review) end Trapper-&gt;&gt;WildIntelTools: Detections are ready WildIntelTools-&gt;&gt;Trapper: Fetch images per deployment WildIntelTools-&gt;&gt;WildIntelTools: Build sequences (n images, no humans) WildIntelTools-&gt;&gt;Zooniverse: Upload sequences as subject set loop Citizen science annotations Zooniverse-&gt;&gt;Zooniverse: Users classify subjects end Zooniverse--&gt;&gt;WildIntelTools: Export classifications WildIntelTools-&gt;&gt;WildIntelTools: Apply consensus WildIntelTools-&gt;&gt;Trapper: Send CSV with observations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick start
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Quick start">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-0-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 0 — Configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-1-run-ai-detection-in-trapper" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1 — Run AI detection in Trapper
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-2-upload-images-to-zooniverse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2 — Upload images to Zooniverse
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-3-collect-classifications-in-zooniverse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 3 — Collect classifications in Zooniverse
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-4-import-annotations-back-to-trapper" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 4 — Import annotations back to Trapper
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#test-connection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        test-connection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#workflows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        workflows
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#subjectsets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        subjectsets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#subjects" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        subjects
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#update-metadata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        update-metadata
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#import" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        import
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#export" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        export
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#download-ss" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        download-ss
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#wizard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        wizard
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#sequencediagram-autonumber-participant-trapper-participant-wildinteltools-participant-zooniverse-loop-detection-revision-trapper-trapper-detect-bounding-boxes-trapper-trapper-approve-detections-review-end-trapper-wildinteltools-detections-are-ready-wildinteltools-trapper-fetch-images-per-deployment-wildinteltools-wildinteltools-build-sequences-n-images-no-humans-wildinteltools-zooniverse-upload-sequences-as-subject-set-loop-citizen-science-annotations-zooniverse-zooniverse-users-classify-subjects-end-zooniverse-wildinteltools-export-classifications-wildinteltools-wildinteltools-apply-consensus-wildinteltools-trapper-send-csv-with-observations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sequenceDiagram autonumber participant Trapper participant WildIntelTools participant Zooniverse loop Detection &amp; Revision Trapper-&gt;&gt;Trapper: Detect bounding boxes Trapper-&gt;&gt;Trapper: Approve detections (review) end Trapper-&gt;&gt;WildIntelTools: Detections are ready WildIntelTools-&gt;&gt;Trapper: Fetch images per deployment WildIntelTools-&gt;&gt;WildIntelTools: Build sequences (n images, no humans) WildIntelTools-&gt;&gt;Zooniverse: Upload sequences as subject set loop Citizen science annotations Zooniverse-&gt;&gt;Zooniverse: Users classify subjects end Zooniverse--&gt;&gt;WildIntelTools: Export classifications WildIntelTools-&gt;&gt;WildIntelTools: Apply consensus WildIntelTools-&gt;&gt;Trapper: Send CSV with observations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick start
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Quick start">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-0-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 0 — Configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-1-run-ai-detection-in-trapper" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1 — Run AI detection in Trapper
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-2-upload-images-to-zooniverse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2 — Upload images to Zooniverse
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-3-collect-classifications-in-zooniverse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 3 — Collect classifications in Zooniverse
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-4-import-annotations-back-to-trapper" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 4 — Import annotations back to Trapper
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#test-connection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        test-connection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#workflows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        workflows
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#subjectsets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        subjectsets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#subjects" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        subjects
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#update-metadata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        update-metadata
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#import" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        import
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#export" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        export
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#download-ss" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        download-ss
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#wizard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        wizard
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="zooniverse-module">zooniverse module</h1>
+<p>Automates the workflow between a <a href="https://trapper-project.org">Trapper</a> instance and <a href="https://www.zooniverse.org/">Zooniverse</a>, covering two main stages:</p>
+<ol>
+<li><strong>Upload</strong> — images with bounding boxes detected and approved in Trapper are loaded into Zooniverse subject sets for citizen-science classification.</li>
+<li><strong>Import annotations</strong> — classifications collected in Zooniverse are exported back to Trapper as observations, following a configurable consensus process.</li>
+</ol>
+<p>To support this workflow, a set of auxiliary commands is provided for querying and inspecting Zooniverse resources such as subjects, subject sets, workflows, and exported classification data.</p>
+<h2 id="sequencediagram-autonumber-participant-trapper-participant-wildinteltools-participant-zooniverse-loop-detection-revision-trapper-trapper-detect-bounding-boxes-trapper-trapper-approve-detections-review-end-trapper-wildinteltools-detections-are-ready-wildinteltools-trapper-fetch-images-per-deployment-wildinteltools-wildinteltools-build-sequences-n-images-no-humans-wildinteltools-zooniverse-upload-sequences-as-subject-set-loop-citizen-science-annotations-zooniverse-zooniverse-users-classify-subjects-end-zooniverse-wildinteltools-export-classifications-wildinteltools-wildinteltools-apply-consensus-wildinteltools-trapper-send-csv-with-observations"><pre class="mermaid"><code>sequenceDiagram
+    autonumber
+
+    participant Trapper
+    participant WildIntelTools
+    participant Zooniverse
+
+    loop Detection &amp; Revision
+        Trapper-&gt;&gt;Trapper: Detect bounding boxes
+        Trapper-&gt;&gt;Trapper: Approve detections (review)
+    end
+
+    Trapper-&gt;&gt;WildIntelTools: Detections are ready
+
+    WildIntelTools-&gt;&gt;Trapper: Fetch images per deployment
+    WildIntelTools-&gt;&gt;WildIntelTools: Build sequences (n images, no humans)
+    WildIntelTools-&gt;&gt;Zooniverse: Upload sequences as subject set
+
+    loop Citizen science annotations
+        Zooniverse-&gt;&gt;Zooniverse: Users classify subjects
+    end
+
+    Zooniverse--&gt;&gt;WildIntelTools: Export classifications
+    WildIntelTools-&gt;&gt;WildIntelTools: Apply consensus
+    WildIntelTools-&gt;&gt;Trapper: Send CSV with observations</code></pre></h2>
+<h2 id="quick-start">Quick start</h2>
+<p>The workflow starts in Trapper, where an AI model is used to detect animals (bounding boxes) in a collection of images. 
+Once those detections are approved, the images are uploaded to Zooniverse for citizen-science classification. 
+The resulting annotations are then imported back into Trapper as observations.</p>
+<h3 id="step-0-configuration">Step 0 — Configuration</h3>
+<p>Before running any command, the connection to both Trapper and Zooniverse must be configured. The easiest way to do this 
+is through the interactive setup wizard:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="gp">$ </span>wildintel-tools<span class="w"> </span>zooniverse<span class="w"> </span>wizard<span class="w"> </span>setup
+</code></pre></div>
+<p>The wizard will guide you through the following questions:</p>
+<ul>
+<li><strong>Zooniverse username and password</strong> — credentials for your Zooniverse account.</li>
+<li><strong>Zooniverse project ID</strong> — numeric ID of the Zooniverse project where subjects will be uploaded. You can find it in the URL of your project's lab page: <code>https://www.zooniverse.org/lab/{project_id}</code>.</li>
+<li><strong>Number of images per sequence</strong> — how many images are sampled from each burst and uploaded as a single subject to Zooniverse. A burst (sequence) is a group of consecutive photos taken within the maximum interval. Default: <code>5</code>.</li>
+<li><strong>Maximum interval between images in a sequence (seconds)</strong> — maximum gap in seconds between two consecutive photos for them to be considered part of the same sequence. If the gap exceeds this value, a new sequence starts. Default: <code>90</code>.</li>
+<li><strong>Maximum upload attempts per sequence</strong> — number of times the upload of a sequence is retried if a transient error occurs (e.g. network timeout). Default: <code>5</code>.</li>
+<li><strong>Delay between sequence upload attempts (seconds)</strong> — seconds to wait before retrying a failed sequence upload. Default: <code>15</code>.</li>
+<li><strong>Maximum attempts per subject</strong> — number of times the upload of a single subject (image) to Zooniverse is retried after a failure. Default: <code>5</code>.</li>
+<li><strong>Delay per subject retry (seconds)</strong> — seconds to wait before retrying the upload of a single subject. Combined with the per-subject attempt limit, this controls the backoff for quota or connectivity errors at subject level. Default: <code>30</code>.</li>
+</ul>
+<p>Once the wizard completes, verify that the connection details are correct by running:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>wildintel<span class="w"> </span>zooniverse<span class="w"> </span>test-connection
+</code></pre></div>
+<p>A successful response confirms that wildintel-tools can authenticate against Zooniverse and is ready to use.</p>
+<h3 id="step-1-run-ai-detection-in-trapper">Step 1 — Run AI detection in Trapper</h3>
+<p>As a general rule, images containing humans or vehicles are <strong>not</strong> uploaded to Zooniverse. To determine whether an 
+image contains such content, an AI detector must first be run in Tapper: it calculates bounding boxes and labels each
+image with  the type of content detected (animal, human, vehicle). Only images labelled as animals — or with no 
+detections — are eligible for upload. This detection process is carried out as follows:</p>
+<ol>
+<li>
+<p>In your Trapper instance, go to <strong>Classification → Classification Projects</strong> and click the magnifier icon on the 
+classification project you want to use.</p>
+<p><p align="center">
+  <img src="../../imgs/zooniverse/select_cp.png" width="600" class="shadow-3d">
+</p></p>
+</li>
+<li>
+<p>Click <strong>Classification Results</strong>.</p>
+<p><p align="center">
+  <img src="../../imgs/zooniverse/select_cr.png" width="600" class="shadow-3d">
+</p></p>
+</li>
+<li>
+<p>In the form that appears, fill in the <strong>Collections</strong> field with the names of the collections whose images you want to process, then click <strong>Filter</strong>.</p>
+<p><p align="center">
+  <img src="../../imgs/zooniverse/filter_by_collection.png" width="600" class="shadow-3d">
+</p>
+4. Click <strong>Select filtered</strong> to mark all images.</p>
+<p><p align="center">
+  <img src="../../imgs/zooniverse/select_filtered.png" width="600" class="shadow-3d">
+</p></p>
+</li>
+<li>
+<p>Under <strong>Actions</strong>, click <strong>More</strong> and select <strong>Classify AI</strong>. Choose the AI model to run.</p>
+<p><p align="center">
+  <img src="../../imgs/zooniverse/classify_by_ai.png" width="600" class="shadow-3d">
+</p></p>
+</li>
+<li>
+<p>After the detection job finishes (duration depends on the number of images), return to the <strong>Classification Results</strong>
+page and select <strong>AI Classifications</strong>.</p>
+<p><p align="center">
+  <img src="../../imgs/zooniverse/ai_results.png" width="600" class="shadow-3d">
+</p></p>
+</li>
+<li>
+<p>Filter by collection, deployment, and/or AI provider, then click <strong>Filter</strong>. The detection results from the previous 
+step (step 5) should appear.</p>
+<p><p align="center">
+  <img src="../../imgs/zooniverse/filter_ai_results.png" width="600" class="shadow-3d">
+</p></p>
+</li>
+<li>
+<p>Click <strong>Select filtered</strong>, then under <strong>Actions → More</strong> click <strong>Approve selected</strong>.</p>
+<p><p align="center">
+  <img src="../../imgs/zooniverse/select_approve_selected.png" width="600" class="shadow-3d">
+</p></p>
+</li>
+<li>
+<p>In the confirmation form, enable the following options: <strong>Mark as approved</strong>, <strong>Overwrite attributes</strong>, <strong>Copy bounding boxes</strong>, <strong>Observation type</strong>.</p>
+</li>
+</ol>
+<p align="center">
+      <img src="../../imgs/zooniverse/approve_options.png" width="600" class="shadow-3d">
+    </p>
+
+<div class="admonition info">
+<p class="admonition-title">Info</p>
+<p>At this point the images are approved in Trapper with their bounding boxes and are ready to be uploaded to Zooniverse.</p>
+</div>
+<h3 id="step-2-upload-images-to-zooniverse">Step 2 — Upload images to Zooniverse</h3>
+<p>To upload images use the <code>wildintel-tools zooniverse importation</code> command. This command requires the Trapper collection
+ID you want to upload. </p>
+<div class="admonition example">
+<p class="admonition-title">Import collection with ID 123 to Zooniverse</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="gp">$ </span>wildintel-tools<span class="w"> </span>zooniverse<span class="w"> </span>importation<span class="w"> </span><span class="m">123</span><span class="w">   </span>
+</code></pre></div>
+</div>
+<p>After execution, the application reports the process status and concludes by presenting a summary of the generated results.
+The full report details can be accessed by running</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>$<span class="w"> </span>wildintel-tools<span class="w"> </span>zooniverse<span class="w"> </span>reports<span class="w"> </span>view<span class="w">   </span>
+</code></pre></div>
+<p>By default, the command creates a new subject set in Zooniverse with an auto-generated name. To specify a custom name or 
+reuse an existing subject set, pass the <code>SUBJECTSET_NAME</code> argument. </p>
+<div class="admonition example">
+<p class="admonition-title">Import collection with ID 123 to a subject set named 'My subject set name'</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="go">wildintel-tools zooniverse importation 123 &quot;My subject set name&quot;</span>
+</code></pre></div>
+</div>
+<p>In some cases, a single collection could be linked to multiple classification projects. You can specify the classification 
+project to use with the <code>--cp</code> option. For example, to use the classification project with ID <code>123</code>:</p>
+<div class="admonition example">
+<p class="admonition-title">Import collection with ID 123 to a subject set named 'My subject set name' using classification project with ID 123</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>wildintel-tools<span class="w"> </span>zooniverse<span class="w"> </span>importation<span class="w"> </span><span class="m">123</span><span class="w"> </span><span class="s2">&quot;My subject set name&quot;</span><span class="w"> </span>--cp<span class="w"> </span><span class="m">123</span>
+</code></pre></div>
+</div>
+<p>If a collection contains many images, you can filter them by deployment using the <code>--deployments</code> option:</p>
+<div class="admonition example">
+<p class="admonition-title">Import collection with ID 123 to a subject set named 'My subject set name' using only deployments with IDs 123 and 456</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>wildintel-tools<span class="w"> </span>zooniverse<span class="w"> </span>importation<span class="w"> </span><span class="m">123</span><span class="w"> </span>--deployments<span class="w"> </span><span class="m">123</span>,456
+</code></pre></div>
+</div>
+<p>Also, if you want to exclude some deployments, use the <code>--exclude-deployments</code> option:</p>
+<div class="admonition example">
+<p class="admonition-title">Import collection with ID 123 to a subject set named 'My subject set name' excluding deployments with IDs 789 and 101</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="go">wildintel zooniverse importation 123 &quot;My subject set name&quot; --deployments 123,456 --exclude-deployments 789,101</span>
+</code></pre></div>
+</div>
+<p>If this command was interrupted or some images were already uploaded in a previous run, you can pass a Zooniverse subjects
+export file to skip those images and avoid duplicates using <code>--exclude-subjects</code> option :</p>
+<div class="admonition example">
+<p class="admonition-title">Import collection with ID 123 to a subject set named 'My subject set name' using only deployments with IDs 123 and 456, excluding deployments with IDs 789 and 101, and skipping already uploaded subjects listed in subjects_export.tsv</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>wildintel-tools<span class="w"> </span>zooniverse<span class="w"> </span>importation<span class="w"> </span><span class="m">123</span><span class="w"> </span>--exclude-deployments<span class="w"> </span><span class="m">789</span>,101<span class="w"> </span>--subjects-subjects<span class="w"> </span>subjects_export.tsv
+</code></pre></div>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>You can download the subjects export file from <strong>https://www.zooniverse.org/lab/{project_id}/data-exports</strong> under 
+<strong>Request new subject export</strong>. Use the <a href="#uploaded-media"><code>uploaded-media</code></a> command to inspect the file and verify which
+media IDs have already been uploaded before running <code>importation</code>.</p>
+</div>
+<h3 id="step-3-collect-classifications-in-zooniverse">Step 3 — Collect classifications in Zooniverse</h3>
+<p>Once the subject set is live, citizen scientists classify the images through the Zooniverse workflow. When enough 
+classifications have been collected, proceed to the next step.</p>
+<h3 id="step-4-import-annotations-back-to-trapper">Step 4 — Import annotations back to Trapper</h3>
+<p>Use the <a href="#public-annotations"><code>public-annotations</code></a> command to export the Zooniverse classifications and import them into Trapper as observations:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>wildintel<span class="w"> </span>zooniverse<span class="w"> </span>public-annotations<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">  </span>--cp<span class="w"> </span>&lt;classification_project_id&gt;<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span>--collection<span class="w"> </span>&lt;collection_id&gt;<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">  </span>--ss-id<span class="w"> </span>&lt;subject_set_id&gt;<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">  </span>--wf-id<span class="w"> </span>&lt;workflow_id&gt;
+</code></pre></div>
+<h2 id="reference">Reference</h2>
+<h3 id="test-connection">test-connection</h3>
+<p>Test the connection to the Zooniverse API using the credentials in the active project settings.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>wildintel<span class="w"> </span>zooniverse<span class="w"> </span>test-connection<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+</code></pre></div>
+<p>Alias: <code>tc</code></p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--zooniverse-username TEXT</code></td>
+<td>str</td>
+<td>settings</td>
+<td>Zooniverse username</td>
+</tr>
+<tr>
+<td><code>--zooniverse-password TEXT</code></td>
+<td>str</td>
+<td>settings</td>
+<td>Zooniverse password</td>
+</tr>
+<tr>
+<td><code>--zooniverse-project-id TEXT</code></td>
+<td>str</td>
+<td>settings</td>
+<td>Zooniverse project ID</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="workflows">workflows</h3>
+<p>Retrieve and display workflows from the Zooniverse project.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>wildintel<span class="w"> </span>zooniverse<span class="w"> </span>workflows<span class="w"> </span><span class="o">[</span>WF_ID<span class="o">]</span><span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+</code></pre></div>
+<p>Alias: <code>wf</code></p>
+<table>
+<thead>
+<tr>
+<th>Argument / Option</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>WF_ID</code></td>
+<td>str</td>
+<td>all</td>
+<td>Workflow ID(s) to retrieve (comma/space separated). Use <code>-</code> to read from stdin</td>
+</tr>
+<tr>
+<td><code>--pipeline</code></td>
+<td>flag</td>
+<td>off</td>
+<td>Print only workflow IDs as a comma-separated list (for shell pipelines)</td>
+</tr>
+<tr>
+<td><code>--query-param TEXT</code></td>
+<td>list</td>
+<td><code>None</code></td>
+<td>Extra query parameters in <code>key=value</code> format. Repeatable.</td>
+</tr>
+<tr>
+<td><code>--raw</code></td>
+<td>flag</td>
+<td>off</td>
+<td>Display raw JSON output instead of a formatted table</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="subjectsets">subjectsets</h3>
+<p>Retrieve subject sets from the Zooniverse project.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>wildintel<span class="w"> </span>zooniverse<span class="w"> </span>subjectsets<span class="w"> </span><span class="o">[</span>SS_ID<span class="o">]</span><span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+</code></pre></div>
+<p>Alias: <code>ss</code></p>
+<table>
+<thead>
+<tr>
+<th>Argument / Option</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SS_ID</code></td>
+<td>str</td>
+<td>all</td>
+<td>Subject set ID(s) (comma/space separated). Use <code>-</code> to read from stdin</td>
+</tr>
+<tr>
+<td><code>--pipeline</code></td>
+<td>flag</td>
+<td>off</td>
+<td>Print only subject set IDs as a comma-separated list</td>
+</tr>
+<tr>
+<td><code>--query-param TEXT</code></td>
+<td>list</td>
+<td><code>None</code></td>
+<td>Extra query parameters in <code>key=value</code> format. Repeatable.</td>
+</tr>
+<tr>
+<td><code>--exports</code></td>
+<td>flag</td>
+<td>off</td>
+<td>Only return subject sets that have exports</td>
+</tr>
+<tr>
+<td><code>--wf-id</code></td>
+<td>int</td>
+<td><code>None</code></td>
+<td>Filter to subject sets linked to this workflow ID</td>
+</tr>
+<tr>
+<td><code>--raw</code></td>
+<td>flag</td>
+<td>off</td>
+<td>Display each subject set as formatted JSON</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="subjects">subjects</h3>
+<p>Retrieve individual subjects (images) from Zooniverse.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>wildintel<span class="w"> </span>zooniverse<span class="w"> </span>subjects<span class="w"> </span><span class="o">[</span>ID<span class="o">]</span><span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+</code></pre></div>
+<p>Alias: <code>sbj</code></p>
+<table>
+<thead>
+<tr>
+<th>Argument / Option</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ID</code></td>
+<td>str</td>
+<td><code>None</code></td>
+<td>Subject ID(s) (comma/space separated). Use <code>-</code> to read from stdin. Mutually exclusive with <code>--subjectset-id</code>.</td>
+</tr>
+<tr>
+<td><code>--subjectset-id, --ss-id</code></td>
+<td>int</td>
+<td><code>None</code></td>
+<td>Retrieve all subjects from this subject set</td>
+</tr>
+<tr>
+<td><code>--pipeline</code></td>
+<td>flag</td>
+<td>off</td>
+<td>Print only subject IDs as a comma-separated list</td>
+</tr>
+<tr>
+<td><code>--query-param TEXT</code></td>
+<td>list</td>
+<td><code>None</code></td>
+<td>Extra query parameters in <code>key=value</code> format. Repeatable.</td>
+</tr>
+<tr>
+<td><code>--raw</code></td>
+<td>flag</td>
+<td>off</td>
+<td>Show raw JSON for a single subject</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="update-metadata">update-metadata</h3>
+<p>Update the metadata of all subjects in a Zooniverse subject set using data retrieved from Trapper. The command extracts the <code>media_id</code> from each subject filename, queries Trapper for the corresponding media in the selected classification project, and updates the subject metadata accordingly.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>wildintel<span class="w"> </span>zooniverse<span class="w"> </span>update-metadata<span class="w"> </span>SS_ID<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+</code></pre></div>
+<p>Alias: <code>um</code></p>
+<table>
+<thead>
+<tr>
+<th>Argument / Option</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SS_ID</code></td>
+<td>int</td>
+<td>required</td>
+<td>Subject set ID to update</td>
+</tr>
+<tr>
+<td><code>--cp</code></td>
+<td>int</td>
+<td>required</td>
+<td>Trapper classification project ID</td>
+</tr>
+<tr>
+<td><code>--dry-run</code></td>
+<td>flag</td>
+<td>off</td>
+<td>Simulate the process — metadata is resolved but no subject is updated in Zooniverse</td>
+</tr>
+<tr>
+<td><code>--attempts</code></td>
+<td>int</td>
+<td><code>3</code></td>
+<td>Maximum retry attempts per subject</td>
+</tr>
+<tr>
+<td><code>--delay-seconds</code></td>
+<td>int</td>
+<td><code>5</code></td>
+<td>Seconds to wait between retries</td>
+</tr>
+<tr>
+<td><code>--white-list TEXT</code></td>
+<td>str</td>
+<td><code>None</code></td>
+<td>Comma/space separated list of subject IDs to process exclusively</td>
+</tr>
+<tr>
+<td><code>--black-list TEXT</code></td>
+<td>str</td>
+<td><code>None</code></td>
+<td>Comma/space separated list of subject IDs to skip</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="import">import</h3>
+<p>Upload all media (images) from a Trapper collection to a Zooniverse subject set. Images are grouped into sequences according to the <code>--n-images-seq</code> and <code>--max-interval</code> parameters.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>wildintel<span class="w"> </span>zooniverse<span class="w"> </span>import<span class="w"> </span>COLLECTION<span class="w"> </span><span class="o">[</span>SUBJECTSET_NAME<span class="o">]</span><span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Argument / Option</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>COLLECTION</code></td>
+<td>int</td>
+<td>required</td>
+<td>Trapper collection ID</td>
+</tr>
+<tr>
+<td><code>SUBJECTSET_NAME</code></td>
+<td>str</td>
+<td>auto-generated</td>
+<td>Name of the Zooniverse subject set to create or reuse</td>
+</tr>
+<tr>
+<td><code>--rp</code></td>
+<td>int</td>
+<td><code>None</code></td>
+<td>Trapper research project ID</td>
+</tr>
+<tr>
+<td><code>--cp</code></td>
+<td>int</td>
+<td><code>None</code></td>
+<td>Trapper classification project ID</td>
+</tr>
+<tr>
+<td><code>--deployments, -d TEXT</code></td>
+<td>str</td>
+<td>all</td>
+<td>Deployment IDs to include (comma/space separated). Use <code>-</code> to read from stdin.</td>
+</tr>
+<tr>
+<td><code>--exclude-deployments, -x TEXT</code></td>
+<td>str</td>
+<td><code>None</code></td>
+<td>Deployment IDs to exclude</td>
+</tr>
+<tr>
+<td><code>--n-images-seq</code></td>
+<td>int</td>
+<td>settings</td>
+<td>Number of images per sequence</td>
+</tr>
+<tr>
+<td><code>--max-interval</code></td>
+<td>int</td>
+<td>settings</td>
+<td>Maximum interval (seconds) between images in the same sequence</td>
+</tr>
+<tr>
+<td><code>--dry-run</code></td>
+<td>flag</td>
+<td>off</td>
+<td>Simulate the process — no images downloaded, no subject set created, nothing uploaded</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="export">export</h3>
+<p>Export the classification results of a Zooniverse subject set back to Trapper as observations.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>wildintel<span class="w"> </span>zooniverse<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+</code></pre></div>
+<p>Alias: <code>exp</code></p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--wf, --workflow</code></td>
+<td>int</td>
+<td>required</td>
+<td>Zooniverse workflow ID</td>
+</tr>
+<tr>
+<td><code>--ss, --subject-set</code></td>
+<td>int</td>
+<td>required</td>
+<td>Zooniverse subject set ID</td>
+</tr>
+<tr>
+<td><code>--cp, --classification-project</code></td>
+<td>int</td>
+<td>required</td>
+<td>Trapper classification project ID</td>
+</tr>
+<tr>
+<td><code>--collection, --c</code></td>
+<td>int</td>
+<td>required</td>
+<td>Trapper collection ID</td>
+</tr>
+<tr>
+<td><code>--deployments, --d</code></td>
+<td>list[int]</td>
+<td>all</td>
+<td>Trapper deployment IDs to process</td>
+</tr>
+<tr>
+<td><code>--observations-file, -of PATH</code></td>
+<td>Path</td>
+<td>auto</td>
+<td>Path to save the raw observations CSV before upload</td>
+</tr>
+<tr>
+<td><code>--verbose / --no-verbose</code></td>
+<td>bool</td>
+<td><code>True</code></td>
+<td>Show per-media detail in the progress bar</td>
+</tr>
+<tr>
+<td><code>--save-zoo-annotations / --no-save-zoo-annotations</code></td>
+<td>bool</td>
+<td><code>True</code></td>
+<td>Save the raw Zooniverse user opinions as a separate CSV with a <code>zoo_annotations_</code> prefix</td>
+</tr>
+</tbody>
+</table>
+<p>After the export completes, the command prints the path of the generated observations CSV and the Trapper import URL. The CSV <strong>must</strong> be imported into Trapper while logged in as the configured Zooniverse user (<code>ZOONIVERSE.zooniverse_username</code>).</p>
+<div class="admonition warning">
+<p class="admonition-title">Important</p>
+<p>The CSV import into Trapper must be performed while logged in as the Zooniverse user configured in <code>ZOONIVERSE.zooniverse_username</code>. Using a different account will cause the import to fail or produce incorrect results.</p>
+</div>
+<hr />
+<h3 id="download-ss">download-ss</h3>
+<p>Download subject images from one or more Zooniverse subject sets to a local directory.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>wildintel<span class="w"> </span>zooniverse<span class="w"> </span>download-ss<span class="w"> </span>SS_IDS...<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+</code></pre></div>
+<p>Alias: <code>dl_ss</code></p>
+<table>
+<thead>
+<tr>
+<th>Argument / Option</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SS_IDS</code></td>
+<td>list[int]</td>
+<td>required</td>
+<td>One or more subject set IDs to download</td>
+</tr>
+<tr>
+<td><code>--output-dir, -o PATH</code></td>
+<td>Path</td>
+<td>temp dir</td>
+<td>Directory where downloaded images will be saved</td>
+</tr>
+<tr>
+<td><code>--max-workers</code></td>
+<td>int</td>
+<td><code>4</code></td>
+<td>Number of parallel download threads</td>
+</tr>
+<tr>
+<td><code>--overwrite</code></td>
+<td>flag</td>
+<td>off</td>
+<td>Overwrite existing files</td>
+</tr>
+<tr>
+<td><code>--verbose / --no-verbose</code></td>
+<td>bool</td>
+<td><code>True</code></td>
+<td>Show per-subject detail during download</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="wizard">wizard</h3>
+<p>Interactive wizard for common Zooniverse workflows.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>wildintel<span class="w"> </span>zooniverse<span class="w"> </span>wizard<span class="w"> </span>WIZARD
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Wizard</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>import</code></td>
+<td>Guided step-by-step import of a Trapper collection to Zooniverse</td>
+</tr>
+<tr>
+<td><code>export</code></td>
+<td>Guided step-by-step export of Zooniverse annotations back to Trapper</td>
+</tr>
+<tr>
+<td><code>download</code></td>
+<td>Guided download of subject images from a Zooniverse subject set</td>
+</tr>
+<tr>
+<td><code>update_metadata</code></td>
+<td>Guided update of subject metadata using Trapper data</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "search.highlight", "content.code.copy", "content.code.annotate", "navigation.tabs"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
