@@ -1,7 +1,7 @@
 site_name: wildintel-tools
 site_description: Utilities for validating and preparing wildlife monitoring data for the WildINTEL project and Trapper platform
-site_url: https://ijfviana.github.io/wildintel-tools
-repo_url: https://github.com/ijfviana/wildintel-tools
+site_url: https://ijfvianauhu.github.io/wildintel-tools
+repo_url: https://github.com/ijfvianauhu/wildintel-tools
 repo_name: wildintel-tools
 
 theme:
