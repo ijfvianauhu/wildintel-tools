@@ -788,6 +788,73 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#consensus-process" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Consensus process
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Consensus process">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#default-consensus-implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Default consensus implementation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Default consensus implementation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-1-extraction-annotationsextractor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1 — Extraction (AnnotationsExtractor)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-2-voting-workflow29187annotationsvoter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2 — Voting (Workflow29187AnnotationsVoter)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#process-diagram" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Process diagram
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#reference" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -892,6 +959,39 @@
     <span class="md-ellipsis">
       
         wizard
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#uploaded-media" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        uploaded-media
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#validate-subject-set" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        validate-subject-set
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#check-metadata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        check-metadata
       
     </span>
   </a>
@@ -1018,6 +1118,73 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#consensus-process" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Consensus process
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Consensus process">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#default-consensus-implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Default consensus implementation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Default consensus implementation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-1-extraction-annotationsextractor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1 — Extraction (AnnotationsExtractor)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-2-voting-workflow29187annotationsvoter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2 — Voting (Workflow29187AnnotationsVoter)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#process-diagram" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Process diagram
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#reference" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1122,6 +1289,39 @@
     <span class="md-ellipsis">
       
         wizard
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#uploaded-media" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        uploaded-media
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#validate-subject-set" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        validate-subject-set
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#check-metadata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        check-metadata
       
     </span>
   </a>
@@ -1290,11 +1490,11 @@ step (step 5) should appear.</p>
 <p>At this point the images are approved in Trapper with their bounding boxes and are ready to be uploaded to Zooniverse.</p>
 </div>
 <h3 id="step-2-upload-images-to-zooniverse">Step 2 — Upload images to Zooniverse</h3>
-<p>To upload images use the <code>wildintel-tools zooniverse importation</code> command. This command requires the Trapper collection
+<p>To upload images use the <code>wildintel-tools zooniverse import</code> command. This command requires the Trapper collection
 ID you want to upload. </p>
 <div class="admonition example">
 <p class="admonition-title">Import collection with ID 123 to Zooniverse</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="gp">$ </span>wildintel-tools<span class="w"> </span>zooniverse<span class="w"> </span>importation<span class="w"> </span><span class="m">123</span><span class="w">   </span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="gp">$ </span>wildintel-tools<span class="w"> </span>zooniverse<span class="w"> </span>import<span class="w"> </span><span class="m">123</span><span class="w">   </span>
 </code></pre></div>
 </div>
 <p>After execution, the application reports the process status and concludes by presenting a summary of the generated results.
@@ -1305,33 +1505,43 @@ The full report details can be accessed by running</p>
 reuse an existing subject set, pass the <code>SUBJECTSET_NAME</code> argument. </p>
 <div class="admonition example">
 <p class="admonition-title">Import collection with ID 123 to a subject set named 'My subject set name'</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="go">wildintel-tools zooniverse importation 123 &quot;My subject set name&quot;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="go">wildintel-tools zooniverse import 123 &quot;My subject set name&quot;</span>
 </code></pre></div>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>You can query for existing subject sets using the <code>wildintel-tools zooniverse ss</code> command and check their IDs and 
+names before running the import. </p>
 </div>
 <p>In some cases, a single collection could be linked to multiple classification projects. You can specify the classification 
-project to use with the <code>--cp</code> option. For example, to use the classification project with ID <code>123</code>:</p>
+project to use with the <code>--cp</code> option. This is required to correctly resolve the media metadata and link the uploaded 
+subjects to the right project in Trapper.</p>
 <div class="admonition example">
 <p class="admonition-title">Import collection with ID 123 to a subject set named 'My subject set name' using classification project with ID 123</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>wildintel-tools<span class="w"> </span>zooniverse<span class="w"> </span>importation<span class="w"> </span><span class="m">123</span><span class="w"> </span><span class="s2">&quot;My subject set name&quot;</span><span class="w"> </span>--cp<span class="w"> </span><span class="m">123</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>wildintel-tools<span class="w"> </span>zooniverse<span class="w"> </span>import<span class="w"> </span><span class="m">123</span><span class="w"> </span><span class="s2">&quot;My subject set name&quot;</span><span class="w"> </span>--cp<span class="w"> </span><span class="m">123</span>
 </code></pre></div>
 </div>
-<p>If a collection contains many images, you can filter them by deployment using the <code>--deployments</code> option:</p>
+<p>If a collection contains many images, you can filter them by deployment using the <code>--deployments</code> option. Thus only 
+images from the specified deployments will be uploaded to Zooniverse. This option  accepts a comma- or space-separated 
+list of deployment IDs to include in the upload. </p>
 <div class="admonition example">
 <p class="admonition-title">Import collection with ID 123 to a subject set named 'My subject set name' using only deployments with IDs 123 and 456</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>wildintel-tools<span class="w"> </span>zooniverse<span class="w"> </span>importation<span class="w"> </span><span class="m">123</span><span class="w"> </span>--deployments<span class="w"> </span><span class="m">123</span>,456
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>wildintel-tools<span class="w"> </span>zooniverse<span class="w"> </span>import<span class="w"> </span><span class="m">123</span><span class="w"> </span>--deployments<span class="w"> </span><span class="m">123</span>,456
 </code></pre></div>
 </div>
-<p>Also, if you want to exclude some deployments, use the <code>--exclude-deployments</code> option:</p>
+<p>Also, if you want to exclude some deployments, use the <code>--exclude-deployments</code> option. This option accepts a comma- or
+space-separated list of deployment IDs to exclude from the upload.</p>
 <div class="admonition example">
 <p class="admonition-title">Import collection with ID 123 to a subject set named 'My subject set name' excluding deployments with IDs 789 and 101</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="go">wildintel zooniverse importation 123 &quot;My subject set name&quot; --deployments 123,456 --exclude-deployments 789,101</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="go">wildintel zooniverse import 123 &quot;My subject set name&quot; --deployments 123,456 --exclude-deployments 789,101</span>
 </code></pre></div>
 </div>
-<p>If this command was interrupted or some images were already uploaded in a previous run, you can pass a Zooniverse subjects
-export file to skip those images and avoid duplicates using <code>--exclude-subjects</code> option :</p>
+<p>If this command was interrupted or some images were already uploaded in a previous run, you can pass a <a href="https://help.zooniverse.org/next-steps/data-exports/">Zooniverse subjects
+export file</a> to skip those images and avoid duplicates using
+<code>--exclude-subjects</code> option-</p>
 <div class="admonition example">
 <p class="admonition-title">Import collection with ID 123 to a subject set named 'My subject set name' using only deployments with IDs 123 and 456, excluding deployments with IDs 789 and 101, and skipping already uploaded subjects listed in subjects_export.tsv</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>wildintel-tools<span class="w"> </span>zooniverse<span class="w"> </span>importation<span class="w"> </span><span class="m">123</span><span class="w"> </span>--exclude-deployments<span class="w"> </span><span class="m">789</span>,101<span class="w"> </span>--subjects-subjects<span class="w"> </span>subjects_export.tsv
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>wildintel-tools<span class="w"> </span>zooniverse<span class="w"> </span>import<span class="w"> </span><span class="m">123</span><span class="w"> </span>--exclude-deployments<span class="w"> </span><span class="m">789</span>,101<span class="w"> </span>--subjects-subjects<span class="w"> </span>subjects_export.tsv
 </code></pre></div>
 </div>
 <div class="admonition tip">
@@ -1342,10 +1552,10 @@ media IDs have already been uploaded before running <code>importation</code>.</p
 </div>
 <h3 id="step-3-validate-the-subject-set">Step 3 — Validate the subject set</h3>
 <p>Before making the subject set live for classification, it is recommended to validate that the expected media were 
-correctly uploaded and that their metadata is correct. To do this, use the <code>validate-subject-set</code> command. This command 
-compares the expected media in the selected collection and deployments with the subjects in the subject set, and reports
-any discrepancies such as missing media (expected but not uploaded), extra media (uploaded but not expected), or 
-subjects with incorrect metadata.</p>
+correctly uploaded and that their metadata is correct. </p>
+<p>To do this, use the <code>validate-subject-set</code> command. This command  compares the expected media in the selected collection
+and deployments with the subjects in the subject set, and reports any discrepancies such as missing media (expected but 
+not uploaded), extra media (uploaded but not expected), or subjects with incorrect metadata.</p>
 <div class="admonition example">
 <p class="admonition-title">Validate the subject set with ID 123 against the collection with ID 123 and the subjects listed in subjects_export.tsv</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="gp">$ </span>wildintel-tools<span class="w"> </span>zooniverse<span class="w"> </span>validate-subject-set<span class="w"> </span>/path/to/subjects_export.tsv<span class="w"> </span><span class="m">123</span>
@@ -1422,6 +1632,120 @@ selecting the subject set, workflow, and classification project:</p>
 <a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a>
 <a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a><span class="go">Continue? [y/N]:</span>
 </code></pre></div>
+<h2 id="consensus-process">Consensus process</h2>
+<p>Once Zooniverse volunteers have finished classifying a subject set, the raw output is a collection of individual
+opinions — one per volunteer per subject. Before those opinions can be imported into Trapper as observations, they
+must be reconciled into a single authoritative answer per image. This reconciliation is called the <strong>consensus
+process</strong>.</p>
+<p>The consensus process answers three questions for each subject:</p>
+<ol>
+<li><strong>How many distinct species appear in this image?</strong></li>
+<li><strong>Which species are they?</strong></li>
+<li><strong>How many individuals of each species are visible?</strong></li>
+</ol>
+<p>Each of these questions is answered by aggregating the volunteers' votes, not by selecting one individual's answer.
+The process is designed to be robust to outliers (e.g., a volunteer who labels an image with an unrealistic number
+of species) while still capturing the community's collective knowledge.</p>
+<h3 id="default-consensus-implementation">Default consensus implementation</h3>
+<p>The default implementation is split across two classes:</p>
+<table>
+<thead>
+<tr>
+<th>Class</th>
+<th>Responsibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AnnotationsExtractor</code> (+ workflow subclass)</td>
+<td>Phase 1 — filter opinions, translate labels, determine <em>k</em></td>
+</tr>
+<tr>
+<td><code>AnnotationsVoter</code> (+ workflow subclass)</td>
+<td>Phase 2 — vote on species and count, compute confidence</td>
+</tr>
+</tbody>
+</table>
+<h4 id="phase-1-extraction-annotationsextractor">Phase 1 — Extraction (<code>AnnotationsExtractor</code>)</h4>
+<p>The extractor processes the raw Zooniverse classifications for a single subject. Its goal is to produce a clean,
+normalised list of <code>(species, attributes)</code> pairs — one entry per volunteer choice — together with the <strong>consensus
+number of species</strong> <em>k</em> for that image.</p>
+<p>Steps:</p>
+<ol>
+<li>
+<p><strong>Filter invalid opinions.</strong> Any volunteer classification that contains zero species choices or more than
+   <code>k_max</code> choices (default <code>3</code>) is discarded. This removes accidental submissions and implausible outliers.</p>
+</li>
+<li>
+<p><strong>Record <em>k</em> per volunteer.</strong> For each surviving classification the number of species the volunteer labelled
+   is stored in a list <code>k_list</code>.</p>
+</li>
+<li>
+<p><strong>Translate Zooniverse labels to Trapper names.</strong> Each Zooniverse choice string (e.g. <code>REDDEER</code>) is mapped to
+   a scientific name or category (e.g. <code>Cervus elaphus</code>) via the workflow-specific <code>zoo_to_trapper</code> dictionary
+   defined in the subclass (e.g. <code>Workflow29187AnnotationExtractor</code>).</p>
+</li>
+<li>
+<p><strong>Compute <em>k</em> majority.</strong> The consensus number of species <em>k</em> is the most frequent value in <code>k_list</code>, capped
+   at <code>k_max</code>. When there is a tie, the largest tied value is used.</p>
+</li>
+</ol>
+<p>The output passed to Phase 2 is a tuple <code>(k, subject_id, opinions)</code>, where <code>opinions</code> is the full list of
+<code>(species_name, {HOWMANY: N, …})</code> pairs contributed by all valid volunteers.</p>
+<h4 id="phase-2-voting-workflow29187annotationsvoter">Phase 2 — Voting (<code>Workflow29187AnnotationsVoter</code>)</h4>
+<p>The voter takes the normalised opinions from Phase 1 and produces one <code>Zoo2TrapperObservation</code> per species.</p>
+<p>Steps:</p>
+<ol>
+<li>
+<p><strong>Select the top-<em>k</em> species.</strong> Votes are counted per species. The <em>k</em> most-voted species are selected. When
+   <em>k</em> &gt; 1 the generic label <code>NOANIMAL</code> is excluded from competition (a volunteer who said "no animal" alongside
+   a species choice is treated as having voted for the species only).</p>
+</li>
+<li>
+<p><strong>Estimate individual count.</strong> For each of the top-<em>k</em> species, the individual counts (<code>HOWMANY</code>) reported by
+   all volunteers are collected and their <strong>median</strong> (rounded up) is used as the consensus count.</p>
+</li>
+<li>
+<p><strong>Compute pairwise confidence.</strong> Confidence is assigned to each species in rank order:</p>
+<ul>
+<li>The <strong>pre-confidence</strong> of species <em>i</em> is the ratio of its votes to the combined votes of species <em>i</em> and <em>i+1</em>:
+  <code>pre_conf = votes_i / (votes_i + votes_{i+1})</code>. For the last species, <code>pre_conf = 1.0</code>.</li>
+<li>The <strong>allocated confidence</strong> is <code>pre_conf × (1 − accumulated_confidence)</code>, so that the total confidence
+  across all species in an image sums to 1.</li>
+</ul>
+</li>
+<li>
+<p><strong>Build the observation.</strong> For each species a <code>Zoo2TrapperObservation</code> is created with the consensus count,
+   the two confidence values, and the appropriate <code>observationType</code> (e.g. <code>animal</code>, <code>blank</code>, <code>human</code>).</p>
+</li>
+</ol>
+<h3 id="process-diagram">Process diagram</h3>
+<pre class="mermaid"><code>flowchart TD
+    A([Raw Zooniverse classifications\nfor one subject])
+
+    subgraph P1["Phase 1 — AnnotationsExtractor"]
+        B["Filter opinions\n(discard if choices = 0 or &gt; k_max)"]
+        B --&gt; C["Record k per volunteer\n(number of species chosen)"]
+        C --&gt; D["Translate labels\nzooniverse key → scientific name\nvia zoo_to_trapper"]
+        D --&gt; E["Compute k majority\n(mode of k_list, capped at k_max)"]
+    end
+
+    subgraph P2["Phase 2 — AnnotationsVoter"]
+        F["Select top-k species\n(by vote count)"]
+        F --&gt; G["Estimate individual count\n(median of HOWMANY per species)"]
+        G --&gt; H["Compute pairwise confidence\npre_conf = votes_i / (votes_i + votes_i+1)\nconf = pre_conf × (1 − accumulated)"]
+        H --&gt; I["Build Zoo2TrapperObservation\nper species"]
+    end
+
+    J([Observations list\nready to import into Trapper])
+
+    A --&gt; B
+    E --&gt;|"k · sid · opinions"| F
+    I --&gt; J
+
+    style P1 fill:#e8f4f8,stroke:#2980b9,color:#000
+    style P2 fill:#eafaf1,stroke:#27ae60,color:#000</code></pre>
+<hr />
 <h2 id="reference">Reference</h2>
 <h3 id="test-connection">test-connection</h3>
 <p>Test the connection to the Zooniverse API using the credentials in the active project settings.</p>
@@ -1866,6 +2190,10 @@ selecting the subject set, workflow, and classification project:</p>
 </thead>
 <tbody>
 <tr>
+<td><code>setup</code></td>
+<td>Guided configuration of Zooniverse connection settings</td>
+</tr>
+<tr>
 <td><code>import</code></td>
 <td>Guided step-by-step import of a Trapper collection to Zooniverse</td>
 </tr>
@@ -1878,8 +2206,167 @@ selecting the subject set, workflow, and classification project:</p>
 <td>Guided download of subject images from a Zooniverse subject set</td>
 </tr>
 <tr>
-<td><code>update_metadata</code></td>
-<td>Guided update of subject metadata using Trapper data</td>
+<td><code>validate</code></td>
+<td>Guided validation of a Zooniverse subject set against a Trapper collection</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="uploaded-media">uploaded-media</h3>
+<p>Read a Zooniverse subjects export file and list the Trapper media IDs that have already been uploaded. Media IDs are extracted from the <code>origin</code> or <code>external_id</code> metadata field using the pattern <code>/:media:&lt;id&gt;</code>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>wildintel<span class="w"> </span>zooniverse<span class="w"> </span>uploaded-media<span class="w"> </span>SUBJECTS_CSV<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Argument / Option</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SUBJECTS_CSV</code></td>
+<td>Path</td>
+<td>required</td>
+<td>Path to the Zooniverse subjects export CSV/TSV file</td>
+</tr>
+<tr>
+<td><code>--subject-set-id, --ss-id</code></td>
+<td>int</td>
+<td><code>None</code></td>
+<td>Filter by subject set ID. If omitted, all rows are included</td>
+</tr>
+<tr>
+<td><code>--pipeline</code></td>
+<td>flag</td>
+<td>off</td>
+<td>Output only media IDs separated by newlines (for shell pipelines)</td>
+</tr>
+<tr>
+<td><code>--unresolved</code></td>
+<td>flag</td>
+<td>off</td>
+<td>Show only subjects for which no media_id could be extracted</td>
+</tr>
+<tr>
+<td><code>--only-duplicated</code></td>
+<td>flag</td>
+<td>off</td>
+<td>Show only media_ids that appear more than once</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="validate-subject-set">validate-subject-set</h3>
+<p>Validate a Zooniverse subject set against a Trapper collection using the same media-selection logic as <code>import</code>. Reports missing media (expected but absent from the subject set), extra media (uploaded but not expected), and subjects with incorrect metadata.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>wildintel<span class="w"> </span>zooniverse<span class="w"> </span>validate-subject-set<span class="w"> </span>SUBJECTS_CSV<span class="w"> </span>COLLECTION<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Argument / Option</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SUBJECTS_CSV</code></td>
+<td>Path</td>
+<td>required</td>
+<td>Path to the Zooniverse subjects export CSV/TSV file</td>
+</tr>
+<tr>
+<td><code>COLLECTION</code></td>
+<td>int</td>
+<td>required</td>
+<td>Trapper collection ID</td>
+</tr>
+<tr>
+<td><code>--rp, --research-project</code></td>
+<td>int</td>
+<td><code>None</code></td>
+<td>ID of the research project</td>
+</tr>
+<tr>
+<td><code>--cp, --classification-project</code></td>
+<td>int</td>
+<td>required</td>
+<td>ID of the classification project linked to the collection</td>
+</tr>
+<tr>
+<td><code>--subject-set-id, --ss-id</code></td>
+<td>int</td>
+<td><code>None</code></td>
+<td>Filter the CSV by subject set ID. If omitted, all rows are included</td>
+</tr>
+<tr>
+<td><code>--deployments, --d TEXT</code></td>
+<td>str</td>
+<td>auto</td>
+<td>Deployment IDs to include (comma/space separated)</td>
+</tr>
+<tr>
+<td><code>--exclude-deployments, --ed TEXT</code></td>
+<td>str</td>
+<td><code>None</code></td>
+<td>Deployment IDs to skip</td>
+</tr>
+<tr>
+<td><code>--n-images-seq</code></td>
+<td>int</td>
+<td><code>5</code></td>
+<td>Number of images per sequence</td>
+</tr>
+<tr>
+<td><code>--max-interval</code></td>
+<td>int</td>
+<td><code>90</code></td>
+<td>Maximum interval between images in a sequence (seconds)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="check-metadata">check-metadata</h3>
+<p>Validate the metadata fields of every subject in a Zooniverse subjects export file. Checks that required fields (<code>external_id</code>, <code>preview</code>, <code>link</code>, <code>thumbnail</code>, <code>origin</code>, <code>license</code>, <code>image_name</code>) are present and that a Trapper media_id can be resolved.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>wildintel<span class="w"> </span>zooniverse<span class="w"> </span>check-metadata<span class="w"> </span>SUBJECTS_CSV<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Argument / Option</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SUBJECTS_CSV</code></td>
+<td>Path</td>
+<td>required</td>
+<td>Path to the Zooniverse subjects export CSV/TSV file</td>
+</tr>
+<tr>
+<td><code>--subject-set-id, --ss-id</code></td>
+<td>int</td>
+<td><code>None</code></td>
+<td>Filter by subject set ID. If omitted, all rows are included</td>
+</tr>
+<tr>
+<td><code>--all</code></td>
+<td>flag</td>
+<td>off</td>
+<td>Show all subjects, not only those with issues</td>
+</tr>
+<tr>
+<td><code>--pipeline</code></td>
+<td>flag</td>
+<td>off</td>
+<td>Output only subject_ids with issues separated by newlines (for shell pipelines)</td>
 </tr>
 </tbody>
 </table>
