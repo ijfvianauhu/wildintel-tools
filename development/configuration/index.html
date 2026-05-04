@@ -466,22 +466,34 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#creating-a-configuration" class="md-nav__link">
+  <a href="#docker-container-configuration" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Creating a configuration
+        Docker container configuration
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Creating a configuration">
+    <nav class="md-nav" aria-label="Docker container configuration">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#interactive-wizard" class="md-nav__link">
+  <a href="#setting-data_path" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Interactive wizard
+        Setting DATA_PATH
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Setting DATA_PATH">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#env-file-recommended" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        .env file (recommended)
       
     </span>
   </a>
@@ -489,10 +501,32 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#cli-command" class="md-nav__link">
+  <a href="#shell-export-unix-temporary" class="md-nav__link">
     <span class="md-ellipsis">
       
-        CLI command
+        Shell export (Unix, temporary)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#powershell-windows-temporary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PowerShell (Windows, temporary)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#persistent-system-wide-windows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Persistent system-wide (Windows)
       
     </span>
   </a>
@@ -503,17 +537,139 @@
     </nav>
   
 </li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
         <li class="md-nav__item">
-  <a href="#configuration-sections" class="md-nav__link">
+  <a href="#application-configuration" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Configuration sections
+        Application configuration
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Configuration sections">
+    <nav class="md-nav" aria-label="Application configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#option-1-interactive-wizard-recommended" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option 1 — Interactive wizard (recommended)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Option 1 — Interactive wizard (recommended)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#general-and-trapper-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        General and Trapper settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#zooniverse-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Zooniverse settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-2-manual-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option 2 — Manual configuration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Option 2 — Manual configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#create-a-baseline-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Create a baseline configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#edit-the-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Edit the file
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#set-individual-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Set individual values
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#verify-the-result" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verify the result
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration reference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuration reference">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -550,10 +706,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#trapper" class="md-nav__link">
+  <a href="#zooniverse_connector" class="md-nav__link">
     <span class="md-ellipsis">
       
-        TRAPPER
+        ZOONIVERSE_CONNECTOR
       
     </span>
   </a>
@@ -561,10 +717,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#zooniverse_connector" class="md-nav__link">
+  <a href="#trapper" class="md-nav__link">
     <span class="md-ellipsis">
       
-        ZOONIVERSE_CONNECTOR
+        TRAPPER
       
     </span>
   </a>
@@ -588,21 +744,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#viewing-and-editing-settings" class="md-nav__link">
+  <a href="#managing-multiple-projects" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Viewing and editing settings
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#multiple-projects" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Multiple projects
+        Managing multiple projects
       
     </span>
   </a>
@@ -899,22 +1044,34 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#creating-a-configuration" class="md-nav__link">
+  <a href="#docker-container-configuration" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Creating a configuration
+        Docker container configuration
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Creating a configuration">
+    <nav class="md-nav" aria-label="Docker container configuration">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#interactive-wizard" class="md-nav__link">
+  <a href="#setting-data_path" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Interactive wizard
+        Setting DATA_PATH
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Setting DATA_PATH">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#env-file-recommended" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        .env file (recommended)
       
     </span>
   </a>
@@ -922,10 +1079,32 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#cli-command" class="md-nav__link">
+  <a href="#shell-export-unix-temporary" class="md-nav__link">
     <span class="md-ellipsis">
       
-        CLI command
+        Shell export (Unix, temporary)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#powershell-windows-temporary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PowerShell (Windows, temporary)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#persistent-system-wide-windows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Persistent system-wide (Windows)
       
     </span>
   </a>
@@ -936,17 +1115,139 @@
     </nav>
   
 </li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
         <li class="md-nav__item">
-  <a href="#configuration-sections" class="md-nav__link">
+  <a href="#application-configuration" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Configuration sections
+        Application configuration
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Configuration sections">
+    <nav class="md-nav" aria-label="Application configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#option-1-interactive-wizard-recommended" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option 1 — Interactive wizard (recommended)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Option 1 — Interactive wizard (recommended)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#general-and-trapper-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        General and Trapper settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#zooniverse-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Zooniverse settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-2-manual-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option 2 — Manual configuration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Option 2 — Manual configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#create-a-baseline-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Create a baseline configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#edit-the-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Edit the file
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#set-individual-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Set individual values
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#verify-the-result" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verify the result
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration reference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuration reference">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -983,10 +1284,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#trapper" class="md-nav__link">
+  <a href="#zooniverse_connector" class="md-nav__link">
     <span class="md-ellipsis">
       
-        TRAPPER
+        ZOONIVERSE_CONNECTOR
       
     </span>
   </a>
@@ -994,10 +1295,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#zooniverse_connector" class="md-nav__link">
+  <a href="#trapper" class="md-nav__link">
     <span class="md-ellipsis">
       
-        ZOONIVERSE_CONNECTOR
+        TRAPPER
       
     </span>
   </a>
@@ -1021,21 +1322,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#viewing-and-editing-settings" class="md-nav__link">
+  <a href="#managing-multiple-projects" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Viewing and editing settings
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#multiple-projects" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Multiple projects
+        Managing multiple projects
       
     </span>
   </a>
@@ -1063,164 +1353,363 @@
 
 
 <h1 id="configuration">Configuration</h1>
-<p>wildintel-tools uses <a href="https://www.dynaconf.com/">Dynaconf</a> to manage per-project YAML configuration files. Each project has its own settings file stored in <code>~/.wildintel-tools/settings/</code>.</p>
+<p>WildIntel Tools stores configuration in <strong>TOML files</strong>, one per project, located in <code>~/.wildintel-tools/</code>.
+Settings are managed with <a href="https://www.dynaconf.com/">Dynaconf</a> and validated with Pydantic on every load.</p>
 <hr />
-<h2 id="creating-a-configuration">Creating a configuration</h2>
-<h3 id="interactive-wizard">Interactive wizard</h3>
-<p>The quickest way to configure the tool is through the setup wizard:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>wildintel<span class="w"> </span>wildintel<span class="w"> </span>wizard<span class="w"> </span>setup
+<h2 id="docker-container-configuration">Docker container configuration</h2>
+<p>When running WildIntel Tools through Docker, the container needs to know where on the <strong>host filesystem</strong>
+to store and read data. This is controlled by the <code>DATA_PATH</code> environment variable, which Docker Compose
+mounts into the container at <code>/data</code>.</p>
+<h3 id="setting-data_path">Setting <code>DATA_PATH</code></h3>
+<h4 id="env-file-recommended"><code>.env</code> file (recommended)</h4>
+<p>Create or edit the <code>.env</code> file next to <code>docker-compose.yml</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>DATA_PATH=./wildintel-tools-data/
 </code></pre></div>
-<p>The wizard will prompt you for all required values, test the Trapper connection, and save the configuration automatically.</p>
-<h3 id="cli-command">CLI command</h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>wildintel<span class="w"> </span>config<span class="w"> </span>init
+<p>Docker Compose reads this file automatically — no extra flags needed.</p>
+<h4 id="shell-export-unix-temporary">Shell export (Unix, temporary)</h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">DATA_PATH</span><span class="o">=</span>/home/youruser/wildintel-tools-data
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>-d
 </code></pre></div>
-<p>This creates a new YAML file for the active project (<code>default</code> by default). You can pass <code>--template</code> to use a custom template file.</p>
+<h4 id="powershell-windows-temporary">PowerShell (Windows, temporary)</h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nv">$env:DATA_PATH</span> <span class="p">=</span> <span class="s2">&quot;C:\wildintel-tools-data&quot;</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">docker</span> <span class="n">compose</span> <span class="n">up</span> <span class="n">-d</span>
+</code></pre></div>
+<h4 id="persistent-system-wide-windows">Persistent system-wide (Windows)</h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">setx</span> <span class="n">DATA_PATH</span> <span class="s2">&quot;C:\wildintel-tools-data&quot;</span>
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<ul>
+<li>The host path is mounted at <code>/data</code> inside the container.</li>
+<li>Ensure the directory exists and the container user has read/write access.</li>
+<li>Verify the mount after starting the container:
+  <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>-d
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>wildintel-tools<span class="w"> </span>ls<span class="w"> </span>-la<span class="w"> </span>/data
+</code></pre></div></li>
+</ul>
+</div>
 <hr />
-<h2 id="configuration-sections">Configuration sections</h2>
+<h2 id="application-configuration">Application configuration</h2>
+<p>The application settings (Trapper credentials, paths, Zooniverse account, etc.) are stored in a TOML file
+inside <code>~/.wildintel-tools/</code>. There are two ways to create or update them: the interactive <strong>wizard</strong>
+(recommended for first-time setup) or the <strong>CLI commands</strong> (for automation or precise control).</p>
+<h3 id="option-1-interactive-wizard-recommended">Option 1 — Interactive wizard (recommended)</h3>
+<p>The wizard guides you step by step, validates every value, and saves the file automatically.</p>
+<h4 id="general-and-trapper-settings">General and Trapper settings</h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="gp">$ </span>wildintel-tools<span class="w"> </span>wildintel<span class="w"> </span>wizard<span class="w"> </span>setup
+</code></pre></div>
+<p>The wizard will ask for:</p>
+<ul>
+<li><strong>Trapper server URL</strong> — base URL of your Trapper instance (e.g. <code>https://trapper.example.org/</code>).</li>
+<li><strong>Login e-mail and password</strong> — credentials used to authenticate. The wizard tests the connection before
+  continuing; if it fails, it lets you retry with different values.</li>
+<li><strong>Classification project</strong> — select the default Trapper project from an interactive list.</li>
+<li><strong>Data directory</strong> — local folder where downloaded Trapper collections are stored.</li>
+<li><strong>Research project name</strong> — label embedded in generated metadata exports.</li>
+<li><strong>Coverage area</strong> — geographic description included in exports (e.g. <code>Doñana National Park</code>).</li>
+<li><strong>Output directory</strong> — folder where processed collections ready for upload are saved.</li>
+<li><strong>Timezone</strong> — IANA timezone for camera-trap timestamps (e.g. <code>UTC</code>, <code>Europe/Madrid</code>).</li>
+</ul>
+<h4 id="zooniverse-settings">Zooniverse settings</h4>
+<p>If you use the Zooniverse integration, run the Zooniverse setup wizard afterwards:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="gp">$ </span>wildintel-tools<span class="w"> </span>zooniverse<span class="w"> </span>wizard<span class="w"> </span>setup
+</code></pre></div>
+<p>This configures the Zooniverse username, password, project ID, and upload parameters (sequence length,
+upload intervals, retry settings). See the <a href="../commands/zooniverse/">Zooniverse module documentation</a> for
+details.</p>
+<hr />
+<h3 id="option-2-manual-configuration">Option 2 — Manual configuration</h3>
+<h4 id="create-a-baseline-configuration">Create a baseline configuration</h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>wildintel-tools<span class="w"> </span>config<span class="w"> </span>init
+</code></pre></div>
+<p>This creates a TOML file with all default values for the active project (<code>default</code> by default).
+Pass <code>--project &lt;name&gt;</code> to target a different project.</p>
+<h4 id="edit-the-file">Edit the file</h4>
+<p>Open the file in your default editor (validates the result after saving):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>wildintel-tools<span class="w"> </span>config<span class="w"> </span>edit
+</code></pre></div>
+<p>The raw TOML file is located at <code>~/.wildintel-tools/&lt;project&gt;.toml</code>. You can also edit it directly with
+any text editor.</p>
+<h4 id="set-individual-values">Set individual values</h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># Read a single value</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>wildintel-tools<span class="w"> </span>config<span class="w"> </span>get<span class="w"> </span>GENERAL.host
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="c1"># Write a single value</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>wildintel-tools<span class="w"> </span>config<span class="w"> </span><span class="nb">set</span><span class="w"> </span>GENERAL.host<span class="w"> </span>https://trapper.example.org/
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>wildintel-tools<span class="w"> </span>config<span class="w"> </span><span class="nb">set</span><span class="w"> </span>GENERAL.login<span class="w"> </span>you@example.com
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>wildintel-tools<span class="w"> </span>config<span class="w"> </span><span class="nb">set</span><span class="w"> </span>WILDINTEL.timezone<span class="w"> </span>Europe/Madrid
+</code></pre></div>
+<h4 id="verify-the-result">Verify the result</h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>wildintel-tools<span class="w"> </span>config<span class="w"> </span>show
+</code></pre></div>
+<p>This prints the full configuration and reports any validation errors.</p>
+<hr />
+<h2 id="configuration-reference">Configuration reference</h2>
 <h3 id="general"><code>GENERAL</code></h3>
+<p>Trapper connection and local filesystem paths.</p>
 <table>
 <thead>
 <tr>
 <th>Key</th>
+<th>Type</th>
+<th>Default</th>
 <th>Description</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td><code>host</code></td>
-<td>Base URL of the Trapper server (e.g. <code>https://trapper.example.org/</code>)</td>
+<td>URL</td>
+<td><code>https://wildintel-trap.uhu.es/</code></td>
+<td>Base URL of the Trapper server (trailing slash required)</td>
 </tr>
 <tr>
 <td><code>login</code></td>
-<td>Your login email for Trapper</td>
+<td>email</td>
+<td><code>user@example.com</code></td>
+<td>E-mail address for Trapper authentication</td>
 </tr>
 <tr>
 <td><code>password</code></td>
-<td>Your Trapper password</td>
+<td>string</td>
+<td>—</td>
+<td>Trapper account password</td>
 </tr>
 <tr>
 <td><code>project_id</code></td>
-<td>Default Trapper classification project ID</td>
+<td>int</td>
+<td><code>123</code></td>
+<td>Default Trapper research project ID</td>
 </tr>
 <tr>
-<td><code>data_dir</code></td>
-<td>Root directory for raw collection data</td>
+<td><code>verify_ssl</code></td>
+<td>bool</td>
+<td><code>true</code></td>
+<td>Verify the server TLS certificate. Set to <code>false</code> only in development</td>
 </tr>
 <tr>
 <td><code>ffmpeg</code></td>
-<td>Path to the <code>ffmpeg</code> binary</td>
+<td>string</td>
+<td><code>ffmpeg</code></td>
+<td>Path or command name of the <code>ffmpeg</code> binary</td>
 </tr>
 <tr>
 <td><code>exiftool</code></td>
-<td>Path to the <code>exiftool</code> binary</td>
+<td>string</td>
+<td><code>exiftool</code></td>
+<td>Path or command name of the <code>exiftool</code> binary</td>
+</tr>
+<tr>
+<td><code>data_dir</code></td>
+<td>path</td>
+<td><code>~/.wildintel-tools/collections</code></td>
+<td>Directory where downloaded Trapper collections are stored</td>
 </tr>
 </tbody>
 </table>
 <h3 id="wildintel"><code>WILDINTEL</code></h3>
+<p>Processing options and metadata defaults.</p>
 <table>
 <thead>
 <tr>
 <th>Key</th>
+<th>Type</th>
+<th>Default</th>
 <th>Description</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>output_dir</code></td>
-<td>Output directory for prepared Trapper packages</td>
-</tr>
-<tr>
 <td><code>rp_name</code></td>
-<td>Research project name embedded in XMP metadata</td>
+<td>string</td>
+<td><code>WildINTEL</code></td>
+<td>Research project name embedded in metadata exports</td>
 </tr>
 <tr>
 <td><code>coverage</code></td>
-<td>Coverage area embedded in XMP metadata</td>
-</tr>
-<tr>
-<td><code>owner</code></td>
-<td>Resource owner embedded in XMP metadata</td>
+<td>string</td>
+<td><code>Doñana National Park</code></td>
+<td>Geographic coverage area included in exports</td>
 </tr>
 <tr>
 <td><code>publisher</code></td>
-<td>Resource publisher embedded in XMP metadata</td>
+<td>string</td>
+<td><code>University of Huelva</code></td>
+<td>Publisher name included in exports</td>
+</tr>
+<tr>
+<td><code>owner</code></td>
+<td>string</td>
+<td><code>University of Huelva</code></td>
+<td>Dataset owner included in exports</td>
+</tr>
+<tr>
+<td><code>output_dir</code></td>
+<td>path</td>
+<td><code>~/.wildintel-tools/readycollections</code></td>
+<td>Directory where processed collections are saved</td>
 </tr>
 <tr>
 <td><code>timezone</code></td>
-<td>IANA timezone name used for timestamp normalisation (e.g. <code>UTC</code>, <code>Europe/Madrid</code>)</td>
+<td>string</td>
+<td><code>UTC</code></td>
+<td>IANA timezone name for interpreting camera-trap timestamps</td>
 </tr>
 <tr>
 <td><code>ignore_dst</code></td>
-<td>Whether to ignore daylight saving time adjustments</td>
+<td>bool</td>
+<td><code>false</code></td>
+<td>If <code>true</code>, Daylight Saving Time transitions are ignored</td>
 </tr>
 <tr>
 <td><code>convert_to_utc</code></td>
-<td>Whether to convert all timestamps to UTC</td>
+<td>bool</td>
+<td><code>true</code></td>
+<td>Convert all timestamps to UTC before storing or exporting</td>
 </tr>
 <tr>
 <td><code>tolerance_hours</code></td>
-<td>Allowed time deviation (hours) when verifying image timestamps against deployment dates</td>
+<td>int</td>
+<td><code>1</code></td>
+<td>Maximum time difference (hours) allowed when matching records</td>
+</tr>
+<tr>
+<td><code>resize_img</code></td>
+<td>bool</td>
+<td><code>false</code></td>
+<td>Resize images before uploading to Zooniverse</td>
+</tr>
+<tr>
+<td><code>resize_img_size</code></td>
+<td>int list</td>
+<td><code>[1024, 768]</code></td>
+<td>Target <code>[width, height]</code> in pixels when <code>resize_img</code> is <code>true</code></td>
+</tr>
+<tr>
+<td><code>overwrite</code></td>
+<td>bool</td>
+<td><code>false</code></td>
+<td>Overwrite existing output files without prompting</td>
+</tr>
+<tr>
+<td><code>remove_zip</code></td>
+<td>bool</td>
+<td><code>true</code></td>
+<td>Delete ZIP archives after successful extraction</td>
+</tr>
+<tr>
+<td><code>trigger</code></td>
+<td>bool</td>
+<td><code>true</code></td>
+<td>Process only motion-triggered images; skip continuous captures</td>
 </tr>
 </tbody>
 </table>
 <h3 id="zooniverse"><code>ZOONIVERSE</code></h3>
+<p>Zooniverse account credentials.</p>
 <table>
 <thead>
 <tr>
 <th>Key</th>
+<th>Type</th>
+<th>Default</th>
 <th>Description</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>zooniverse_project_id</code></td>
-<td>Zooniverse project ID (numeric or <code>owner/project-name</code>)</td>
-</tr>
-<tr>
 <td><code>zooniverse_username</code></td>
-<td>Zooniverse username</td>
+<td>string</td>
+<td>—</td>
+<td>Zooniverse account username</td>
 </tr>
 <tr>
 <td><code>zooniverse_password</code></td>
-<td>Zooniverse password</td>
+<td>string</td>
+<td>—</td>
+<td>Zooniverse account password</td>
+</tr>
+<tr>
+<td><code>zooniverse_project_id</code></td>
+<td>string</td>
+<td>—</td>
+<td>Zooniverse project ID (numeric or <code>owner/project-slug</code>)</td>
 </tr>
 </tbody>
 </table>
-<h3 id="trapper"><code>TRAPPER</code></h3>
+<h3 id="zooniverse_connector"><code>ZOONIVERSE_CONNECTOR</code></h3>
+<p>Upload behaviour when pushing media from Trapper to Zooniverse.</p>
 <table>
 <thead>
 <tr>
 <th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>upload_collection_n_images_seq</code></td>
+<td>int</td>
+<td><code>5</code></td>
+<td>Number of images grouped into a single Zooniverse subject (sequence length)</td>
+</tr>
+<tr>
+<td><code>upload_collection_max_interval</code></td>
+<td>int</td>
+<td><code>90</code></td>
+<td>Maximum gap in seconds between images in the same sequence</td>
+</tr>
+<tr>
+<td><code>upload_collection_attempts</code></td>
+<td>int</td>
+<td><code>5</code></td>
+<td>Maximum retry attempts when downloading a media file from Trapper</td>
+</tr>
+<tr>
+<td><code>upload_collection_delay</code></td>
+<td>int</td>
+<td><code>15</code></td>
+<td>Seconds to wait between Trapper download retries</td>
+</tr>
+<tr>
+<td><code>upload_collection_max_attempts_per_subject</code></td>
+<td>int</td>
+<td><code>5</code></td>
+<td>Maximum retry attempts when uploading a single subject to Zooniverse</td>
+</tr>
+<tr>
+<td><code>upload_collection_delay_seconds_per_subject</code></td>
+<td>int</td>
+<td><code>30</code></td>
+<td>Seconds to wait between Zooniverse upload retries per subject</td>
+</tr>
+</tbody>
+</table>
+<h3 id="trapper"><code>TRAPPER</code></h3>
+<p>Secondary Trapper credentials used by the Zooniverse connector when importing annotations.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
 <th>Description</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td><code>trapper_username</code></td>
-<td>Secondary Trapper username (used by the Zooniverse connector)</td>
+<td>string</td>
+<td>—</td>
+<td>Secondary Trapper username (must match the Zooniverse account owner in Trapper)</td>
 </tr>
 <tr>
 <td><code>trapper_password</code></td>
+<td>string</td>
+<td>—</td>
 <td>Secondary Trapper password</td>
-</tr>
-</tbody>
-</table>
-<h3 id="zooniverse_connector"><code>ZOONIVERSE_CONNECTOR</code></h3>
-<table>
-<thead>
-<tr>
-<th>Key</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>upload_collection_max_interval</code></td>
-<td>Maximum interval (seconds) between images in a sequence during upload</td>
-</tr>
-<tr>
-<td><code>upload_collection_n_images_seq</code></td>
-<td>Number of images per sequence during upload</td>
 </tr>
 </tbody>
 </table>
@@ -1229,40 +1718,42 @@
 <thead>
 <tr>
 <th>Key</th>
+<th>Type</th>
+<th>Default</th>
 <th>Description</th>
 </tr>
 </thead>
 <tbody>
 <tr>
+<td><code>loglevel</code></td>
+<td>int</td>
+<td><code>1</code></td>
+<td>Verbosity: <code>0</code> = error, <code>1</code> = info, <code>2</code> = debug</td>
+</tr>
+<tr>
 <td><code>filename</code></td>
-<td>Path to the application log file</td>
+<td>string</td>
+<td><code>""</code></td>
+<td>Path to a log file. Leave empty to log to stdout only</td>
 </tr>
 </tbody>
 </table>
 <hr />
-<h2 id="viewing-and-editing-settings">Viewing and editing settings</h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Show the current project settings</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>wildintel<span class="w"> </span>config<span class="w"> </span>show
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># Edit the settings file in your default editor</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>wildintel<span class="w"> </span>config<span class="w"> </span>edit
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="c1"># Read a single value</span>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>wildintel<span class="w"> </span>config<span class="w"> </span>get<span class="w"> </span>GENERAL.host
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>
-<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="c1"># Update a single value</span>
-<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>wildintel<span class="w"> </span>config<span class="w"> </span><span class="nb">set</span><span class="w"> </span>GENERAL.host<span class="w"> </span>https://new-trapper.example.org/
+<h2 id="managing-multiple-projects">Managing multiple projects</h2>
+<p>WildIntel Tools supports multiple named configurations — useful when working with different Trapper
+instances or research projects simultaneously.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># List all saved configurations</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>wildintel-tools<span class="w"> </span>config<span class="w"> </span>list
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="c1"># Create or initialise a named project</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>wildintel-tools<span class="w"> </span>--project<span class="w"> </span>tatra<span class="w"> </span>config<span class="w"> </span>init
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="c1"># Use a named project for any command</span>
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>wildintel-tools<span class="w"> </span>--project<span class="w"> </span>tatra<span class="w"> </span>config<span class="w"> </span>show
+<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>wildintel-tools<span class="w"> </span>--project<span class="w"> </span>tatra<span class="w"> </span>wildintel<span class="w"> </span>wizard<span class="w"> </span>setup
 </code></pre></div>
-<hr />
-<h2 id="multiple-projects">Multiple projects</h2>
-<p>wildintel-tools supports multiple named project configurations:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># List available configurations</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>wildintel<span class="w"> </span>config<span class="w"> </span>list
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="c1"># Use a named project</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>wildintel<span class="w"> </span>--project<span class="w"> </span>myproject<span class="w"> </span>config<span class="w"> </span>show
-</code></pre></div>
-<p>Each project corresponds to a separate YAML file in the settings directory.</p>
+<p>Each project corresponds to a separate file at <code>~/.wildintel-tools/&lt;project&gt;.toml</code>. The active project
+defaults to <code>default</code> unless overridden with <code>--project</code>.</p>
 
 
 
