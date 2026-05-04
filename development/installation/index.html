@@ -22,7 +22,7 @@
         
       
       
-      <link rel="icon" href="../assets/images/favicon.png">
+      <link rel="icon" href="../imgs/logo.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
@@ -71,7 +71,7 @@
     
     
     
-    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="light-green">
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
   
     
     <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#installation" class="md-skip">
+        <a href="#installing-wildintel-tools" class="md-skip">
           Skip to content
         </a>
       
@@ -130,7 +130,7 @@
     
     
     
-    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="light-green"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
     
       <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
@@ -140,7 +140,7 @@
     
     
     
-    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="green" data-md-color-accent="light-green"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
     
       <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
@@ -439,22 +439,66 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#requirements" class="md-nav__link">
+  <a href="#installation-methods" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Requirements
+        Installation methods
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Requirements">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#from-source-using-uv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From source (using uv)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="From source (using uv)">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#external-tools-optional-but-required-for-some-commands" class="md-nav__link">
+  <a href="#install-exiftool" class="md-nav__link">
     <span class="md-ellipsis">
       
-        External tools (optional but required for some commands)
+        Install ExifTool
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#install-git" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Install Git
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#install-uv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Install uv
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#install-wildintel-tools" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Install wildintel-tools
       
     </span>
   </a>
@@ -467,46 +511,41 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#install-from-source" class="md-nav__link">
+  <a href="#from-binaries" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Install from source
+        From binaries
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="From binaries">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#using-docker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using Docker
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#install-with-pip" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#prebuilt-binaries-releases" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Install with pip
+        Prebuilt binaries (Releases)
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#verify-the-installation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Verify the installation
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#next-step" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Next step
-      
-    </span>
-  </a>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -827,22 +866,66 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#requirements" class="md-nav__link">
+  <a href="#installation-methods" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Requirements
+        Installation methods
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Requirements">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#from-source-using-uv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From source (using uv)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="From source (using uv)">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#external-tools-optional-but-required-for-some-commands" class="md-nav__link">
+  <a href="#install-exiftool" class="md-nav__link">
     <span class="md-ellipsis">
       
-        External tools (optional but required for some commands)
+        Install ExifTool
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#install-git" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Install Git
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#install-uv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Install uv
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#install-wildintel-tools" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Install wildintel-tools
       
     </span>
   </a>
@@ -855,46 +938,41 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#install-from-source" class="md-nav__link">
+  <a href="#from-binaries" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Install from source
+        From binaries
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="From binaries">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#using-docker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using Docker
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#install-with-pip" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#prebuilt-binaries-releases" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Install with pip
+        Prebuilt binaries (Releases)
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#verify-the-installation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Verify the installation
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#next-step" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Next step
-      
-    </span>
-  </a>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -918,43 +996,178 @@
   
 
 
-<h1 id="installation">Installation</h1>
-<h2 id="requirements">Requirements</h2>
+<h1 id="installing-wildintel-tools">Installing WildIntel Tools</h1>
+<h2 id="installation-methods">Installation methods</h2>
+<p>WildIntel Tools can be installed in two main ways:</p>
+<ul>
+<li><strong>From source</strong>: using <code>uv</code> (managed Python environment).</li>
+<li><strong>From binaries</strong>: either using Docker (container) or downloading prebuilt executables from the project's GitHub <a href="https://github.com/ijfvianauhu/wildintel-tools/releases">Releases</a> page.</li>
+</ul>
+<hr />
+<h2 id="from-source-using-uv">From source (using <code>uv</code>)</h2>
+<p><strong>Requirements:</strong></p>
 <ul>
 <li>Python 3.12 or higher</li>
-<li><a href="https://docs.astral.sh/uv/">uv</a> (recommended) or pip</li>
+<li><code>uv</code> (environment/runner)</li>
+<li><code>git</code> and <code>exiftool</code> installed on the host</li>
 </ul>
-<h3 id="external-tools-optional-but-required-for-some-commands">External tools (optional but required for some commands)</h3>
+<h3 id="install-exiftool">Install ExifTool</h3>
+<p><code>ExifTool</code> is required for metadata extraction.</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:4"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><input id="__tabbed_1_3" name="__tabbed_1" type="radio" /><input id="__tabbed_1_4" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Linux (Debian / Ubuntu)</label><label for="__tabbed_1_2">Linux (Fedora / RHEL)</label><label for="__tabbed_1_3">macOS (Homebrew)</label><label for="__tabbed_1_4">Windows (winget)</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>libimage-exiftool-perl
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>sudo<span class="w"> </span>dnf<span class="w"> </span>install<span class="w"> </span>perl-Image-ExifTool
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>/bin/bash<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh<span class="k">)</span><span class="s2">&quot;</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>brew<span class="w"> </span>install<span class="w"> </span>exiftool
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">winget</span> <span class="n">install</span> <span class="n">-e</span> <span class="p">-</span><span class="n">-id</span> <span class="n">OliverBetz</span><span class="p">.</span><span class="n">ExifTool</span>
+</code></pre></div>
+</div>
+</div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
 <ul>
-<li><strong>ffmpeg</strong> — used by the <code>wildintel prepare-for-trapper</code> pipeline for image processing.</li>
-<li><strong>exiftool</strong> — used to read and write XMP metadata on image files.</li>
+<li>Ensure <code>exiftool</code> is available on your <code>PATH</code> after installation.</li>
+<li>Alternative downloads available at <a href="https://exiftool.org/">https://exiftool.org/</a>.</li>
 </ul>
-<p>Both tools can be tested after installation with <code>wildintel helpers test-external-tools</code>.</p>
+</div>
 <hr />
-<h2 id="install-from-source">Install from source</h2>
-<p>Clone the repository and install the project with uv:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/ijfviana/wildintel-tools.git
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">cd</span><span class="w"> </span>wildintel-tools
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>uv<span class="w"> </span>sync
+<h3 id="install-git">Install Git</h3>
+<p><code>Git</code> is required to clone the repository.</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="2:4"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><input id="__tabbed_2_3" name="__tabbed_2" type="radio" /><input id="__tabbed_2_4" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">Linux (Debian / Ubuntu)</label><label for="__tabbed_2_2">Linux (Fedora / RHEL)</label><label for="__tabbed_2_3">macOS (Homebrew)</label><label for="__tabbed_2_4">Windows (winget)</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>git
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>git<span class="w"> </span>--version
 </code></pre></div>
-<p>This installs the <code>wildintel</code> command in the project's virtual environment. Activate it or prefix commands with <code>uv run</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>uv<span class="w"> </span>run<span class="w"> </span>wildintel<span class="w"> </span>--help
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>sudo<span class="w"> </span>dnf<span class="w"> </span>install<span class="w"> </span>git
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>git<span class="w"> </span>--version
 </code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>brew<span class="w"> </span>install<span class="w"> </span>git
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>git<span class="w"> </span>--version
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">winget</span> <span class="n">install</span> <span class="n">-e</span> <span class="p">-</span><span class="n">-id</span> <span class="n">Git</span><span class="p">.</span><span class="n">Git</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="n">git</span> <span class="p">-</span><span class="n">-version</span>
+</code></pre></div>
+</div>
+</div>
+</div>
 <hr />
-<h2 id="install-with-pip">Install with pip</h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>pip<span class="w"> </span>install<span class="w"> </span>wildintel-tools
+<h3 id="install-uv">Install <code>uv</code></h3>
+<p>Install <code>uv</code> (the Astral <code>uv</code> tool) to manage the project environment and run the CLI.</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="3:2"><input checked="checked" id="__tabbed_3_1" name="__tabbed_3" type="radio" /><input id="__tabbed_3_2" name="__tabbed_3" type="radio" /><div class="tabbed-labels"><label for="__tabbed_3_1">Linux / macOS</label><label for="__tabbed_3_2">Windows (winget)</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># Install uv</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>curl<span class="w"> </span>-LsSf<span class="w"> </span>https://astral.sh/uv/install.sh<span class="w"> </span><span class="p">|</span><span class="w"> </span>sh
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="c1"># Ensure the installation bin directory is on your PATH</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="nb">export</span><span class="w"> </span><span class="nv">PATH</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$HOME</span><span class="s2">/.local/bin:</span><span class="nv">$PATH</span><span class="s2">&quot;</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="c1"># Verify installation</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>uv<span class="w"> </span>--version
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>uv<span class="w"> </span>run<span class="w"> </span>wildintel-tools<span class="w"> </span>--help
 </code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c"># Install uv</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="n">winget</span> <span class="n">install</span> <span class="n">-e</span> <span class="p">-</span><span class="n">-id</span> <span class="n">astral-sh</span><span class="p">.</span><span class="n">uv</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="c"># Verify installation</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="n">uv</span> <span class="p">-</span><span class="n">-version</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="n">uv</span> <span class="n">run</span> <span class="n">wildintel-tools</span> <span class="p">-</span><span class="n">-help</span>
+</code></pre></div>
+</div>
+</div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<ul>
+<li>If <code>uv</code> is not found after installation, restart your terminal or add the installation directory to your <code>PATH</code>.</li>
+<li>On Linux/macOS the installer typically places binaries under <code>~/.local/bin</code>; adjust the <code>PATH</code> accordingly.</li>
+<li>On Windows, <code>winget</code> normally updates the system <code>PATH</code> automatically; if not, restart PowerShell or sign out and sign in.</li>
+</ul>
+</div>
 <hr />
-<h2 id="verify-the-installation">Verify the installation</h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>wildintel<span class="w"> </span>--help
+<h3 id="install-wildintel-tools">Install wildintel-tools</h3>
+<p>After installing the dependencies, clone the repository and run the tool using <code>uv</code>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># Clone and prepare the project</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/ijfvianauhu/wildintel-tools.git
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="nb">cd</span><span class="w"> </span>wildintel-tools
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="c1"># (Optional) sync dependencies into the uv-managed environment</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>uv<span class="w"> </span>sync<span class="w"> </span>--all-extras<span class="w"> </span>--dev
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="c1"># Run the CLI via uv</span>
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>uv<span class="w"> </span>run<span class="w"> </span>wildintel-tools<span class="w"> </span>--help
 </code></pre></div>
-<p>You should see the top-level help message listing all available command groups.</p>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>If you need to activate the virtual environment created by <code>uv</code>, run <code>source .venv/bin/activate</code> when required.</p>
+</div>
 <hr />
-<h2 id="next-step">Next step</h2>
-<p>Run the setup wizard to create your first project configuration:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>wildintel<span class="w"> </span>wildintel<span class="w"> </span>wizard<span class="w"> </span>setup
+<h2 id="from-binaries">From binaries</h2>
+<h3 id="using-docker">Using Docker</h3>
+<p>The container is the recommended way to run the tool without installing local dependencies. First, ensure Docker is
+installed on your system by following the instructions for your OS on the <a href="https://www.docker.com/get-started">Docker website</a>.</p>
+<p>Then, obtain the <code>docker-compose.yml</code> from the repository and download it to your computer. In the directory where you
+have the <code>docker-compose.yml</code>, run:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>-d
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>--user<span class="w"> </span>trapper<span class="w"> </span>wildintel-tools<span class="w"> </span>bash
 </code></pre></div>
-<p>Or create a configuration manually — see the <a href="../configuration/">Configuration guide</a>.</p>
+<p>Verify that the tool is available inside the container:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>wildintel-tools<span class="w"> </span>--help
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Updating the Docker image</p>
+<p>To update to the latest version, run the following commands in the directory where <code>docker-compose.yml</code> is located.
+This will pull the latest image and restart the container.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>docker<span class="w"> </span>compose<span class="w"> </span>pull
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>-d
+</code></pre></div>
+</div>
+<hr />
+<h3 id="prebuilt-binaries-releases">Prebuilt binaries (Releases)</h3>
+<p>Prebuilt executables for the main operating systems are published in the
+<a href="https://github.com/ijfvianauhu/wildintel-tools/releases">project's GitHub Releases page</a>.</p>
+<ol>
+<li>Go to the <a href="https://github.com/ijfvianauhu/wildintel-tools/releases">Releases page</a>.</li>
+<li>Download the artifact that matches your OS/architecture (Linux, macOS x86_64/arm64, Windows).</li>
+<li>Extract/move the executable and run it, or place it in a directory on your <code>PATH</code>.</li>
+</ol>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<ul>
+<li>Download the artifact that matches your architecture.</li>
+<li>On Linux/macOS you may need <code>chmod +x</code> to make the file executable.</li>
+<li>Prebuilt binaries do not include <code>exiftool</code> and <code>ffmpeg</code>; ensure these are installed as per the instructions above.</li>
+</ul>
+</div>
+<hr />
+<div class="admonition info">
+<p class="admonition-title">Which method should I use?</p>
+<ul>
+<li>For <strong>development or contributions</strong>, prefer installation from source using <code>uv</code>.</li>
+<li>For <strong>production</strong> or usage without managing local dependencies, prefer Docker or the prebuilt binaries from Releases.</li>
+<li>Consult <code>README.md</code> for common commands and configuration details (<code>DATA_PATH</code>, <code>wildintel-tools-data</code> layout, etc.).</li>
+</ul>
+</div>
 
 
 
