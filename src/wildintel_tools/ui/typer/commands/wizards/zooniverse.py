@@ -12,7 +12,7 @@ from wildintel_tools.ui.typer.settings import (
     Settings, SettingsManager, ZooniverseSettings, ZooniverseConnectorSettings,
 )
 from wildintel_tools.ui.typer.zooniverse import get_workflows, get_subject_sets
-from wildintel_tools.ui.typer.commands.zooniverse import download_ss, export_annotations
+from wildintel_tools.ui.typer.commands.zooniverse import download_ss, export_annotations, validate_subject_set
 from wildintel_tools.ui.typer.TyperUtils import TyperUtils
 from wildintel_tools.ui.typer.i18n import _
 from wildintel_tools.zooniverse.ZooniverseClient import ZooniverseClient
@@ -23,6 +23,7 @@ class Wizard(str, Enum):
     setup       = "setup"
     export      = "export"
     download    = "download"
+    validate    = "validate"
 
 
 def _print_section(title: str) -> None:
@@ -449,6 +450,116 @@ def run_download_wizard(ctx: typer.Context, settings: Settings) -> None:
     )
 
 
+def run_validate_wizard(ctx: typer.Context, settings: Settings) -> None:
+    _print_section("Validate a Zooniverse subject set against a Trapper collection")
+    TyperUtils.console.print()
+    TyperUtils.console.print("[blue]ℹ[/blue] This wizard will guide you through validating that the subjects in a")
+    TyperUtils.console.print("    Zooniverse export file match the expected media from a Trapper collection.")
+    TyperUtils.console.print("    You will need a Zooniverse subjects export CSV/TSV file.")
+    TyperUtils.console.print("    You can download it from [bold]https://www.zooniverse.org/lab/{project_id}/data-exports[/bold]")
+    TyperUtils.console.print("    under [bold]Request new subject export[/bold].")
+    TyperUtils.console.print()
+
+    if not typer.confirm("Continue?"):
+        typer.echo("Aborted.")
+        return
+
+    subjects_csv_str = typer.prompt("Path to the Zooniverse subjects export CSV/TSV file")
+    subjects_csv = Path(subjects_csv_str)
+    if not subjects_csv.exists():
+        TyperUtils.fatal(f"File not found: {subjects_csv}")
+
+    trapper_client = TrapperClient(
+        base_url=str(settings.GENERAL.host),
+        user_name=settings.GENERAL.login,
+        user_password=settings.GENERAL.password.get_secret_value(),
+        access_token=None,
+    )
+
+    TyperUtils.console.print()
+    rp = trapper_client.research_projects.get_all()
+    if not rp.results:
+        TyperUtils.fatal("No research projects found in Trapper. Cannot continue.")
+    rp_selected, _ = TyperUtils.select_from_list(rp.results, title="Select a research project")
+
+    cp = trapper_client.classification_projects.get_by_research_project(rp_selected.pk)
+    if not cp.results:
+        TyperUtils.fatal(
+            f"No classification projects found in research project "
+            f"{rp_selected.name} ({rp_selected.pk}). Cannot continue."
+        )
+    TyperUtils.console.print()
+    cp_selected, _ = TyperUtils.select_from_list(cp.results, title="Select a classification project")
+
+    collections = trapper_client.collections.get_by_classification_project(cp_selected.pk)
+    if not collections.results:
+        TyperUtils.fatal(
+            f"No collections found in classification project "
+            f"{cp_selected.name} ({cp_selected.pk}). Cannot continue."
+        )
+    TyperUtils.console.print()
+    collection_selected, _ = TyperUtils.select_from_list(
+        collections.results, id_attr="collection_pk", title="Select a collection"
+    )
+
+    TyperUtils.console.print()
+    ss_id_str = typer.prompt(
+        "Subject set ID to filter the CSV (leave blank to include all rows)",
+        default="",
+    )
+    subject_set_id = int(ss_id_str) if ss_id_str.strip() else None
+
+    TyperUtils.console.print()
+    deployments = trapper_client.deployments.get_all(
+        query={"research_project": rp_selected.pk}
+    )
+    prefix = f"{collection_selected.name}-".lower()
+    filtered = [d for d in deployments.results if d.deployment_id.lower().startswith(prefix)]
+
+    deployment_selected = []
+    if filtered:
+        TyperUtils.console.print()
+        deployment_selected, _ = TyperUtils.select_from_list(
+            filtered, name_attr="deployment_id", title="Select deployments to validate (leave empty for all)", multi_select=True
+        )
+
+    deployment_pks = [str(d.pk) for d in deployment_selected] if deployment_selected else []
+    deployments_str = ",".join(deployment_pks) if deployment_pks else None
+    deployments_info = ", ".join(f"{d.deployment_id} ({d.pk})" for d in deployment_selected) if deployment_selected else "all"
+
+    TyperUtils.console.print()
+    msg = (
+        f"We are going to validate subjects in [bold]{subjects_csv.name}[/bold] "
+        f"against collection {collection_selected.name} ({collection_selected.collection_pk}), "
+        f"classification project {cp_selected.name} ({cp_selected.pk}), "
+        f"research project {rp_selected.name} ({rp_selected.pk}), "
+        f"deployments: {deployments_info}"
+    )
+    if subject_set_id:
+        msg += f", subject set ID: {subject_set_id}"
+    msg += ". Are you sure?"
+    TyperUtils.console.print(msg)
+    TyperUtils.console.print()
+
+    if not typer.confirm("Proceed?"):
+        typer.echo("Aborted.")
+        return
+
+    TyperUtils.console.print()
+    validate_subject_set(
+        ctx,
+        subjects_csv=subjects_csv,
+        collection=collection_selected.collection_pk,
+        research_project=rp_selected.pk,
+        classification_project=cp_selected.pk,
+        subject_set_id=subject_set_id,
+        deployments_input=deployments_str,
+        exclude_deployments_input=None,
+        n_images_seq=settings.ZOONIVERSE_CONNECTOR.upload_collection_n_images_seq,
+        max_interval=settings.ZOONIVERSE_CONNECTOR.upload_collection_max_interval,
+    )
+
+
 def register_wizard_command(app: typer.Typer, callback_with_override: Any) -> None:
     @app.command(
         "wizard",
@@ -471,3 +582,5 @@ def register_wizard_command(app: typer.Typer, callback_with_override: Any) -> No
             run_setup_wizard(ctx, settings, settings_manager)
         elif wizard == Wizard.download:
             run_download_wizard(ctx, settings)
+        elif wizard == Wizard.validate:
+            run_validate_wizard(ctx, settings)

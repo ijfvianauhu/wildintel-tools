@@ -151,12 +151,12 @@ step (step 5) should appear.
 
 ### Step 2 — Upload images to Zooniverse
 
-To upload images use the `wildintel-tools zooniverse importation` command. This command requires the Trapper collection
+To upload images use the `wildintel-tools zooniverse import` command. This command requires the Trapper collection
 ID you want to upload. 
 
 !!! example "Import collection with ID 123 to Zooniverse"
     ```console
-    $ wildintel-tools zooniverse importation 123   
+    $ wildintel-tools zooniverse import 123   
     ```
 After execution, the application reports the process status and concludes by presenting a summary of the generated results.
 The full report details can be accessed by running
@@ -168,39 +168,47 @@ $ wildintel-tools zooniverse reports view
 By default, the command creates a new subject set in Zooniverse with an auto-generated name. To specify a custom name or 
 reuse an existing subject set, pass the `SUBJECTSET_NAME` argument. 
 
-
 !!! example "Import collection with ID 123 to a subject set named 'My subject set name'"
     ```console
-    wildintel-tools zooniverse importation 123 "My subject set name"
+    wildintel-tools zooniverse import 123 "My subject set name"
     ```
 
+!!! tip 
+    You can query for existing subject sets using the `wildintel-tools zooniverse ss` command and check their IDs and 
+    names before running the import. 
+
 In some cases, a single collection could be linked to multiple classification projects. You can specify the classification 
-project to use with the `--cp` option. For example, to use the classification project with ID `123`:
+project to use with the `--cp` option. This is required to correctly resolve the media metadata and link the uploaded 
+subjects to the right project in Trapper.
 
 !!! example "Import collection with ID 123 to a subject set named 'My subject set name' using classification project with ID 123"
     ```bash
-    wildintel-tools zooniverse importation 123 "My subject set name" --cp 123
+    wildintel-tools zooniverse import 123 "My subject set name" --cp 123
     ```
 
-If a collection contains many images, you can filter them by deployment using the `--deployments` option:
+If a collection contains many images, you can filter them by deployment using the `--deployments` option. Thus only 
+images from the specified deployments will be uploaded to Zooniverse. This option  accepts a comma- or space-separated 
+list of deployment IDs to include in the upload. 
 
 !!! example "Import collection with ID 123 to a subject set named 'My subject set name' using only deployments with IDs 123 and 456"
     ```bash
-    wildintel-tools zooniverse importation 123 --deployments 123,456
+    wildintel-tools zooniverse import 123 --deployments 123,456
     ``` 
-Also, if you want to exclude some deployments, use the `--exclude-deployments` option:
+Also, if you want to exclude some deployments, use the `--exclude-deployments` option. This option accepts a comma- or
+space-separated list of deployment IDs to exclude from the upload.
 
 !!! example "Import collection with ID 123 to a subject set named 'My subject set name' excluding deployments with IDs 789 and 101"
     ```console
-    wildintel zooniverse importation 123 "My subject set name" --deployments 123,456 --exclude-deployments 789,101
+    wildintel zooniverse import 123 "My subject set name" --deployments 123,456 --exclude-deployments 789,101
     ``` 
 
-If this command was interrupted or some images were already uploaded in a previous run, you can pass a Zooniverse subjects
-export file to skip those images and avoid duplicates using `--exclude-subjects` option :
+If this command was interrupted or some images were already uploaded in a previous run, you can pass a [Zooniverse subjects
+export file](https://help.zooniverse.org/next-steps/data-exports/) to skip those images and avoid duplicates using
+`--exclude-subjects` option-
 
 !!! example "Import collection with ID 123 to a subject set named 'My subject set name' using only deployments with IDs 123 and 456, excluding deployments with IDs 789 and 101, and skipping already uploaded subjects listed in subjects_export.tsv"
     ```bash
-    wildintel-tools zooniverse importation 123 --exclude-deployments 789,101 --subjects-subjects subjects_export.tsv
+    wildintel-tools zooniverse import 123 --exclude-deployments 789,101 --subjects-subjects subjects_export.tsv
     ```
 !!! tip
     You can download the subjects export file from **https://www.zooniverse.org/lab/{project_id}/data-exports** under 
@@ -210,11 +218,11 @@ export file to skip those images and avoid duplicates using `--exclude-subjects`
 ### Step 3 — Validate the subject set
 
 Before making the subject set live for classification, it is recommended to validate that the expected media were 
-correctly uploaded and that their metadata is correct. To do this, use the `validate-subject-set` command. This command 
-compares the expected media in the selected collection and deployments with the subjects in the subject set, and reports
-any discrepancies such as missing media (expected but not uploaded), extra media (uploaded but not expected), or 
-subjects with incorrect metadata.
+correctly uploaded and that their metadata is correct. 
 
+To do this, use the `validate-subject-set` command. This command  compares the expected media in the selected collection
+and deployments with the subjects in the subject set, and reports any discrepancies such as missing media (expected but 
+not uploaded), extra media (uploaded but not expected), or subjects with incorrect metadata.
 
 !!! example "Validate the subject set with ID 123 against the collection with ID 123 and the subjects listed in subjects_export.tsv"
     ```console
@@ -298,6 +306,111 @@ $ wildintel-tools zooniverse wizard export
 
 Continue? [y/N]:
 ```
+
+## Consensus process
+
+Once Zooniverse volunteers have finished classifying a subject set, the raw output is a collection of individual
+opinions — one per volunteer per subject. Before those opinions can be imported into Trapper as observations, they
+must be reconciled into a single authoritative answer per image. This reconciliation is called the **consensus
+process**.
+
+The consensus process answers three questions for each subject:
+
+1. **How many distinct species appear in this image?**
+2. **Which species are they?**
+3. **How many individuals of each species are visible?**
+
+Each of these questions is answered by aggregating the volunteers' votes, not by selecting one individual's answer.
+The process is designed to be robust to outliers (e.g., a volunteer who labels an image with an unrealistic number
+of species) while still capturing the community's collective knowledge.
+
+### Default consensus implementation
+
+The default implementation is split across two classes:
+
+| Class | Responsibility |
+|---|---|
+| `AnnotationsExtractor` (+ workflow subclass) | Phase 1 — filter opinions, translate labels, determine *k* |
+| `AnnotationsVoter` (+ workflow subclass) | Phase 2 — vote on species and count, compute confidence |
+
+#### Phase 1 — Extraction (`AnnotationsExtractor`)
+
+The extractor processes the raw Zooniverse classifications for a single subject. Its goal is to produce a clean,
+normalised list of `(species, attributes)` pairs — one entry per volunteer choice — together with the **consensus
+number of species** *k* for that image.
+
+Steps:
+
+1. **Filter invalid opinions.** Any volunteer classification that contains zero species choices or more than
+   `k_max` choices (default `3`) is discarded. This removes accidental submissions and implausible outliers.
+
+2. **Record *k* per volunteer.** For each surviving classification the number of species the volunteer labelled
+   is stored in a list `k_list`.
+
+3. **Translate Zooniverse labels to Trapper names.** Each Zooniverse choice string (e.g. `REDDEER`) is mapped to
+   a scientific name or category (e.g. `Cervus elaphus`) via the workflow-specific `zoo_to_trapper` dictionary
+   defined in the subclass (e.g. `Workflow29187AnnotationExtractor`).
+
+4. **Compute *k* majority.** The consensus number of species *k* is the most frequent value in `k_list`, capped
+   at `k_max`. When there is a tie, the largest tied value is used.
+
+The output passed to Phase 2 is a tuple `(k, subject_id, opinions)`, where `opinions` is the full list of
+`(species_name, {HOWMANY: N, …})` pairs contributed by all valid volunteers.
+
+#### Phase 2 — Voting (`Workflow29187AnnotationsVoter`)
+
+The voter takes the normalised opinions from Phase 1 and produces one `Zoo2TrapperObservation` per species.
+
+Steps:
+
+1. **Select the top-*k* species.** Votes are counted per species. The *k* most-voted species are selected. When
+   *k* > 1 the generic label `NOANIMAL` is excluded from competition (a volunteer who said "no animal" alongside
+   a species choice is treated as having voted for the species only).
+
+2. **Estimate individual count.** For each of the top-*k* species, the individual counts (`HOWMANY`) reported by
+   all volunteers are collected and their **median** (rounded up) is used as the consensus count.
+
+3. **Compute pairwise confidence.** Confidence is assigned to each species in rank order:
+
+    - The **pre-confidence** of species *i* is the ratio of its votes to the combined votes of species *i* and *i+1*:
+      `pre_conf = votes_i / (votes_i + votes_{i+1})`. For the last species, `pre_conf = 1.0`.
+    - The **allocated confidence** is `pre_conf × (1 − accumulated_confidence)`, so that the total confidence
+      across all species in an image sums to 1.
+
+4. **Build the observation.** For each species a `Zoo2TrapperObservation` is created with the consensus count,
+   the two confidence values, and the appropriate `observationType` (e.g. `animal`, `blank`, `human`).
+
+### Process diagram
+
+```mermaid
+flowchart TD
+    A([Raw Zooniverse classifications\nfor one subject])
+
+    subgraph P1["Phase 1 — AnnotationsExtractor"]
+        B["Filter opinions\n(discard if choices = 0 or > k_max)"]
+        B --> C["Record k per volunteer\n(number of species chosen)"]
+        C --> D["Translate labels\nzooniverse key → scientific name\nvia zoo_to_trapper"]
+        D --> E["Compute k majority\n(mode of k_list, capped at k_max)"]
+    end
+
+    subgraph P2["Phase 2 — AnnotationsVoter"]
+        F["Select top-k species\n(by vote count)"]
+        F --> G["Estimate individual count\n(median of HOWMANY per species)"]
+        G --> H["Compute pairwise confidence\npre_conf = votes_i / (votes_i + votes_i+1)\nconf = pre_conf × (1 − accumulated)"]
+        H --> I["Build Zoo2TrapperObservation\nper species"]
+    end
+
+    J([Observations list\nready to import into Trapper])
+
+    A --> B
+    E -->|"k · sid · opinions"| F
+    I --> J
+
+    style P1 fill:#e8f4f8,stroke:#2980b9,color:#000
+    style P2 fill:#eafaf1,stroke:#27ae60,color:#000
+```
+
+---
 
 ## Reference
 
@@ -482,7 +595,65 @@ wildintel zooniverse wizard WIZARD
 
 | Wizard | Description |
 |---|---|
+| `setup` | Guided configuration of Zooniverse connection settings |
 | `import` | Guided step-by-step import of a Trapper collection to Zooniverse |
 | `export` | Guided step-by-step export of Zooniverse annotations back to Trapper |
 | `download` | Guided download of subject images from a Zooniverse subject set |
-| `update_metadata` | Guided update of subject metadata using Trapper data |
+| `validate` | Guided validation of a Zooniverse subject set against a Trapper collection |
+
+---
+
+### uploaded-media
+
+Read a Zooniverse subjects export file and list the Trapper media IDs that have already been uploaded. Media IDs are extracted from the `origin` or `external_id` metadata field using the pattern `/:media:<id>`.
+
+```bash
+wildintel zooniverse uploaded-media SUBJECTS_CSV [OPTIONS]
+```
+
+| Argument / Option | Type | Default | Description |
+|---|---|---|---|
+| `SUBJECTS_CSV` | Path | required | Path to the Zooniverse subjects export CSV/TSV file |
+| `--subject-set-id, --ss-id` | int | `None` | Filter by subject set ID. If omitted, all rows are included |
+| `--pipeline` | flag | off | Output only media IDs separated by newlines (for shell pipelines) |
+| `--unresolved` | flag | off | Show only subjects for which no media_id could be extracted |
+| `--only-duplicated` | flag | off | Show only media_ids that appear more than once |
+
+---
+
+### validate-subject-set
+
+Validate a Zooniverse subject set against a Trapper collection using the same media-selection logic as `import`. Reports missing media (expected but absent from the subject set), extra media (uploaded but not expected), and subjects with incorrect metadata.
+
+```bash
+wildintel zooniverse validate-subject-set SUBJECTS_CSV COLLECTION [OPTIONS]
+```
+
+| Argument / Option | Type | Default | Description |
+|---|---|---|---|
+| `SUBJECTS_CSV` | Path | required | Path to the Zooniverse subjects export CSV/TSV file |
+| `COLLECTION` | int | required | Trapper collection ID |
+| `--rp, --research-project` | int | `None` | ID of the research project |
+| `--cp, --classification-project` | int | required | ID of the classification project linked to the collection |
+| `--subject-set-id, --ss-id` | int | `None` | Filter the CSV by subject set ID. If omitted, all rows are included |
+| `--deployments, --d TEXT` | str | auto | Deployment IDs to include (comma/space separated) |
+| `--exclude-deployments, --ed TEXT` | str | `None` | Deployment IDs to skip |
+| `--n-images-seq` | int | `5` | Number of images per sequence |
+| `--max-interval` | int | `90` | Maximum interval between images in a sequence (seconds) |
+
+---
+
+### check-metadata
+
+Validate the metadata fields of every subject in a Zooniverse subjects export file. Checks that required fields (`external_id`, `preview`, `link`, `thumbnail`, `origin`, `license`, `image_name`) are present and that a Trapper media_id can be resolved.
+
+```bash
+wildintel zooniverse check-metadata SUBJECTS_CSV [OPTIONS]
+```
+
+| Argument / Option | Type | Default | Description |
+|---|---|---|---|
+| `SUBJECTS_CSV` | Path | required | Path to the Zooniverse subjects export CSV/TSV file |
+| `--subject-set-id, --ss-id` | int | `None` | Filter by subject set ID. If omitted, all rows are included |
+| `--all` | flag | off | Show all subjects, not only those with issues |
+| `--pipeline` | flag | off | Output only subject_ids with issues separated by newlines (for shell pipelines) |
