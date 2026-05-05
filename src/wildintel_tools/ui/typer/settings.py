@@ -10,7 +10,12 @@ based on the `Dynaconf` and "Pydantic" libraries. It includes utilities for:
 - Managing multiple configuration environments.
 - Accessing and updating individual parameters safely.
 
-The configuration files are stored in TOML format (default location: ``~/.trapper-tools``)
+The configuration files are stored in TOML format.
+The default location is platform-specific and resolved via ``typer.get_app_dir("wildintel-tools")``:
+
+- Linux:   ``~/.config/wildintel-tools/``
+- macOS:   ``~/Library/Application Support/wildintel-tools/``
+- Windows: ``%LOCALAPPDATA%\\wildintel-tools\\``
 and grouped into logical sections such as ``LOGGER``, ``GENERAL``, and ``WILDINTEL``.
 
 Example:
@@ -27,15 +32,37 @@ Example:
 import os
 import platform
 import subprocess
-from pathlib import Path
-from typing import List, Optional, Dict, Type, get_origin, Union, get_args, Any
 import tempfile
+import typer
+import platformdirs
+from pathlib import Path
+from typing import List, Optional, Dict, get_origin, Union, get_args, Any
 from zoneinfo import ZoneInfo
 
 from dynaconf import Dynaconf
 from dynaconf import loaders
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, EmailStr, ValidationError, SecretStr, \
     TypeAdapter, field_validator, field_serializer
+
+# Canonical app directory — platform-aware, consistent with typer.get_app_dir used by the CLI.
+# Linux:   ~/.config/wildintel-tools/
+# macOS:   ~/Library/Application Support/wildintel-tools/
+# Windows: %LOCALAPPDATA%\wildintel-tools\
+APP_NAME = "wildintel-tools"
+DEFAULT_SETTINGS_DIR = Path(typer.get_app_dir(APP_NAME))
+
+
+def get_documents_dir() -> Path:
+    """
+    Return the user's Documents directory using :mod:`platformdirs`.
+
+    Resolves to the platform-specific Documents folder:
+
+    - **Linux**:   ``~/Documents`` (respects XDG)
+    - **macOS**:   ``~/Documents``
+    - **Windows**: ``C:\\Users\\<user>\\Documents`` (respects folder redirection)
+    """
+    return Path(platformdirs.user_documents_dir())
 
 
 class LoggerSettings(BaseModel):
@@ -81,8 +108,11 @@ class GeneralSettings(BaseModel):
         description="Path or command name of the exiftool binary used for reading image metadata.",
     )
     data_dir: Path = Field(
-        default=Path.home() / ".wildintel-tools" / "collections",
-        description="Local directory where downloaded Trapper collections are stored. Created automatically if it does not exist.",
+        default_factory=lambda: get_documents_dir() / "wildintel-tools" / "collections",
+        description=(
+            "Local directory where downloaded Trapper collections are stored. "
+            "Defaults to the user's Documents folder. Created automatically if it does not exist."
+        ),
     )
 
     @field_serializer("host")
@@ -154,8 +184,11 @@ class WildIntelSettings(BaseModel):
         description="If True, only triggered (motion-detected) images are processed; continuous captures are skipped.",
     )
     output_dir: Path = Field(
-        default=Path.home() / ".wildintel-tools" / "readycollections",
-        description="Local directory where processed collections ready for upload are saved. Created automatically if it does not exist.",
+        default_factory=lambda: get_documents_dir() / "wildintel-tools" / "readycollections",
+        description=(
+            "Local directory where processed collections ready for upload are saved. "
+            "Defaults to the user's Documents folder. Created automatically if it does not exist."
+        ),
     )
 
     @field_validator("timezone")
@@ -275,10 +308,13 @@ class SettingsManager:
         """
         Initialize a :class:`SettingsManager` instance.
 
-        :param settings_dir: Directory to store settings files. Defaults to ``~/.trapper-tools``.
+        :param settings_dir: Directory to store settings files.
+            Defaults to the platform-specific app directory returned by
+            ``typer.get_app_dir("wildintel-tools")`` (e.g. ``~/.config/wildintel-tools``
+            on Linux, ``~/Library/Application Support/wildintel-tools`` on macOS).
         :type settings_dir: Optional[Path]
         """
-        self.settings_dir = Path(settings_dir) if settings_dir else Path.home() / ".wildintel-tools"
+        self.settings_dir = Path(settings_dir) if settings_dir else DEFAULT_SETTINGS_DIR
         self.settings_dir.mkdir(parents=True, exist_ok=True)
         self.SETTINGS_ORDER = SettingsManager._generate_settings_order()
 

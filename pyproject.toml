@@ -25,6 +25,7 @@ dependencies = [
     "tqdm>=4.67.1",
     "tzdata>=2025.3",
     "panoptes-client>=1.7.1",
+    "platformdirs>=4.0.0",
 ]
 
 [dependency-groups]

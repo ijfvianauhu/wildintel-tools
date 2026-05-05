@@ -82,18 +82,33 @@ override_mapping = {
 
 callback_with_override = make_dynaconf_callback(override_mapping)
 
-def get_latest_github_release(owner: str, repo: str) -> str:
+def get_latest_github_release(owner: str, repo: str, timeout: float = 3.0) -> str | None:
     """
-    Returns the tag name of the latest GitHub release.
+    Returns the tag name of the latest GitHub release, or ``None`` on any error.
+
+    Failures (no network, timeout, unexpected HTTP status, malformed JSON…) are
+    logged at DEBUG level and never propagate to the caller, so the CLI always
+    starts correctly even without internet access.
+
+    :param owner: GitHub repository owner.
+    :param repo: GitHub repository name.
+    :param timeout: Request timeout in seconds (default 3 s).
     """
     url = f"https://api.github.com/repos/{owner}/{repo}/releases/latest"
-    response = requests.get(url)
-    if response.status_code != 200:
-        TyperUtils.error(_(f"GitHub API request failed with status {response.status_code}"))
-        return None
+    try:
+        response = requests.get(url, timeout=timeout)
+        response.raise_for_status()
+        return response.json()["tag_name"]
+    except requests.exceptions.ConnectionError:
+        logger.debug("Version check skipped: no internet connection.")
+    except requests.exceptions.Timeout:
+        logger.debug("Version check skipped: request timed out after %ss.", timeout)
+    except requests.exceptions.HTTPError as exc:
+        logger.debug("Version check skipped: HTTP %s.", exc.response.status_code)
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("Version check skipped: %s", exc)
+    return None
 
-    data = response.json()
-    return data["tag_name"]
 
 
 def is_newer_version(current_version: str, latest_version: str) -> bool:
