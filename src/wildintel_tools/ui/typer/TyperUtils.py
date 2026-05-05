@@ -395,7 +395,7 @@ class TyperUtils:
         return report_file
 
     @staticmethod
-    def display_report(report: "Report", raw: bool = False) -> None:
+    def display_report(report: "Report", raw: bool = False, only_errors: bool = False, only_successes: bool = False) -> None:
         """
         Displays a formatted summary of the Report instance in the console using Rich.
         """
@@ -406,13 +406,24 @@ class TyperUtils:
                 # Si se pasa la ruta, cargar el YAML
                 with open(report, "r", encoding="utf-8") as f:
                     data = yaml.safe_load(f)
+                if only_errors:
+                    data = {**data, "successes": {}}
+                elif only_successes:
+                    data = {**data, "errors": {}}
+                yaml_str = yaml.safe_dump(data, sort_keys=False, allow_unicode=True)
+                TyperUtils.console.print(yaml_str)
             else:
-                # Convertir la instancia Report a diccionario
-                from dataclasses import asdict
-                data = asdict(report)
-
-            yaml_str = yaml.safe_dump(data, sort_keys=False, allow_unicode=True)
-            TyperUtils.console.print(yaml_str)
+                # Usar to_yaml que ya convierte Path -> str y excluye campos internos
+                yaml_str = report.to_yaml(filepath=None)
+                if only_errors or only_successes:
+                    import copy
+                    data = yaml.safe_load(yaml_str)
+                    if only_errors:
+                        data = {**data, "successes": {}}
+                    elif only_successes:
+                        data = {**data, "errors": {}}
+                    yaml_str = yaml.safe_dump(data, sort_keys=False, allow_unicode=True)
+                TyperUtils.console.print(yaml_str)
             return
 
         title = Text(f"📊 Report: {report.title}")
