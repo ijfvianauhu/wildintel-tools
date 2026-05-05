@@ -81,6 +81,14 @@ def view(ctx: typer.Context,
         str,
         typer.Argument(help=_("Name of the YAML report file to display (optional)"))
     ] = None,
+    only_errors: Annotated[
+        bool,
+        typer.Option("--only-errors", "--oe", help=_("Show only error entries.")),
+    ] = False,
+    only_successes: Annotated[
+        bool,
+        typer.Option("--only-successes", "--os", help=_("Show only success entries.")),
+    ] = False,
 ):
     """
     Load and display a report file.
@@ -92,6 +100,8 @@ def view(ctx: typer.Context,
     :type ctx: typer.Context
     :param filename: Optional YAML filename to display.
     :type filename: str | None
+    :param only_errors: If True, show only error entries.
+    :param only_successes: If True, show only success entries.
     :raises SystemExit: Exits with a fatal message if no reports are found or
         if the requested file does not exist.
     :return: None
@@ -100,10 +110,13 @@ def view(ctx: typer.Context,
     project_name = str(ctx.obj.get("project", "default"))
     logger = ctx.obj.get("logger", logging.getLogger(__name__))
 
+    if only_errors and only_successes:
+        TyperUtils.fatal(_("Cannot use --only-errors and --only-successes at the same time."))
+
     results_dir = TyperUtils.get_default_report_dir()
     target_file = _choose_report_file(results_dir, filename)
     report = Report.from_yaml(target_file)
-    TyperUtils.display_report(report, True)
+    TyperUtils.display_report(report, raw=True, only_errors=only_errors, only_successes=only_successes)
 
 @app.command(help=_("Show a formatted summary of a report file"),
              short_help=_("Show a formatted summary of a report file"))

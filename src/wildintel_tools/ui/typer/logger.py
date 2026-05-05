@@ -19,10 +19,12 @@ Typical usage example:
 """
 import logging
 from pathlib import Path
+from typing import Optional
+from rich.logging import RichHandler
 # Create module logger
 logger = logging.getLogger(__name__)
 
-def setup_logging(app:str, verbosity: int, logger_file:Path=None) -> None:
+def setup_logging(app:str, verbosity: int, logger_file:Optional[Path]=None) -> None:
     """
     Configure logging for all modules in the application.
 
@@ -62,11 +64,13 @@ def setup_logging(app:str, verbosity: int, logger_file:Path=None) -> None:
     # libraries during import), so we replace them explicitly.
     root_logger.handlers.clear()
 
-    fmt = logging.Formatter("[%(levelname)s] %(name)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
-    handler: logging.Handler = (
-        logging.FileHandler(str(logger_file), mode="a") if logger_file else logging.StreamHandler()
-    )
-    handler.setFormatter(fmt)
+    if logger_file:
+        fmt = logging.Formatter("[%(levelname)s] %(name)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+        handler: logging.Handler = logging.FileHandler(str(logger_file), mode="a")
+        handler.setFormatter(fmt)
+    else:
+        handler = RichHandler(rich_tracebacks=True, show_path=False, markup=False)
+
     root_logger.addHandler(handler)
 
     logger.setLevel(log_level)
@@ -76,4 +80,5 @@ def setup_logging(app:str, verbosity: int, logger_file:Path=None) -> None:
     logging.getLogger("PIL").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
+    logging.getLogger("trapper_client").setLevel(logging.WARNING)
 
