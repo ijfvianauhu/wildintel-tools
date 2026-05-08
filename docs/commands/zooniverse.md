@@ -151,6 +151,44 @@ step (step 5) should appear.
 
 ### Step 2 — Upload images to Zooniverse
 
+There are two ways to upload images to Zooniverse: using the **interactive wizard** (recommended for first-time users)
+or running the **`import` command manually** (recommended for advanced users or automation).
+
+#### Option A — Wizard (recommended)
+
+The wizard guides you step by step through the entire import process, asking you to select the collection, subject set,
+deployments, and other options interactively. No prior knowledge of the command-line options is required.
+
+```console
+$ uv run wildintel-tools zooniverse wizard import
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Import a Trapper collection to Zooniverse
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ℹ This wizard will guide you through uploading images from a Trapper
+  collection to a Zooniverse subject set.
+
+Continue? [y/N]:
+```
+
+The wizard will guide you through the following steps:
+
+1. **Select the Trapper collection** — choose the collection whose images you want to upload.
+2. **Select or create a subject set** — choose an existing Zooniverse subject set or create a new one with a custom name.
+3. **Select the classification project** — if the collection is linked to more than one classification project, you will be prompted to pick one.
+4. **Filter by deployments** *(optional)* — narrow the upload to specific deployments within the collection.
+5. **Review and confirm** — a summary of all selected options is shown before the upload starts.
+
+Once confirmed, the wizard launches the import and displays a live progress bar. After completion it prints a summary 
+report. The full report details can be accessed at any time by running:
+
+```bash
+$ wildintel-tools reports view
+```
+
+#### Option B — Manual (`import` command)
+
 To upload images use the `wildintel-tools zooniverse import` command. This command requires the Trapper collection
 ID you want to upload. 
 
@@ -162,7 +200,7 @@ After execution, the application reports the process status and concludes by pre
 The full report details can be accessed by running
 
 ```bash
-$ wildintel-tools zooniverse reports view   
+$ wildintel-tools reports view   
 ```
 
 By default, the command creates a new subject set in Zooniverse with an auto-generated name. To specify a custom name or 
@@ -187,13 +225,14 @@ subjects to the right project in Trapper.
     ```
 
 If a collection contains many images, you can filter them by deployment using the `--deployments` option. Thus only 
-images from the specified deployments will be uploaded to Zooniverse. This option  accepts a comma- or space-separated 
+images from the specified deployments will be uploaded to Zooniverse. This option accepts a comma- or space-separated 
 list of deployment IDs to include in the upload. 
 
 !!! example "Import collection with ID 123 to a subject set named 'My subject set name' using only deployments with IDs 123 and 456"
     ```bash
     wildintel-tools zooniverse import 123 --deployments 123,456
     ``` 
+
 Also, if you want to exclude some deployments, use the `--exclude-deployments` option. This option accepts a comma- or
 space-separated list of deployment IDs to exclude from the upload.
 
@@ -204,16 +243,17 @@ space-separated list of deployment IDs to exclude from the upload.
 
 If this command was interrupted or some images were already uploaded in a previous run, you can pass a [Zooniverse subjects
 export file](https://help.zooniverse.org/next-steps/data-exports/) to skip those images and avoid duplicates using
-`--exclude-subjects` option-
+the `--exclude-subjects` option.
 
-!!! example "Import collection with ID 123 to a subject set named 'My subject set name' using only deployments with IDs 123 and 456, excluding deployments with IDs 789 and 101, and skipping already uploaded subjects listed in subjects_export.tsv"
+!!! example "Import collection with ID 123, excluding deployments 789 and 101, and skipping already uploaded subjects listed in subjects_export.tsv"
     ```bash
-    wildintel-tools zooniverse import 123 --exclude-deployments 789,101 --subjects-subjects subjects_export.tsv
+    wildintel-tools zooniverse import 123 --exclude-deployments 789,101 --exclude-subjects subjects_export.tsv
     ```
+
 !!! tip
     You can download the subjects export file from **https://www.zooniverse.org/lab/{project_id}/data-exports** under 
     **Request new subject export**. Use the [`uploaded-media`](#uploaded-media) command to inspect the file and verify which
-    media IDs have already been uploaded before running `importation`.
+    media IDs have already been uploaded before running `import`.
 
 ### Step 3 — Validate the subject set
 
@@ -231,69 +271,17 @@ not uploaded), extra media (uploaded but not expected), or subjects with incorre
 
 ### Step 4 — Import annotations back to Trapper
 
-Once all the subjects in a subject set linked to a Zooniverse workflow have been classified, we are ready to import 
-these classifications into Trapper. To do this, we will use the export command, where we must specify the subject set 
-whose labels we want to import (using the `--ss` option) and the workflow where the labels were generated (using the
-`--wf` option). In addition, we need to define the destination, namely the collection (option `--c`) and the classification 
-project (`--cp`).
+Once all the subjects in a subject set linked to a Zooniverse workflow have been classified, the annotations can be
+imported back into Trapper. As with the upload step, there are two ways to do this: using the **interactive wizard**
+(recommended for first-time users) or running the **`export` command manually** (recommended for advanced users or
+automation).
 
-Essentially, the export command applies a consensus process to the classifications collected in Zooniverse and generates
-a CSV file with observations that can be imported into Trapper. The command also prints the path of the generated 
-observations CSV and the URL to import it into Trapper.
+#### Option A — Wizard (recommended)
 
-!!! example "Export classifications from Zooniverse workflow with ID 123 and subject set with ID 456 to Trapper collection with ID 789 and classification project with ID 101"
-```bash
-wildintel zooniverse public-annotations \
-  --cp 101 \
-  --c 789 \
-  --ss 456 \
-  --wf 123
-```
+The wizard guides you step by step through the entire export process, asking you to select the subject set, workflow,
+collection, and classification project interactively. No prior knowledge of the command-line options is required.
 
-By default, the command processes all deployments linked to the specified collection. To restrict the export to specific
-deployments, use the `--deployments` option:
-
-!!! example "Export classifications from Zooniverse workflow with ID 123 and subject set with ID 456 to Trapper collection with ID 789 and classification project with ID 101, using only deployments with IDs 123 and 456"
-    ```bash
-    wildintel zooniverse public-annotations \
-      --cp 101 \
-      --c 789 \
-      --ss 456 \
-      --wf 123
-      --d 123,456
-    ```
-By default, the command saves the generated observations CSV in a temporary directory. To specify a custom path, use the 
-`--observations-file` option:
-
-!!! example "Export classifications from Zooniverse workflow with ID 123 and subject set with ID 456 to Trapper collection with ID 789 and classification project with ID 101, using only deployments with IDs 123 and 456, and saving the observations CSV to /path/to/observations.csv"
-    ```bash
-    wildintel zooniverse public-annotations \
-      --cp 101 \
-      --c 789 \
-      --ss 456 \
-      --wf 123
-      --d 123,456
-      --of /path/to/observations.csv
-    ```
-Since the raw Zooniverse annotations are often useful for debugging and analysis, they can be saved as a separate CSV
-file by enabling the `--save-zoo-annotations` flag:
-
-!!! example "Export classifications from Zooniverse workflow with ID 123 and subject set with ID 456 to Trapper collection with ID 789 and classification project with ID 101, using only deployments with IDs 123 and 456, saving the observations CSV to /path/to/observations.csv, and saving the raw Zooniverse annotations to zoo_annotations_observations.csv"
-    ```bash
-    wildintel zooniverse public-annotations \
-      --cp 101 \
-      --c 789 \
-      --ss 456 \
-      --wf 123
-      --d 123,456
-      --of /path/to/observations.csv
-      -- save-zoo-annotations 
-    ```
-
-Also, if it possible to execite a step-by-step interactive wizard for the export process, which guides you through 
-selecting the subject set, workflow, and classification project:
-
-``` console
+```console
 $ wildintel-tools zooniverse wizard export
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -301,11 +289,93 @@ $ wildintel-tools zooniverse wizard export
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ℹ This wizard will guide you through exporting Zooniverse classification
-    results back to Trapper as observations. You will need to select
-    the subject set, the research project and the classification project.
+  results back to Trapper as observations. You will need to select
+  the subject set, the research project and the classification project.
 
 Continue? [y/N]:
 ```
+
+The wizard will guide you through the following steps:
+
+1. **Select the Zooniverse subject set** — choose the subject set whose classifications you want to export.
+2. **Select the Zooniverse workflow** — choose the workflow in which volunteers performed the classifications.
+3. **Select the Trapper collection** — choose the destination collection in Trapper.
+4. **Select the classification project** — choose the Trapper classification project linked to that collection.
+5. **Filter by deployments** *(optional)* — restrict the export to specific deployments.
+6. **Review and confirm** — a summary of all selected options is shown before the export starts.
+
+Once confirmed, the wizard applies the consensus process and generates a CSV file with observations ready to be
+imported into Trapper. It prints the path of the generated CSV and the Trapper import URL.
+
+!!! warning "Important"
+    The CSV import into Trapper must be performed while logged in as the Zooniverse user configured in
+    `ZOONIVERSE.zooniverse_username`. Using a different account will cause the import to fail or produce incorrect results.
+
+#### Option B — Manual (`export` command)
+
+Once all the subjects in a subject set linked to a Zooniverse workflow have been classified, use the `export` command.
+You must specify the subject set whose labels you want to import (using the `--ss` option) and the workflow where the
+labels were generated (using the `--wf` option). You also need to define the destination collection (`--c`) and the
+classification project (`--cp`).
+
+The command applies a consensus process to the classifications collected in Zooniverse and generates a CSV file with
+observations that can be imported into Trapper. It also prints the path of the generated observations CSV and the URL
+to import it into Trapper.
+
+!!! example "Export classifications from Zooniverse workflow with ID 123 and subject set with ID 456 to Trapper collection with ID 789 and classification project with ID 101"
+    ```bash
+    wildintel-tools zooniverse export \
+      --cp 101 \
+      --c 789 \
+      --ss 456 \
+      --wf 123
+    ```
+
+By default, the command processes all deployments linked to the specified collection. To restrict the export to specific
+deployments, use the `--deployments` option:
+
+!!! example "Same export using only deployments with IDs 123 and 456"
+    ```bash
+    wildintel-tools zooniverse export \
+      --cp 101 \
+      --c 789 \
+      --ss 456 \
+      --wf 123 \
+      --d 123,456
+    ```
+
+By default, the command saves the generated observations CSV in a temporary directory. To specify a custom path, use the
+`--observations-file` option:
+
+!!! example "Same export saving the observations CSV to /path/to/observations.csv"
+    ```bash
+    wildintel-tools zooniverse export \
+      --cp 101 \
+      --c 789 \
+      --ss 456 \
+      --wf 123 \
+      --d 123,456 \
+      --of /path/to/observations.csv
+    ```
+
+Since the raw Zooniverse annotations are often useful for debugging and analysis, they can be saved as a separate CSV
+file by enabling the `--save-zoo-annotations` flag:
+
+!!! example "Same export also saving the raw Zooniverse annotations to a separate CSV"
+    ```bash
+    wildintel-tools zooniverse export \
+      --cp 101 \
+      --c 789 \
+      --ss 456 \
+      --wf 123 \
+      --d 123,456 \
+      --of /path/to/observations.csv \
+      --save-zoo-annotations
+    ```
+
+!!! warning "Important"
+    The CSV import into Trapper must be performed while logged in as the Zooniverse user configured in
+    `ZOONIVERSE.zooniverse_username`. Using a different account will cause the import to fail or produce incorrect results.
 
 ## Consensus process
 
