@@ -6,6 +6,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Annotated, Optional, Any, List
 
+from rich.table import Table
+
 import typer
 from panoptes_client.panoptes import PanoptesAPIException
 from trapper_client.TrapperClient import TrapperClient
@@ -82,6 +84,32 @@ def _parse_uploaded_media_ids(csv_path: Path, subject_set_id: Optional[int] = No
         if (mid := _media_id_from_row(row)) is not None
     }
 
+def _resolve_trapper_collection(
+    trapper_client: TrapperClient,
+    research_project: int,
+    classification_project: int,
+    collection: int,
+):
+    """Validate the RP → CP → collection chain in Trapper; fatal-exit on the first missing link."""
+    cp_obj = trapper_client.classification_projects.get_all_by_research_project(research_project)
+    cp_selected = next((obj for obj in cp_obj.results if obj.pk == classification_project), None)
+    if not cp_selected:
+        TyperUtils.fatal(
+            f"Classification project {classification_project} not found in research project {research_project}."
+        )
+
+    collections_obj = trapper_client.collections.get_by_classification_project(classification_project)
+    collection_selected = next(
+        (obj for obj in collections_obj.results if obj.collection_pk == collection), None
+    )
+    if not collection_selected:
+        TyperUtils.fatal(
+            f"Collection {collection} not found in classification project {classification_project}."
+        )
+
+    return cp_selected, collection_selected
+
+
 def make_dynaconf_callback(override_mapping: dict | None = None):
     def callback(ctx, param: typer.CallbackParam, value: Any):
         return TyperUtils.dynamic_dynaconf_callback(ctx, param, value, override_mapping=override_mapping)
@@ -133,8 +161,8 @@ def main_callback(ctx: typer.Context):
         ctx.obj["zooniverse_client"] = zooniverse_client
         ctx.obj["trapper_client"] = trapper_client
         ctx.obj["connector"] = TrapperZooniverseConnector(zooniverse_client, trapper_client)
-    except Exception:
-        pass
+    except Exception as e:
+        TyperUtils.error(_(f"Could not initialise Zooniverse/Trapper clients: {e}. Check your settings."))
 
 @app.command(help=_("Test connection to Zooniverse server instance ") ,
              short_help=_("Test connection to Zooniverse server instance") + " (alias: tc)",
@@ -853,17 +881,9 @@ def importation(
         TyperUtils.fatal(f"No research project found with id {research_project}.")
     rp_selected = rp_obj.results[0]
 
-    # Find classification project
-    cp_obj = trapper_client.classification_projects.get_all_by_research_project(research_project)
-    cp_selected = next((obj for obj in cp_obj.results if obj.pk == classification_project), None)
-    if not cp_selected:
-        TyperUtils.fatal(f"No classification project found with id {classification_project} in research_project {research_project}.")
-
-    # Find collection
-    collections_obj = trapper_client.collections.get_by_classification_project(classification_project)
-    collection_selected = next((obj for obj in collections_obj.results if obj.collection_pk == collection), None)
-    if not collection_selected:
-        TyperUtils.fatal(f"No collection {collection} found in  classification project {classification_project}")
+    _, collection_selected = _resolve_trapper_collection(
+        trapper_client, research_project, classification_project, collection
+    )
 
     if subjectset_name is None:
         subjectset_name = f"{rp_selected.name}_{rp_selected.pk}_{collection_selected.name}_{collection_selected.collection_pk}_{datetime.now():%Y-%m}"
@@ -910,8 +930,7 @@ def importation(
         TyperUtils.success(_(f"Report saved at: {report_file}"))
 
     except Exception as e:
-        raise e
-        TyperUtils.error(f"Error uploading collection {collection}: {str(e)}")
+        TyperUtils.fatal(_(f"Error uploading collection {collection}: {e}"))
 
 
 @app.command(
@@ -965,7 +984,7 @@ def uploaded_media(
                 typer.echo(sid)
             return
 
-        from rich.table import Table
+
         table = Table(title=f"[yellow]Subjects without media_id{ss_label}[/yellow]", show_lines=False)
         table.add_column("subject_id", style="yellow", justify="right")
         for sid in unmatched:
@@ -983,7 +1002,7 @@ def uploaded_media(
                 typer.echo(mid)
             return
 
-        from rich.table import Table
+
         table = Table(title=f"Duplicated media IDs{ss_label}", show_lines=False)
         table.add_column("media_id", style="cyan", justify="right")
         table.add_column("count", style="yellow", justify="right")
@@ -1002,7 +1021,7 @@ def uploaded_media(
             typer.echo(mid)
         return
 
-    from rich.table import Table
+
     table = Table(title=f"Uploaded media IDs{ss_label}", show_lines=False)
     table.add_column("media_id", style="cyan", justify="right")
     for mid in sorted_mids:
@@ -1073,27 +1092,18 @@ def validate_subject_set(
 
     connector: TrapperZooniverseConnector = ctx.obj["connector"]
     trapper_client: TrapperClient = ctx.obj["trapper_client"]
+    settings: Settings = ctx.obj.get("settings", Settings())
 
     if not research_project or not classification_project or not collection:
         TyperUtils.fatal("No research project, classification project or collection defined.")
 
-    # Validate that the collection exists in the given classification project
-    cp_obj = trapper_client.classification_projects.get_all_by_research_project(research_project)
-
-    cp_selected = next((obj for obj in cp_obj.results if obj.pk == classification_project), None)
-    if not cp_selected:
-        TyperUtils.fatal(f"Classification project {classification_project} not found in research project {research_project}.")
-
-    collections_obj = trapper_client.collections.get_by_classification_project(classification_project)
-    collection_selected = next((obj for obj in collections_obj.results if obj.collection_pk == collection), None)
-    if not collection_selected:
-        TyperUtils.fatal(f"Collection {collection} not found in classification project {classification_project}.")
+    _resolve_trapper_collection(trapper_client, research_project, classification_project, collection)
 
     deployments = TyperUtils.parse_id_list(deployments_input, allow_stdin=False)
     excluded_deployments = TyperUtils.parse_id_list(exclude_deployments_input, allow_stdin=False)
 
-    n_images_seq = n_images_seq or 5
-    max_interval = max_interval or 90
+    n_images_seq = n_images_seq or settings.ZOONIVERSE_CONNECTOR.upload_collection_n_images_seq or 5
+    max_interval = max_interval or settings.ZOONIVERSE_CONNECTOR.upload_collection_max_interval or 90
 
     TyperUtils.info(_(f"Validating collection {collection} against {subjects_csv.name}…"))
 
@@ -1111,7 +1121,7 @@ def validate_subject_set(
             progress_callback=progress_callback,
         )
 
-    from rich.table import Table
+
     ss_label = f" — subject set {subject_set_id}" if subject_set_id else ""
 
     # --- Missing ---
@@ -1254,7 +1264,7 @@ def check_metadata(
             typer.echo(r["subject_id"])
         return
 
-    from rich.table import Table
+
 
     display = results if all_subjects else invalid
     table = Table(
@@ -1343,24 +1353,17 @@ def check_missing_media(
 
     connector: TrapperZooniverseConnector = ctx.obj["connector"]
     trapper_client: TrapperClient = ctx.obj["trapper_client"]
+    settings: Settings = ctx.obj.get("settings", Settings())
 
     if not research_project or not classification_project or not collection:
         TyperUtils.fatal("No research project, classification project or collection defined.")
 
-    cp_obj = trapper_client.classification_projects.get_all_by_research_project(research_project)
-    cp_selected = next((obj for obj in cp_obj.results if obj.pk == classification_project), None)
-    if not cp_selected:
-        TyperUtils.fatal(f"Classification project {classification_project} not found in research project {research_project}.")
-
-    collections_obj = trapper_client.collections.get_by_classification_project(classification_project)
-    collection_selected = next((obj for obj in collections_obj.results if obj.collection_pk == collection), None)
-    if not collection_selected:
-        TyperUtils.fatal(f"Collection {collection} not found in classification project {classification_project}.")
+    _resolve_trapper_collection(trapper_client, research_project, classification_project, collection)
 
     deployments = TyperUtils.parse_id_list(deployments_input, allow_stdin=False)
     excluded_deployments = TyperUtils.parse_id_list(exclude_deployments_input, allow_stdin=False)
-    n_images_seq = n_images_seq or 5
-    max_interval = max_interval or 90
+    n_images_seq = n_images_seq or settings.ZOONIVERSE_CONNECTOR.upload_collection_n_images_seq or 5
+    max_interval = max_interval or settings.ZOONIVERSE_CONNECTOR.upload_collection_max_interval or 90
 
     TyperUtils.info(_(f"Checking missing media for collection {collection} against {subjects_csv.name}…"))
 
@@ -1383,7 +1386,7 @@ def check_missing_media(
             typer.echo(mid)
         return
 
-    from rich.table import Table
+
 
     ss_label = f" — subject set {subject_set_id}" if subject_set_id else ""
 
@@ -1445,7 +1448,7 @@ def check_duplicated_media(
             typer.echo(mid)
         return
 
-    from rich.table import Table
+
 
     ss_label = f" — subject set {subject_set_id}" if subject_set_id else ""
 
@@ -1513,7 +1516,7 @@ def check_unmatched_subjects(
             typer.echo(sid)
         return
 
-    from rich.table import Table
+
 
     ss_label = f" — subject set {subject_set_id}" if subject_set_id else ""
 
