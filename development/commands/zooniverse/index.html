@@ -1754,6 +1754,14 @@ deployments, and other options interactively. No prior knowledge of the command-
 report. The full report details can be accessed at any time by running:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>$<span class="w"> </span>wildintel-tools<span class="w"> </span>reports<span class="w"> </span>view
 </code></pre></div>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>The wizard will ask whether you want to run in <strong>dry-run mode</strong> before starting the import. In dry-run mode no images are downloaded, no subject set is created and nothing is uploaded to Zooniverse. This is a safe way to validate how many images would be imported and check that the selection is correct before committing to the actual upload.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>If the number of images to upload is very large, the wizard is not recommended — it runs interactively in the foreground and will block your terminal for the entire duration of the upload. Use <strong>Option B</strong> (the <code>import</code> command) instead, which is better suited for long-running or automated imports.</p>
+</div>
 <h4 id="option-b-manual-import-command">Option B — Manual (<code>import</code> command)</h4>
 <p>To upload images use the <code>wildintel-tools zooniverse import</code> command. This command requires the Trapper collection
 ID you want to upload. </p>
@@ -1815,6 +1823,63 @@ the <code>--exclude-subjects</code> option.</p>
 <strong>Request new subject export</strong>. Use the <a href="#uploaded-media"><code>uploaded-media</code></a> command to inspect the file and verify which
 media IDs have already been uploaded before running <code>import</code>.</p>
 </div>
+<div class="admonition tip">
+<p class="admonition-title">Processing many deployments with one report per deployment</p>
+<p>When the number of deployments is large and you want a separate report for each one, running the wizard or the
+<code>import</code> command manually for each deployment is impractical. A simple shell script can automate this:</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Bash</label><label for="__tabbed_1_2">PowerShell</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="ch">#!/bin/bash</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="c1"># Configuration</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="nv">PROJECT_ID</span><span class="o">=</span><span class="m">66</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="nv">PROJECT_NAME</span><span class="o">=</span><span class="s2">&quot;DONA_24_14_R0037_66_2026-04&quot;</span>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="nv">RP</span><span class="o">=</span><span class="m">14</span>
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="nv">CP</span><span class="o">=</span><span class="m">46</span>
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="nv">EXCLUDE_SUBJECTS</span><span class="o">=</span><span class="s2">&quot;./european-camera-trap-project-subjects.csv&quot;</span>
+<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>
+<a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a><span class="c1"># Deployments (space-separated PKs)</span>
+<a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a><span class="nv">deployments</span><span class="o">=</span><span class="s2">&quot;1081 1080 1047 1071 1083 1068 1036 1038 1063 1058&quot;</span>
+<a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a>
+<a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a><span class="k">for</span><span class="w"> </span>dep<span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="nv">$deployments</span><span class="p">;</span><span class="w"> </span><span class="k">do</span>
+<a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a><span class="w">    </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Processing deployment </span><span class="nv">$dep</span><span class="s2">...&quot;</span>
+<a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a><span class="w">    </span>uv<span class="w"> </span>run<span class="w"> </span>wildintel-tools<span class="w"> </span>zooniverse<span class="w"> </span>import<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$PROJECT_ID</span><span class="s2">&quot;</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$PROJECT_NAME</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-16" name="__codelineno-11-16" href="#__codelineno-11-16"></a><span class="w">        </span>--rp<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$RP</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-17" name="__codelineno-11-17" href="#__codelineno-11-17"></a><span class="w">        </span>--cp<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$CP</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-18" name="__codelineno-11-18" href="#__codelineno-11-18"></a><span class="w">        </span>--deployments<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$dep</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-19" name="__codelineno-11-19" href="#__codelineno-11-19"></a><span class="w">        </span>--exclude-subjects<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$EXCLUDE_SUBJECTS</span><span class="s2">&quot;</span>
+<a id="__codelineno-11-20" name="__codelineno-11-20" href="#__codelineno-11-20"></a><span class="k">done</span>
+<a id="__codelineno-11-21" name="__codelineno-11-21" href="#__codelineno-11-21"></a>
+<a id="__codelineno-11-22" name="__codelineno-11-22" href="#__codelineno-11-22"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;All deployments processed.&quot;</span>
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c"># Configuration</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="nv">$ProjectId</span>      <span class="p">=</span> <span class="n">66</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="nv">$ProjectName</span>    <span class="p">=</span> <span class="s2">&quot;DONA_24_14_R0037_66_2026-04&quot;</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="nv">$RP</span>             <span class="p">=</span> <span class="n">14</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="nv">$CP</span>             <span class="p">=</span> <span class="n">46</span>
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="nv">$ExcludeSubjects</span> <span class="p">=</span> <span class="s2">&quot;./european-camera-trap-project-subjects.csv&quot;</span>
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="c"># Deployments (space-separated PKs)</span>
+<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a><span class="nv">$deployments</span> <span class="p">=</span> <span class="s2">&quot;1081 1080 1047 1071 1083 1068 1036 1038 1063 1058&quot;</span> <span class="n">-split</span> <span class="s2">&quot; &quot;</span>
+<a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a>
+<a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a><span class="k">foreach</span> <span class="p">(</span><span class="nv">$dep</span> <span class="k">in</span> <span class="nv">$deployments</span><span class="p">)</span> <span class="p">{</span>
+<a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a>    <span class="nb">Write-Host</span> <span class="s2">&quot;Processing deployment $dep...&quot;</span>
+<a id="__codelineno-12-13" name="__codelineno-12-13" href="#__codelineno-12-13"></a>    <span class="n">uv</span> <span class="n">run</span> <span class="n">wildintel-tools</span> <span class="n">zooniverse</span> <span class="n">import</span> <span class="nv">$ProjectId</span> <span class="nv">$ProjectName</span> <span class="p">`</span>
+<a id="__codelineno-12-14" name="__codelineno-12-14" href="#__codelineno-12-14"></a>        <span class="p">-</span><span class="n">-rp</span> <span class="nv">$RP</span> <span class="p">`</span>
+<a id="__codelineno-12-15" name="__codelineno-12-15" href="#__codelineno-12-15"></a>        <span class="p">-</span><span class="n">-cp</span> <span class="nv">$CP</span> <span class="p">`</span>
+<a id="__codelineno-12-16" name="__codelineno-12-16" href="#__codelineno-12-16"></a>        <span class="p">-</span><span class="n">-deployments</span> <span class="nv">$dep</span> <span class="p">`</span>
+<a id="__codelineno-12-17" name="__codelineno-12-17" href="#__codelineno-12-17"></a>        <span class="p">-</span><span class="n">-exclude-subjects</span> <span class="nv">$ExcludeSubjects</span>
+<a id="__codelineno-12-18" name="__codelineno-12-18" href="#__codelineno-12-18"></a><span class="p">}</span>
+<a id="__codelineno-12-19" name="__codelineno-12-19" href="#__codelineno-12-19"></a>
+<a id="__codelineno-12-20" name="__codelineno-12-20" href="#__codelineno-12-20"></a><span class="nb">Write-Host</span> <span class="s2">&quot;All deployments processed.&quot;</span>
+</code></pre></div>
+</div>
+</div>
+</div>
+</div>
 <h3 id="step-3-validate-the-subject-set">Step 3 — Validate the subject set</h3>
 <p>Before making the subject set live for classification, verify that the upload completed correctly. Four dedicated 
 commands cover different aspects of the validation. Use them individually for targeted checks or run <code>check-subject-set</code> 
@@ -1832,12 +1897,12 @@ export file</a>.</p>
 </ul>
 <div class="admonition example">
 <p class="admonition-title">Full validation of collection 66 against a subjects export</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="gp">$ </span>wildintel-tools<span class="w"> </span>zooniverse<span class="w"> </span>check-subject-set<span class="w"> </span>european-camera-trap-project-subjects.csv<span class="w"> </span><span class="m">66</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">    </span>--rp<span class="w"> </span><span class="m">12</span><span class="w"> </span>--cp<span class="w"> </span><span class="m">34</span><span class="w"> </span>--ss<span class="w"> </span><span class="m">9876</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="gp">$ </span>wildintel-tools<span class="w"> </span>zooniverse<span class="w"> </span>check-subject-set<span class="w"> </span>european-camera-trap-project-subjects.csv<span class="w"> </span><span class="m">66</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">    </span>--rp<span class="w"> </span><span class="m">12</span><span class="w"> </span>--cp<span class="w"> </span><span class="m">34</span><span class="w"> </span>--ss<span class="w"> </span><span class="m">9876</span>
 </code></pre></div>
 </div>
 <p>The summary line at the end shows all counters at a glance:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>Summary: 1420 expected · 1418 uploaded · 2 missing · 0 extra · 0 duplicated · 1 unmatched · 0 metadata issues
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>Summary: 1420 expected · 1418 uploaded · 2 missing · 0 extra · 0 duplicated · 1 unmatched · 0 metadata issues
 </code></pre></div>
 <hr />
 <h4 id="check-missing-media-check-missing-media">Check missing media — <code>check-missing-media</code></h4>
@@ -1845,12 +1910,12 @@ export file</a>.</p>
 every media ID that Trapper expects in the subject set but is absent from the CSV. Requires a Trapper connection.</p>
 <div class="admonition example">
 <p class="admonition-title">Check for missing media in collection 66</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="gp">$ </span>wildintel-tools<span class="w"> </span>zooniverse<span class="w"> </span>check-missing-media<span class="w"> </span>european-camera-trap-project-subjects.csv<span class="w"> </span><span class="m">66</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">    </span>--rp<span class="w"> </span><span class="m">12</span><span class="w"> </span>--cp<span class="w"> </span><span class="m">34</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="gp">$ </span>wildintel-tools<span class="w"> </span>zooniverse<span class="w"> </span>check-missing-media<span class="w"> </span>european-camera-trap-project-subjects.csv<span class="w"> </span><span class="m">66</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="w">    </span>--rp<span class="w"> </span><span class="m">12</span><span class="w"> </span>--cp<span class="w"> </span><span class="m">34</span>
 </code></pre></div>
 </div>
 <p>Use <code>--pipeline</code> to get only the missing media IDs as plain output, one per line, suitable for shell pipelines:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="gp">$ </span>wildintel-tools<span class="w"> </span>zooniverse<span class="w"> </span>check-missing-media<span class="w"> </span>subjects.csv<span class="w"> </span><span class="m">66</span><span class="w"> </span>--rp<span class="w"> </span><span class="m">12</span><span class="w"> </span>--cp<span class="w"> </span><span class="m">34</span><span class="w"> </span>--pipeline
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="gp">$ </span>wildintel-tools<span class="w"> </span>zooniverse<span class="w"> </span>check-missing-media<span class="w"> </span>subjects.csv<span class="w"> </span><span class="m">66</span><span class="w"> </span>--rp<span class="w"> </span><span class="m">12</span><span class="w"> </span>--cp<span class="w"> </span><span class="m">34</span><span class="w"> </span>--pipeline
 </code></pre></div>
 <hr />
 <h4 id="check-duplicated-media-check-duplicated-media">Check duplicated media — <code>check-duplicated-media</code></h4>
@@ -1858,11 +1923,11 @@ every media ID that Trapper expects in the subject set but is absent from the CS
 Trapper media was uploaded multiple times, which can skew classification results.</p>
 <div class="admonition example">
 <p class="admonition-title">Check for duplicated media IDs</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="gp">$ </span>wildintel-tools<span class="w"> </span>zooniverse<span class="w"> </span>check-duplicated-media<span class="w"> </span>european-camera-trap-project-subjects.csv
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="gp">$ </span>wildintel-tools<span class="w"> </span>zooniverse<span class="w"> </span>check-duplicated-media<span class="w"> </span>european-camera-trap-project-subjects.csv
 </code></pre></div>
 </div>
 <p>Filter to a specific subject set with <code>--ss</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="gp">$ </span>wildintel-tools<span class="w"> </span>zooniverse<span class="w"> </span>check-duplicated-media<span class="w"> </span>subjects.csv<span class="w"> </span>--ss<span class="w"> </span><span class="m">9876</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="gp">$ </span>wildintel-tools<span class="w"> </span>zooniverse<span class="w"> </span>check-duplicated-media<span class="w"> </span>subjects.csv<span class="w"> </span>--ss<span class="w"> </span><span class="m">9876</span>
 </code></pre></div>
 <hr />
 <h4 id="check-unmatched-subjects-check-unmatched-subjects">Check unmatched subjects — <code>check-unmatched-subjects</code></h4>
@@ -1870,7 +1935,7 @@ Trapper media was uploaded multiple times, which can skew classification results
 missing or malformed <code>origin</code> / <code>external_id</code> metadata fields.</p>
 <div class="admonition example">
 <p class="admonition-title">Check for subjects with no media ID</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="gp">$ </span>wildintel-tools<span class="w"> </span>zooniverse<span class="w"> </span>check-unmatched-subjects<span class="w"> </span>european-camera-trap-project-subjects.csv
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="gp">$ </span>wildintel-tools<span class="w"> </span>zooniverse<span class="w"> </span>check-unmatched-subjects<span class="w"> </span>european-camera-trap-project-subjects.csv
 </code></pre></div>
 </div>
 <hr />
@@ -1880,12 +1945,12 @@ missing or malformed <code>origin</code> / <code>external_id</code> metadata fie
 Does <strong>not</strong> require a Trapper connection.</p>
 <div class="admonition example">
 <p class="admonition-title">Check metadata for all subjects</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="gp">$ </span>wildintel-tools<span class="w"> </span>zooniverse<span class="w"> </span>check-metadata<span class="w"> </span>european-camera-trap-project-subjects.csv
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="gp">$ </span>wildintel-tools<span class="w"> </span>zooniverse<span class="w"> </span>check-metadata<span class="w"> </span>european-camera-trap-project-subjects.csv
 </code></pre></div>
 </div>
 <p>Use <code>--all</code> to display every subject (not just those with issues), or <code>--pipeline</code> to output only the
 <code>subject_id</code>s with problems for use in scripts:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="gp">$ </span>wildintel-tools<span class="w"> </span>zooniverse<span class="w"> </span>check-metadata<span class="w"> </span>subjects.csv<span class="w"> </span>--ss<span class="w"> </span><span class="m">9876</span><span class="w"> </span>--pipeline<span class="w"> </span><span class="p">|</span><span class="w"> </span>xargs<span class="w"> </span>...
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="gp">$ </span>wildintel-tools<span class="w"> </span>zooniverse<span class="w"> </span>check-metadata<span class="w"> </span>subjects.csv<span class="w"> </span>--ss<span class="w"> </span><span class="m">9876</span><span class="w"> </span>--pipeline<span class="w"> </span><span class="p">|</span><span class="w"> </span>xargs<span class="w"> </span>...
 </code></pre></div>
 <h3 id="step-4-import-annotations-back-to-trapper">Step 4 — Import annotations back to Trapper</h3>
 <p>Once all the subjects in a subject set linked to a Zooniverse workflow have been classified, the annotations can be
@@ -1895,17 +1960,17 @@ automation).</p>
 <h4 id="option-a-wizard-recommended_1">Option A — Wizard (recommended)</h4>
 <p>The wizard guides you step by step through the entire export process, asking you to select the subject set, workflow,
 collection, and classification project interactively. No prior knowledge of the command-line options is required.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="gp">$ </span>wildintel-tools<span class="w"> </span>zooniverse<span class="w"> </span>wizard<span class="w"> </span><span class="nb">export</span>
-<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>
-<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a><span class="go">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>
-<a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a><span class="go">  Export annotations from a Zooniverse subject set to Trapper</span>
-<a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a><span class="go">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>
-<a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a>
-<a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a><span class="go">ℹ This wizard will guide you through exporting Zooniverse classification</span>
-<a id="__codelineno-20-8" name="__codelineno-20-8" href="#__codelineno-20-8"></a><span class="go">  results back to Trapper as observations. You will need to select</span>
-<a id="__codelineno-20-9" name="__codelineno-20-9" href="#__codelineno-20-9"></a><span class="go">  the subject set, the research project and the classification project.</span>
-<a id="__codelineno-20-10" name="__codelineno-20-10" href="#__codelineno-20-10"></a>
-<a id="__codelineno-20-11" name="__codelineno-20-11" href="#__codelineno-20-11"></a><span class="go">Continue? [y/N]:</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="gp">$ </span>wildintel-tools<span class="w"> </span>zooniverse<span class="w"> </span>wizard<span class="w"> </span><span class="nb">export</span>
+<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>
+<a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a><span class="go">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>
+<a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a><span class="go">  Export annotations from a Zooniverse subject set to Trapper</span>
+<a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a><span class="go">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>
+<a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a>
+<a id="__codelineno-22-7" name="__codelineno-22-7" href="#__codelineno-22-7"></a><span class="go">ℹ This wizard will guide you through exporting Zooniverse classification</span>
+<a id="__codelineno-22-8" name="__codelineno-22-8" href="#__codelineno-22-8"></a><span class="go">  results back to Trapper as observations. You will need to select</span>
+<a id="__codelineno-22-9" name="__codelineno-22-9" href="#__codelineno-22-9"></a><span class="go">  the subject set, the research project and the classification project.</span>
+<a id="__codelineno-22-10" name="__codelineno-22-10" href="#__codelineno-22-10"></a>
+<a id="__codelineno-22-11" name="__codelineno-22-11" href="#__codelineno-22-11"></a><span class="go">Continue? [y/N]:</span>
 </code></pre></div>
 <p>The wizard will guide you through the following steps:</p>
 <ol>
@@ -1933,50 +1998,50 @@ observations that can be imported into Trapper. It also prints the path of the g
 to import it into Trapper.</p>
 <div class="admonition example">
 <p class="admonition-title">Export classifications from Zooniverse workflow with ID 123 and subject set with ID 456 to Trapper collection with ID 789 and classification project with ID 101</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>wildintel-tools<span class="w"> </span>zooniverse<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="w">  </span>--cp<span class="w"> </span><span class="m">101</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a><span class="w">  </span>--c<span class="w"> </span><span class="m">789</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a><span class="w">  </span>--ss<span class="w"> </span><span class="m">456</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a><span class="w">  </span>--wf<span class="w"> </span><span class="m">123</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>wildintel-tools<span class="w"> </span>zooniverse<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="w">  </span>--cp<span class="w"> </span><span class="m">101</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a><span class="w">  </span>--c<span class="w"> </span><span class="m">789</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="w">  </span>--ss<span class="w"> </span><span class="m">456</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a><span class="w">  </span>--wf<span class="w"> </span><span class="m">123</span>
 </code></pre></div>
 </div>
 <p>By default, the command processes all deployments linked to the specified collection. To restrict the export to specific
 deployments, use the <code>--deployments</code> option:</p>
 <div class="admonition example">
 <p class="admonition-title">Same export using only deployments with IDs 123 and 456</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>wildintel-tools<span class="w"> </span>zooniverse<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="w">  </span>--cp<span class="w"> </span><span class="m">101</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a><span class="w">  </span>--c<span class="w"> </span><span class="m">789</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a><span class="w">  </span>--ss<span class="w"> </span><span class="m">456</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a><span class="w">  </span>--wf<span class="w"> </span><span class="m">123</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a><span class="w">  </span>--d<span class="w"> </span><span class="m">123</span>,456
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>wildintel-tools<span class="w"> </span>zooniverse<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="w">  </span>--cp<span class="w"> </span><span class="m">101</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a><span class="w">  </span>--c<span class="w"> </span><span class="m">789</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a><span class="w">  </span>--ss<span class="w"> </span><span class="m">456</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a><span class="w">  </span>--wf<span class="w"> </span><span class="m">123</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a><span class="w">  </span>--d<span class="w"> </span><span class="m">123</span>,456
 </code></pre></div>
 </div>
 <p>By default, the command saves the generated observations CSV in a temporary directory. To specify a custom path, use the
 <code>--observations-file</code> option:</p>
 <div class="admonition example">
 <p class="admonition-title">Same export saving the observations CSV to /path/to/observations.csv</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>wildintel-tools<span class="w"> </span>zooniverse<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="w">  </span>--cp<span class="w"> </span><span class="m">101</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a><span class="w">  </span>--c<span class="w"> </span><span class="m">789</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="w">  </span>--ss<span class="w"> </span><span class="m">456</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a><span class="w">  </span>--wf<span class="w"> </span><span class="m">123</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a><span class="w">  </span>--d<span class="w"> </span><span class="m">123</span>,456<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a><span class="w">  </span>--of<span class="w"> </span>/path/to/observations.csv
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>wildintel-tools<span class="w"> </span>zooniverse<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a><span class="w">  </span>--cp<span class="w"> </span><span class="m">101</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a><span class="w">  </span>--c<span class="w"> </span><span class="m">789</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a><span class="w">  </span>--ss<span class="w"> </span><span class="m">456</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a><span class="w">  </span>--wf<span class="w"> </span><span class="m">123</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-25-6" name="__codelineno-25-6" href="#__codelineno-25-6"></a><span class="w">  </span>--d<span class="w"> </span><span class="m">123</span>,456<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-25-7" name="__codelineno-25-7" href="#__codelineno-25-7"></a><span class="w">  </span>--of<span class="w"> </span>/path/to/observations.csv
 </code></pre></div>
 </div>
 <p>Since the raw Zooniverse annotations are often useful for debugging and analysis, they can be saved as a separate CSV
 file by enabling the <code>--save-zoo-annotations</code> flag:</p>
 <div class="admonition example">
 <p class="admonition-title">Same export also saving the raw Zooniverse annotations to a separate CSV</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>wildintel-tools<span class="w"> </span>zooniverse<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="w">  </span>--cp<span class="w"> </span><span class="m">101</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a><span class="w">  </span>--c<span class="w"> </span><span class="m">789</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a><span class="w">  </span>--ss<span class="w"> </span><span class="m">456</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a><span class="w">  </span>--wf<span class="w"> </span><span class="m">123</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a><span class="w">  </span>--d<span class="w"> </span><span class="m">123</span>,456<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-24-7" name="__codelineno-24-7" href="#__codelineno-24-7"></a><span class="w">  </span>--of<span class="w"> </span>/path/to/observations.csv<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-24-8" name="__codelineno-24-8" href="#__codelineno-24-8"></a><span class="w">  </span>--save-zoo-annotations
+<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>wildintel-tools<span class="w"> </span>zooniverse<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a><span class="w">  </span>--cp<span class="w"> </span><span class="m">101</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a><span class="w">  </span>--c<span class="w"> </span><span class="m">789</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a><span class="w">  </span>--ss<span class="w"> </span><span class="m">456</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a><span class="w">  </span>--wf<span class="w"> </span><span class="m">123</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-26-6" name="__codelineno-26-6" href="#__codelineno-26-6"></a><span class="w">  </span>--d<span class="w"> </span><span class="m">123</span>,456<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-26-7" name="__codelineno-26-7" href="#__codelineno-26-7"></a><span class="w">  </span>--of<span class="w"> </span>/path/to/observations.csv<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-26-8" name="__codelineno-26-8" href="#__codelineno-26-8"></a><span class="w">  </span>--save-zoo-annotations
 </code></pre></div>
 </div>
 <div class="admonition warning">
@@ -2101,7 +2166,7 @@ number of species</strong> <em>k</em> for that image.</p>
 <h2 id="reference">Reference</h2>
 <h3 id="test-connection">test-connection</h3>
 <p>Test the connection to the Zooniverse API using the credentials in the active project settings.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>wildintel<span class="w"> </span>zooniverse<span class="w"> </span>test-connection<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a>wildintel<span class="w"> </span>zooniverse<span class="w"> </span>test-connection<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
 </code></pre></div>
 <p>Alias: <code>tc</code></p>
 <table>
@@ -2137,7 +2202,7 @@ number of species</strong> <em>k</em> for that image.</p>
 <hr />
 <h3 id="workflows">workflows</h3>
 <p>Retrieve and display workflows from the Zooniverse project.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>wildintel<span class="w"> </span>zooniverse<span class="w"> </span>workflows<span class="w"> </span><span class="o">[</span>WF_ID<span class="o">]</span><span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a>wildintel<span class="w"> </span>zooniverse<span class="w"> </span>workflows<span class="w"> </span><span class="o">[</span>WF_ID<span class="o">]</span><span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
 </code></pre></div>
 <p>Alias: <code>wf</code></p>
 <table>
@@ -2179,7 +2244,7 @@ number of species</strong> <em>k</em> for that image.</p>
 <hr />
 <h3 id="subjectsets">subjectsets</h3>
 <p>Retrieve subject sets from the Zooniverse project.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a>wildintel<span class="w"> </span>zooniverse<span class="w"> </span>subjectsets<span class="w"> </span><span class="o">[</span>SS_ID<span class="o">]</span><span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a>wildintel<span class="w"> </span>zooniverse<span class="w"> </span>subjectsets<span class="w"> </span><span class="o">[</span>SS_ID<span class="o">]</span><span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
 </code></pre></div>
 <p>Alias: <code>ss</code></p>
 <table>
@@ -2233,7 +2298,7 @@ number of species</strong> <em>k</em> for that image.</p>
 <hr />
 <h3 id="subjects">subjects</h3>
 <p>Retrieve individual subjects (images) from Zooniverse.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a>wildintel<span class="w"> </span>zooniverse<span class="w"> </span>subjects<span class="w"> </span><span class="o">[</span>ID<span class="o">]</span><span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a>wildintel<span class="w"> </span>zooniverse<span class="w"> </span>subjects<span class="w"> </span><span class="o">[</span>ID<span class="o">]</span><span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
 </code></pre></div>
 <p>Alias: <code>sbj</code></p>
 <table>
@@ -2281,7 +2346,7 @@ number of species</strong> <em>k</em> for that image.</p>
 <hr />
 <h3 id="update-metadata">update-metadata</h3>
 <p>Update the metadata of all subjects in a Zooniverse subject set using data retrieved from Trapper. The command extracts the <code>media_id</code> from each subject filename, queries Trapper for the corresponding media in the selected classification project, and updates the subject metadata accordingly.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a>wildintel<span class="w"> </span>zooniverse<span class="w"> </span>update-metadata<span class="w"> </span>SS_ID<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a>wildintel<span class="w"> </span>zooniverse<span class="w"> </span>update-metadata<span class="w"> </span>SS_ID<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
 </code></pre></div>
 <p>Alias: <code>um</code></p>
 <table>
@@ -2341,7 +2406,7 @@ number of species</strong> <em>k</em> for that image.</p>
 <hr />
 <h3 id="import">import</h3>
 <p>Upload all media (images) from a Trapper collection to a Zooniverse subject set. Images are grouped into sequences according to the <code>--n-images-seq</code> and <code>--max-interval</code> parameters.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a>wildintel<span class="w"> </span>zooniverse<span class="w"> </span>import<span class="w"> </span>COLLECTION<span class="w"> </span><span class="o">[</span>SUBJECTSET_NAME<span class="o">]</span><span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a>wildintel<span class="w"> </span>zooniverse<span class="w"> </span>import<span class="w"> </span>COLLECTION<span class="w"> </span><span class="o">[</span>SUBJECTSET_NAME<span class="o">]</span><span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
 </code></pre></div>
 <table>
 <thead>
@@ -2412,7 +2477,7 @@ number of species</strong> <em>k</em> for that image.</p>
 <hr />
 <h3 id="export">export</h3>
 <p>Export the classification results of a Zooniverse subject set back to Trapper as observations.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a>wildintel<span class="w"> </span>zooniverse<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a>wildintel<span class="w"> </span>zooniverse<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
 </code></pre></div>
 <p>Alias: <code>exp</code></p>
 <table>
@@ -2483,7 +2548,7 @@ number of species</strong> <em>k</em> for that image.</p>
 <hr />
 <h3 id="download-ss">download-ss</h3>
 <p>Download subject images from one or more Zooniverse subject sets to a local directory.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a>wildintel<span class="w"> </span>zooniverse<span class="w"> </span>download-ss<span class="w"> </span>SS_IDS...<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a>wildintel<span class="w"> </span>zooniverse<span class="w"> </span>download-ss<span class="w"> </span>SS_IDS...<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
 </code></pre></div>
 <p>Alias: <code>dl_ss</code></p>
 <table>
@@ -2531,7 +2596,7 @@ number of species</strong> <em>k</em> for that image.</p>
 <hr />
 <h3 id="wizard">wizard</h3>
 <p>Interactive wizard for common Zooniverse workflows.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a>wildintel<span class="w"> </span>zooniverse<span class="w"> </span>wizard<span class="w"> </span>WIZARD
+<div class="highlight"><pre><span></span><code><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a>wildintel<span class="w"> </span>zooniverse<span class="w"> </span>wizard<span class="w"> </span>WIZARD
 </code></pre></div>
 <table>
 <thead>
@@ -2566,7 +2631,7 @@ number of species</strong> <em>k</em> for that image.</p>
 <hr />
 <h3 id="uploaded-media">uploaded-media</h3>
 <p>Read a Zooniverse subjects export file and list the Trapper media IDs that have already been uploaded. Media IDs are extracted from the <code>origin</code> or <code>external_id</code> metadata field using the pattern <code>/:media:&lt;id&gt;</code>.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a>wildintel<span class="w"> </span>zooniverse<span class="w"> </span>uploaded-media<span class="w"> </span>SUBJECTS_CSV<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a>wildintel<span class="w"> </span>zooniverse<span class="w"> </span>uploaded-media<span class="w"> </span>SUBJECTS_CSV<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
 </code></pre></div>
 <table>
 <thead>
@@ -2613,7 +2678,7 @@ number of species</strong> <em>k</em> for that image.</p>
 <hr />
 <h3 id="validate-subject-set">validate-subject-set</h3>
 <p>Validate a Zooniverse subject set against a Trapper collection using the same media-selection logic as <code>import</code>. Reports missing media (expected but absent from the subject set), extra media (uploaded but not expected), and subjects with incorrect metadata.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a>wildintel<span class="w"> </span>zooniverse<span class="w"> </span>validate-subject-set<span class="w"> </span>SUBJECTS_CSV<span class="w"> </span>COLLECTION<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-37-1" name="__codelineno-37-1" href="#__codelineno-37-1"></a>wildintel<span class="w"> </span>zooniverse<span class="w"> </span>validate-subject-set<span class="w"> </span>SUBJECTS_CSV<span class="w"> </span>COLLECTION<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
 </code></pre></div>
 <table>
 <thead>
@@ -2684,7 +2749,7 @@ number of species</strong> <em>k</em> for that image.</p>
 <hr />
 <h3 id="check-metadata">check-metadata</h3>
 <p>Validate the metadata fields of every subject in a Zooniverse subjects export file. Checks that required fields (<code>external_id</code>, <code>preview</code>, <code>link</code>, <code>thumbnail</code>, <code>origin</code>, <code>license</code>, <code>image_name</code>) are present and that a Trapper media_id can be resolved.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a>wildintel<span class="w"> </span>zooniverse<span class="w"> </span>check-metadata<span class="w"> </span>SUBJECTS_CSV<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-38-1" name="__codelineno-38-1" href="#__codelineno-38-1"></a>wildintel<span class="w"> </span>zooniverse<span class="w"> </span>check-metadata<span class="w"> </span>SUBJECTS_CSV<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
 </code></pre></div>
 <table>
 <thead>
