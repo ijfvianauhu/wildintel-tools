@@ -65,6 +65,17 @@ def get_documents_dir() -> Path:
     return Path(platformdirs.user_documents_dir())
 
 
+def get_app_documents_dir() -> Path:
+    """
+    Return the application's documents directory (``<Documents>/wildintel-tools``).
+
+    - **Linux**:   ``~/Documents/wildintel-tools``
+    - **macOS**:   ``~/Documents/wildintel-tools``
+    - **Windows**: ``C:\\Users\\<user>\\Documents\\wildintel-tools``
+    """
+    return get_documents_dir() / APP_NAME
+
+
 class LoggerSettings(BaseModel):
     loglevel: int = Field(
         default=1, ge=0, le=2,

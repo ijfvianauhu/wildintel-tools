@@ -11,7 +11,7 @@ from panoptes_client.panoptes import PanoptesAPIException
 from trapper_client.TrapperClient import TrapperClient
 
 from wildintel_tools.ui.typer.ZooUtils import ZooUtils
-from wildintel_tools.ui.typer.settings import Settings
+from wildintel_tools.ui.typer.settings import Settings, get_app_documents_dir
 from wildintel_tools.ui.typer.zooniverse import (
     check_connection,
     get_workflows,
@@ -141,13 +141,13 @@ def main_callback(ctx: typer.Context):
              rich_help_panel=_("Helpers")
 )
 def test_connection(ctx: typer.Context,
-        zooniverse_username: str = typer.Option( None, "--zooniverse-username", "--zu",
+        zooniverse_username: str = typer.Option( None, "--zooniverse-username", "--zu", "--username",
                                                 help=_("Username to authenticate with the Trapper server")),
         zooniverse_password: str = typer.Option(
-            None, "--zooniverse-password", "--zp", help=_("Password for the specified user (use only if no access token is provided)")
+            None, "--zooniverse-password", "--zp", "--password", help=_("Password for the specified user (use only if no access token is provided)")
         ),
         zooniverse_project_id: str = typer.Option(
-            None, "--zooniverse-project-id", "--zP", help=_("Zooniverse project ID to connect to (e.g., '12345' or 'owner/project-name')")
+            None, "--zooniverse-project-id", "--zP", "--project", help=_("Zooniverse project ID to connect to (e.g., '12345' or 'owner/project-name')")
         ),
 
         config: Annotated[Path,typer.Option(hidden=True,help=_("File to save the report"),
@@ -432,7 +432,7 @@ def update_metadata(
     classification_project: Annotated[
         int,
         typer.Option(
-            "--cp",
+            "--cp", "--classification-project",
             help=_("Trapper classification project ID used to look up media by media_id."),
         ),
     ] = ...,
@@ -619,7 +619,9 @@ def export_annotations(
         deps_str = "-".join(str(d) for d in deployments) if deployments else "all"
         timestamp = datetime.now().strftime("%Y%m%d%H%M")
         filename = f"wildintel_observations_wf{wf_id}_ss{ss_id}_cp{classification_project}_col{collection}_dep{deps_str}_{timestamp}.csv"
-        observations_file = Path(tempfile.gettempdir()) / filename
+        output_dir = get_app_documents_dir() / "zooniverse"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        observations_file = output_dir / filename
 
     TyperUtils.info(
         _(
@@ -627,12 +629,6 @@ def export_annotations(
             f"collection {collection}, classification project {classification_project}…"
         )
     )
-
-    if observations_file is None:
-        observations_file = Path(
-            f"zoo_annotations_{wf_id}_{ss_id}_{classification_project}_{collection}"
-            f"_{datetime.now():%Y%m%d%H%M}.csv"
-        )
 
     try:
         report = public_annotations(
