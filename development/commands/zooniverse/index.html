@@ -1814,11 +1814,10 @@ the <code>--exclude-subjects</code> option.</p>
 media IDs have already been uploaded before running <code>import</code>.</p>
 </div>
 <h3 id="step-3-validate-the-subject-set">Step 3 — Validate the subject set</h3>
-<p>Before making the subject set live for classification, verify that the upload completed correctly. The tools below all
-work from a <strong>Zooniverse subjects export file</strong> — download it from
-<code>https://www.zooniverse.org/lab/{project_id}/data-exports</code> → <strong>Request new subject export</strong>.</p>
-<p>Four dedicated commands cover different aspects of the validation. Use them individually for targeted checks or run
-<code>check-subject-set</code> to perform all of them at once.</p>
+<p>Before making the subject set live for classification, verify that the upload completed correctly. Four dedicated 
+commands cover different aspects of the validation. Use them individually for targeted checks or run <code>check-subject-set</code> 
+to perform all of them at once. For efficiency reasons, all these commands make use of the <a href="https://help.zooniverse.org/next-steps/data-exports/">Zooniverse subjects
+export file</a>.</p>
 <hr />
 <h4 id="full-check-check-subject-set">Full check — <code>check-subject-set</code></h4>
 <p>Runs all four validations in a single pass and prints a consolidated report:</p>
