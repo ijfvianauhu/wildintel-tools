@@ -257,12 +257,10 @@ the `--exclude-subjects` option.
 
 ### Step 3 — Validate the subject set
 
-Before making the subject set live for classification, verify that the upload completed correctly. The tools below all
-work from a **Zooniverse subjects export file** — download it from
-`https://www.zooniverse.org/lab/{project_id}/data-exports` → **Request new subject export**.
-
-Four dedicated commands cover different aspects of the validation. Use them individually for targeted checks or run
-`check-subject-set` to perform all of them at once.
+Before making the subject set live for classification, verify that the upload completed correctly. Four dedicated 
+commands cover different aspects of the validation. Use them individually for targeted checks or run `check-subject-set` 
+to perform all of them at once. For efficiency reasons, all these commands make use of the [Zooniverse subjects
+export file](https://help.zooniverse.org/next-steps/data-exports/).
 
 ---
 

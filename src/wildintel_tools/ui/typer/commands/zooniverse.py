@@ -647,13 +647,18 @@ def export_annotations(
         return
 
     TyperUtils.success(_(f"Annotations exported successfully from subject set {ss_id}."))
-    TyperUtils.success(_(f"Csv file was saved as  {observations_file}."))
+    TyperUtils.success(_(f"Annotations Csv file was saved as  {observations_file}."))
     TyperUtils.info(_(
         f"To import the CSV into Trapper, go to:\n"
         f"  {trapper_client.base_url}/media_classification/classification/import/\n"
         f"and upload '{observations_file.name}' checking only the option 'Import expert classifications'."
     ))
 
+    TyperUtils.console.print()
+    TyperUtils.console.print(
+        "[bold red]⚠  IMPORTANT:[/bold red] [bold]The import process  MUST be performed logged in {trapper_client.base_url} "
+        "as Trapper Zooniverse user[/bold]- "
+        f"Using a different account will cause the import to fail or produce incorrect results.")
 
 
     report_file = TyperUtils.save_report(report)
@@ -663,11 +668,6 @@ def export_annotations(
 
     import_url = str(trapper_client.base_url).rstrip("/") + "/media_classification/classification/import/"
     TyperUtils.console.print()
-    TyperUtils.console.print(f"[bold]CSV file:[/bold] [cyan]{observations_file}[/cyan]")
-    TyperUtils.console.print(f"[bold]Import it at:[/bold] [link={import_url}]{import_url}[/link]")
-    TyperUtils.console.print()
-    TyperUtils.console.print("[bold red]⚠  IMPORTANT:[/bold red] [bold]The import MUST be performed logged in as Trapper Zooniverse user[/bold] "                             
-                             f"Using a different account will cause the import to fail or produce incorrect results.")
 
 
 app.command(name="exp", hidden=True, help=_("Alias for export")) (export_annotations)
