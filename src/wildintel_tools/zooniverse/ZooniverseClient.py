@@ -534,10 +534,20 @@ class SubjectsComponent(ZooniverseClientComponent):
                 pass
 
         _PERMANENT_KEYWORDS = ("maximum", "quota", "limit", "not authorized", "forbidden")
+        _AUTH_KEYWORDS = ("logged in", "must be logged", "log in", "unauthorized", "unauthenticated")
 
         def _should_retry(exc: BaseException) -> bool:
             if isinstance(exc, PanoptesAPIException):
-                return not any(kw in str(exc).lower() for kw in _PERMANENT_KEYWORDS)
+                msg = str(exc).lower()
+                # Session expired: invalidate the connection flag so the next
+                # attempt will call connect() again before uploading.
+                if any(kw in msg for kw in _AUTH_KEYWORDS):
+                    self.client.logger.warning(
+                        "Zooniverse session expired (%s). Will reconnect before retrying.", exc
+                    )
+                    self.client._connected = False
+                    return True
+                return not any(kw in msg for kw in _PERMANENT_KEYWORDS)
             return True
 
         @retry(
@@ -550,6 +560,9 @@ class SubjectsComponent(ZooniverseClientComponent):
             retry_state = _upload_subject.retry.statistics
             attempt_number = retry_state.get("attempt_number", 1)
             self.client.logger.debug(f"[Attempt {attempt_number}/{attempts}] Uploading... {path}")
+            # Always ensure an active session at every attempt (reconnects when
+            # _connected was reset by _should_retry after an auth error).
+            self.client._ensure_connection()
 
             subject = Subject()
             subject.links.project = self.client.project_id

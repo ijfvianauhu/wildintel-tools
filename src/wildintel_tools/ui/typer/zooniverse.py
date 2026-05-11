@@ -50,15 +50,27 @@ def make_progress_callback(progress: Progress, verbose: bool = True) -> Callable
             progress.update(task_id, total=total)
 
         if state == "start":
-            progress.update(task_id, description=f"🟢  {label}")
+            progress.update(task_id, description=f"  {label}")
         elif state == "end":
-            completed = next((t.total for t in progress.tasks if t.id == task_id), None) or 1
+            task_obj = next((t for t in progress.tasks if t.id == task_id), None)
+            completed = (task_obj.total if task_obj and task_obj.total else None) or 1
             progress.update(task_id, completed=completed, description=f"✔️  {label}")
             progress.stop_task(task_id)
+            rendered = progress.make_tasks_table([task_obj]) if task_obj else None
+            progress.remove_task(task_id)
+            del task_registry[task_name]
+            if rendered is not None:
+                progress.console.print(rendered)
             return
         elif state == "fail":
+            task_obj = next((t for t in progress.tasks if t.id == task_id), None)
             progress.update(task_id, description=f"❌  {label}")
             progress.stop_task(task_id)
+            rendered = progress.make_tasks_table([task_obj]) if task_obj else None
+            progress.remove_task(task_id)
+            del task_registry[task_name]
+            if rendered is not None:
+                progress.console.print(rendered)
             return
 
         if item_name is not None:
@@ -77,17 +89,13 @@ def check_connection(zooniverse_client: ZooniverseClient):
     """
     Verifies the connection to the Zooniverse API using the provided credentials.
 
-    :param api_url: Base URL of the Zooniverse API.
-    :type api_url: str
-    :param user_name: Username or email used for authentication.
-    :type user_name: str
-    :param user_password: User password for authentication.
-    :type user_password: str
-    :raises Exception: If the connection fails or authentication is invalid.
-    :return: None
-    :rtype: None
+    Args:
+        zooniverse_client: ZooniverseClient instance.
     """
-    zooniverse_client.connect()
+    with make_progress() as progress:
+        task = progress.add_task("Connecting to Zooniverse...", total=None)
+        zooniverse_client.connect()
+        progress.update(task, completed=1, total=1, description="✔️  Connected")
 
 def get_workflows(zooniverse_client:ZooniverseClient, id:int=None, query:dict[str, Any]=None) -> List[Workflow]:
     """
@@ -164,6 +172,9 @@ def upload_collection( tzc : TrapperZooniverseConnector,
         delay_seconds_per_subject: int,
         dry_run: bool = False,
         uploaded_media_ids: Optional[set[int]] = None,
+        media_ids: Optional[List[int]] = None,
+        excluded_media_ids: Optional[List[int]] = None,
+        max_workers: int = 4,
 ) -> Report :
 
     TyperUtils.debug(f"Starting upload_collection with values:{locals().items()}")
@@ -184,6 +195,9 @@ def upload_collection( tzc : TrapperZooniverseConnector,
              progress_callback=progress_callback,
              dry_run=dry_run,
              uploaded_media_ids=uploaded_media_ids,
+             media_ids=media_ids,
+             excluded_media_ids=excluded_media_ids,
+             max_workers=max_workers,
         )
 
     return report
@@ -375,6 +389,36 @@ def public_annotations(tzc: TrapperZooniverseConnector, cp_id: int, collection_i
             save_zoo_annotations=save_zoo_annotations,
         )
 
+    return results
+
+
+def check_subject_metadata(
+    csv_path: Path,
+    subject_set_id: Optional[int] = None,
+    trapper_client: Optional[TrapperClient] = None,
+    verbose: bool = True,
+) -> list[dict]:
+    """
+    Validate metadata for every subject in a Zooniverse subjects export file,
+    showing a Rich progress bar while iterating.
+
+    :param csv_path: Path to the Zooniverse subjects export CSV/TSV.
+    :param subject_set_id: Optional subject-set ID to filter rows.
+    :param trapper_client: Optional TrapperClient for deep field comparison.
+    :param verbose: Show per-subject detail in the progress log.
+    :returns: List of result dicts (subject_id, subject_set_id, media_id, issues).
+    """
+    # Create a minimal connector instance (zoo=None is safe as long as we only
+    # call check_subject_metadata, which does not use self.zoo).
+    connector = TrapperZooniverseConnector(zoo=None, trapper=trapper_client)
+    with make_progress() as progress:
+        progress_callback = make_progress_callback(progress, verbose=verbose)
+        results = connector.check_subject_metadata(
+            csv_path=csv_path,
+            subject_set_id=subject_set_id,
+            trapper_client=trapper_client,
+            progress_callback=progress_callback,
+        )
     return results
 
 

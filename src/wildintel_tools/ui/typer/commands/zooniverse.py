@@ -19,6 +19,9 @@ from wildintel_tools.ui.typer.zooniverse import (
     update_subject_metadata_from_trapper,
     public_annotations,
     download_subjectsets,
+    check_subject_metadata as _check_subject_metadata,
+    make_progress,
+    make_progress_callback,
 )
 from wildintel_tools.zooniverse.TrapperZooniverseConnector import TrapperZooniverseConnector
 from wildintel_tools.zooniverse.ZooniverseClient import ZooniverseClient
@@ -71,7 +74,6 @@ def _media_id_from_row(row: dict) -> Optional[int]:
             return mid
     return None
 
-
 def _parse_uploaded_media_ids(csv_path: Path, subject_set_id: Optional[int] = None) -> set[int]:
     """Read a Zooniverse subjects export and return the set of Trapper media IDs already uploaded."""
     return {
@@ -79,7 +81,6 @@ def _parse_uploaded_media_ids(csv_path: Path, subject_set_id: Optional[int] = No
         for row in _iter_subject_rows(csv_path, subject_set_id)
         if (mid := _media_id_from_row(row)) is not None
     }
-
 
 def make_dynaconf_callback(override_mapping: dict | None = None):
     def callback(ctx, param: typer.CallbackParam, value: Any):
@@ -136,21 +137,23 @@ def main_callback(ctx: typer.Context):
         pass
 
 @app.command(help=_("Test connection to Zooniverse server instance ") ,
-             short_help=_("Test connection to Zooniverse server instance") + " (alias: tc)")
+             short_help=_("Test connection to Zooniverse server instance") + " (alias: tc)",
+             rich_help_panel=_("Helpers")
+)
 def test_connection(ctx: typer.Context,
-                    zooniverse_username: str = typer.Option( None, "--zooniverse-username", "--zu",
-                                                            help=_("Username to authenticate with the Trapper server")),
-                    zooniverse_password: str = typer.Option(
-                        None, "--zooniverse-password", "--zp", help=_("Password for the specified user (use only if no access token is provided)")
-                    ),
-                    zooniverse_project_id: str = typer.Option(
-                        None, "--zooniverse-project-id", "--zP", help=_("Zooniverse project ID to connect to (e.g., '12345' or 'owner/project-name')")
-                    ),
+        zooniverse_username: str = typer.Option( None, "--zooniverse-username", "--zu",
+                                                help=_("Username to authenticate with the Trapper server")),
+        zooniverse_password: str = typer.Option(
+            None, "--zooniverse-password", "--zp", help=_("Password for the specified user (use only if no access token is provided)")
+        ),
+        zooniverse_project_id: str = typer.Option(
+            None, "--zooniverse-project-id", "--zP", help=_("Zooniverse project ID to connect to (e.g., '12345' or 'owner/project-name')")
+        ),
 
-                    config: Annotated[Path,typer.Option(hidden=True,help=_("File to save the report"),
-                            callback=callback_with_override
-                        )
-                    ] = None,
+        config: Annotated[Path,typer.Option(hidden=True,help=_("File to save the report"),
+                callback=callback_with_override
+            )
+        ] = None,
     ):
     """
     Test the connection to Zooniverse server (API).
@@ -158,13 +161,13 @@ def test_connection(ctx: typer.Context,
     Performs a check using ``check_trapper_connection`` and reports the result
     to the console.
 
-    :param ctx: Typer context.
-    :type ctx: typer.Context
-    :param config: Internal configuration option (dynamic callback).
-    :type config: pathlib.Path | None
-    :raises Exception: If the connection fails a fatal message is logged.
+    Args:
+        ctx (Typer.Context): Typer context (expects `settings`).
+        zooniverse_username (str, optional): Username to authenticate with the Trapper server.
+        zooniverse_password (str, optional): Password for the specified user (use only if no access token is provided).
+        zooniverse_project_id (str, optional): Zooniverse project ID to connect to (e.g., '12345' or 'owner/project-name').
+        config (Path, optional): Internal configuration option (dynamic callback).
     """
-    settings:Settings = ctx.obj.get("settings", {})
 
     zooniverse_client = ZooniverseClient(
         project_id=zooniverse_project_id,
@@ -187,7 +190,9 @@ app.command(name="tc", help=_("Alias for test-connection"), hidden=True) (test_c
     help=_("Retrieve workflows from a Zooniverse project."
             " If a project ID is provided, only workflows for that project will be retrieved."
             ),
-    short_help=_("Retrieve workflows from a Zooniverse project") + " (alias: wf)")
+    short_help=_("Retrieve workflows from a Zooniverse project") + " (alias: wf)",
+    rich_help_panel=_("Helpers")
+)
 def workflows(ctx: typer.Context,
               wf_id: Annotated[Optional[str], typer.Argument( help=("Workflow ID or list (comma/space separated). Use '-' to read from stdin"))] = None,
               pipeline: Annotated[
@@ -219,14 +224,14 @@ def workflows(ctx: typer.Context,
     """
     Display Zooniverse workflows.
 
-    :param ctx: Typer context (must contain ``project`` and ``setting_manager``).
-    :type ctx: typer.Context
-    :param wf_id: Workflow ID to retrieve (optional).
-    :type wf_id: int | None
-    :param raw: Whether to display raw JSON output instead of a formatted table.
-    :type raw: bool
-    :param config: Internal configuration option (dynamic callback).
-    :type config: pathlib.Path | None
+    Args:
+        ctx (typer.Context): Typer context (expects `settings`).
+        wf_id (list[int] | int ): Workflow ID or list (comma/space separated).
+        pipeline (bool): If True, outputs only workflow IDs separated by commas (for shell pipelines).
+        query_param (List[str]):
+        raw (bool): Whether to display raw JSON output instead of a formatted table.
+        config (Path, optional): Internal configuration option (dynamic callback).
+
     :raises Exception: If any check raises, the error is logged.
 
     """
@@ -238,12 +243,9 @@ def workflows(ctx: typer.Context,
     TyperUtils.info(_(f"Retrieving workflows from Zooniverse project {zooniverse_client.project_id} with id {', '.join(str(i) for i in ids)}"))
     query = TyperUtils.parse_query_params(query_param)
     wfs = []
-    if ids:
-        for wid in ids:
-            result = get_workflows(zooniverse_client, wid, query=query)
-            wfs.extend(result if isinstance(result, list) else [result])
-    else:
-        wfs = get_workflows(zooniverse_client, None, query=query)
+    for wid in ids or [None]:
+        result = get_workflows(zooniverse_client, wid, query=query)
+        wfs.extend(result if isinstance(result, list) else [result])
 
     if pipeline:
         ids_csv = ",".join(str(w.id) for w in wfs if getattr(w, "id", None) is not None)
@@ -261,6 +263,7 @@ app.command(name="wf", hidden=True, help=_("Alias for workflows")) (workflows)
         "If a workflow ID is provided, only the subject sets linked to that workflow will be retrieved."
     ) + " (alias: ss)",
     short_help=_("Retrieve all or workflow-specific subject sets from a Zooniverse project" + " (alias: ss)"),
+    rich_help_panel="Helpers"
 )
 def subjectsets(ctx: typer.Context,
     ss_id: Annotated[Optional[str], typer.Argument(help=("Subjectset ID or list (comma/space separated). Use '-' to read from stdin"))] = None,
@@ -299,17 +302,14 @@ def subjectsets(ctx: typer.Context,
     """
     Retrieve subject sets from a Zooniverse project
 
-    :param ctx: Typer context.
-    :type ctx: typer.Context
-    :param ss_id: SubjectSet ID to filter subject sets (optional).
-    :type ss_id: int | None
-    :param exports: Whether to filter subject sets with exports only.
-    :type exports: bool
-    :param wf_id: Workflow ID to filter subject sets (optional).
-    :type wf_id: int | None
-    :param config: Internal configuration option (dynamic callback).
-    :type config: pathlib.Path | None
-    :raises Exception: If retrieval fails a fatal message is logged.
+    Args:
+        ctx (Typer.Context): Typer context (expects `settings`).
+        ss_id (list[int] | int): Subjectset ID or list (comma/space separated).
+        pipeline (bool): Output only subjectsets IDs linked to a pipeline.
+        query_param: Query key-value pair (comma/space separated).
+        wf_id (int): Subjectset ID or list (comma/space separated).
+        raw (bool): Display each subjectset with formatted JSON.
+        config (pathlib.Path | None):
     """
 
     zooniverse_client: ZooniverseClient = ctx.obj["zooniverse_client"]
@@ -345,7 +345,9 @@ app.command(name="ss", hidden=True, help="Alias for subjectsets") (subjectsets)
 
 @app.command(
     help=_("Retrieve a specific subject (image) from a Zooniverse project" + "(alias: sbj)"),
-    short_help=_("Retrieve a subject" + "(alias: sbj)"))
+    short_help=_("Retrieve a subject" + "(alias: sbj)"),
+    rich_help_panel="Helpers"
+)
 def subjects(
     ctx: typer.Context,
     id: Annotated[Optional[str], typer.Argument(help=("Subject ID or list (comma/space separated). Use '-' to read from stdin"))] = None,
@@ -362,7 +364,7 @@ def subjects(
         ),
     ] = None,
     subjectset_id: Annotated[
-        int, typer.Option("--subjectset-id", "--ss-id", help=("Subjectset ID. Only subjects of this subjectset will be retrieved"))
+        int, typer.Option("--ss", "--subjectset-id", "--ss-id", help=("Subjectset ID. Only subjects of this subjectset will be retrieved"))
     ] = None,
     raw: bool = typer.Option(False, help=_("If a single subject is returned, show its raw JSON")),
     config: Annotated[
@@ -678,6 +680,7 @@ app.command(name="exp", hidden=True, help=_("Alias for export")) (export_annotat
 @app.command(
     help=_("Download subjects (images) from one or more Zooniverse subject sets (alias: dl_ss)."),
     short_help=_("Download subject set(s) (alias: dl_ss)"),
+    rich_help_panel="Helpers"
 )
 def download_ss(
     ctx: typer.Context,
@@ -808,6 +811,22 @@ def importation(
             ),
         ),
     ] = None,
+    media_input: Annotated[
+        Optional[str],
+        typer.Option(
+            "--media",
+            "--m",
+            help=_("Media IDs to upload (comma or space separated). Only these media will be uploaded. Use '-' to read from stdin."),
+        ),
+    ] = None,
+    exclude_media_input: Annotated[
+        Optional[str],
+        typer.Option(
+            "--exclude-media",
+            "--em",
+            help=_("Media IDs to skip (comma or space separated). These media will never be uploaded. Use '-' to read from stdin."),
+        ),
+    ] = None,
     config: Annotated[Path, typer.Option(hidden=True, callback=callback_with_override)] = None,
 ) -> None:
     """
@@ -823,9 +842,12 @@ def importation(
     """
     connector: TrapperZooniverseConnector = ctx.obj["connector"]
     trapper_client: TrapperClient = ctx.obj["trapper_client"]
+    settings: Settings = ctx.obj.get("settings", Settings())
 
     deployments = TyperUtils.parse_id_list(deployments_input, allow_stdin=False)
     excluded_deployments = TyperUtils.parse_id_list(exclude_deployments_input, allow_stdin=False)
+    media_ids = TyperUtils.parse_id_list(media_input, allow_stdin=True, param_name="--media")
+    excluded_media_ids = TyperUtils.parse_id_list(exclude_media_input, allow_stdin=True, param_name="--exclude-media")
 
     TyperUtils.debug(f"Uploading collection {collection} to Zooniverse")
 
@@ -839,7 +861,7 @@ def importation(
     rp_selected = rp_obj.results[0]
 
     # Find classification project
-    cp_obj = trapper_client.classification_projects.get_by_research_project(research_project)
+    cp_obj = trapper_client.classification_projects.get_all_by_research_project(research_project)
     cp_selected = next((obj for obj in cp_obj.results if obj.pk == classification_project), None)
     if not cp_selected:
         TyperUtils.fatal(f"No classification project found with id {classification_project} in research_project {research_project}.")
@@ -883,6 +905,9 @@ def importation(
             delay_seconds_per_subject=15,
             dry_run=dry_run,
             uploaded_media_ids=uploaded_media_ids or None,
+            media_ids=media_ids,
+            excluded_media_ids=excluded_media_ids,
+            max_workers=settings.ZOONIVERSE_CONNECTOR.upload_collection_max_workers or 4,
         )
 
         TyperUtils.success(f"Collection {collection} uploaded to Zooniverse subject set '{subjectset_name}'")
@@ -913,7 +938,7 @@ def uploaded_media(
     ],
     subject_set_id: Annotated[
         Optional[int],
-        typer.Option("--subject-set-id", "--ss-id", help=_("Filter by subject set ID. If omitted, all rows are included.")),
+        typer.Option("--subject-set-id", "--ss", "--ss-id", help=_("Filter by subject set ID. If omitted, all rows are included.")),
     ] = None,
     pipeline: Annotated[
         bool,
@@ -976,6 +1001,7 @@ def uploaded_media(
         return
 
     media_map = TrapperZooniverseConnector.uploaded_media_id(subjects_csv, subject_set_id)
+
     sorted_mids = sorted(media_map)
 
     if pipeline:
@@ -993,6 +1019,7 @@ def uploaded_media(
 
 
 @app.command(
+    name="check-subject-set",
     help=_(
         "Validate a Zooniverse subject set against a Trapper collection. "
         "Follows the same selection logic as 'import' but without downloading or uploading. "
@@ -1000,6 +1027,7 @@ def uploaded_media(
         "and subjects with incorrect metadata."
     ),
     short_help=_("Validate a subject set against a Trapper collection"),
+    rich_help_panel="Validation"
 )
 def validate_subject_set(
     ctx: typer.Context,
@@ -1022,7 +1050,7 @@ def validate_subject_set(
     ] = None,
     subject_set_id: Annotated[
         Optional[int],
-        typer.Option("--subject-set-id", "--ss-id", help=_("Filter the CSV by subject set ID. If omitted, all rows are included.")),
+        typer.Option("--subject-set-id", "--ss", "--ss-id", help=_("Filter the CSV by subject set ID. If omitted, all rows are included.")),
     ] = None,
     deployments_input: Annotated[
         Optional[str],
@@ -1057,7 +1085,8 @@ def validate_subject_set(
         TyperUtils.fatal("No research project, classification project or collection defined.")
 
     # Validate that the collection exists in the given classification project
-    cp_obj = trapper_client.classification_projects.get_by_research_project(research_project)
+    cp_obj = trapper_client.classification_projects.get_all_by_research_project(research_project)
+
     cp_selected = next((obj for obj in cp_obj.results if obj.pk == classification_project), None)
     if not cp_selected:
         TyperUtils.fatal(f"Classification project {classification_project} not found in research project {research_project}.")
@@ -1075,16 +1104,19 @@ def validate_subject_set(
 
     TyperUtils.info(_(f"Validating collection {collection} against {subjects_csv.name}…"))
 
-    result = connector.validate_subject_set(
-        subjects_csv=subjects_csv,
-        collection=collection,
-        classification_project=classification_project,
-        subject_set_id=subject_set_id,
-        deployments=deployments,
-        blacklisted_deployments=excluded_deployments,
-        n_images_seq=n_images_seq,
-        max_interval=max_interval,
-    )
+    with make_progress() as progress:
+        progress_callback = make_progress_callback(progress)
+        result = connector.validate_subject_set(
+            subjects_csv=subjects_csv,
+            collection=collection,
+            classification_project=classification_project,
+            subject_set_id=subject_set_id,
+            deployments=deployments,
+            blacklisted_deployments=excluded_deployments,
+            n_images_seq=n_images_seq,
+            max_interval=max_interval,
+            progress_callback=progress_callback,
+        )
 
     from rich.table import Table
     ss_label = f" — subject set {subject_set_id}" if subject_set_id else ""
@@ -1119,6 +1151,35 @@ def validate_subject_set(
 
     TyperUtils.console.print()
 
+    # --- Duplicated ---
+    duplicated = result["duplicated"]
+    if duplicated:
+        t = Table(title=f"[red]Duplicated media IDs{ss_label}[/red]", show_lines=False)
+        t.add_column("media_id", style="red", justify="right")
+        t.add_column("subject_ids", style="yellow")
+        for mid in sorted(duplicated):
+            t.add_row(str(mid), ", ".join(str(s) for s in duplicated[mid]))
+        TyperUtils.console.print(t)
+        TyperUtils.console.print(f"[red]{len(duplicated)} media IDs uploaded more than once[/red]")
+    else:
+        TyperUtils.success(_("No duplicated media IDs."))
+
+    TyperUtils.console.print()
+
+    # --- Unmatched ---
+    unmatched = result["unmatched"]
+    if unmatched:
+        t = Table(title=f"[red]Subjects without media ID{ss_label}[/red]", show_lines=False)
+        t.add_column("subject_id", style="red", justify="right")
+        for sid in unmatched:
+            t.add_row(str(sid))
+        TyperUtils.console.print(t)
+        TyperUtils.console.print(f"[red]{len(unmatched)} subjects with no extractable media ID[/red]")
+    else:
+        TyperUtils.success(_("No unmatched subjects — all subjects have a valid media ID."))
+
+    TyperUtils.console.print()
+
     # --- Metadata issues ---
     meta_issues = result["metadata_issues"]
     if meta_issues:
@@ -1147,6 +1208,8 @@ def validate_subject_set(
         f"[cyan]{total_uploaded}[/cyan] uploaded · "
         f"[red]{len(missing)}[/red] missing · "
         f"[yellow]{len(extra)}[/yellow] extra · "
+        f"[red]{len(duplicated)}[/red] duplicated · "
+        f"[red]{len(unmatched)}[/red] unmatched · "
         f"[red]{len(meta_issues)}[/red] metadata issues"
     )
 
@@ -1154,6 +1217,7 @@ def validate_subject_set(
 @app.command(
     help=_("Validate metadata fields of every subject in a Zooniverse subjects export file."),
     short_help=_("Check subject metadata from a subjects export"),
+    rich_help_panel="Validation"
 )
 def check_metadata(
     ctx: typer.Context,
@@ -1168,7 +1232,7 @@ def check_metadata(
     ],
     subject_set_id: Annotated[
         Optional[int],
-        typer.Option("--subject-set-id", "--ss-id", help=_("Filter by subject set ID. If omitted, all rows are included.")),
+        typer.Option("--subject-set-id", "--ss", "--ss-id", help=_("Filter by subject set ID. If omitted, all rows are included.")),
     ] = None,
     all_subjects: Annotated[
         bool,
@@ -1188,7 +1252,7 @@ def check_metadata(
     if not subjects_csv.exists():
         TyperUtils.fatal(f"File not found: {subjects_csv}")
 
-    results = TrapperZooniverseConnector.check_subject_metadata(subjects_csv, subject_set_id)
+    results = _check_subject_metadata(subjects_csv, subject_set_id)
     invalid = [r for r in results if r["issues"]]
     ss_label = f" — subject set {subject_set_id}" if subject_set_id else ""
 
@@ -1228,6 +1292,255 @@ def check_metadata(
         TyperUtils.console.print(
             f"[red]{n_invalid}[/red] of {total} subjects have metadata issues"
         )
+
+
+@app.command(
+    name="check-missing-media",
+    help=_(
+        "Find media IDs that Trapper expects in Zooniverse but are absent from a subjects export CSV. "
+        "Follows the same selection logic as 'import' (deployments, sequences, public-only, human-filtered)."
+    ),
+    short_help=_("Check for media IDs missing from a subjects export"),
+    rich_help_panel="Validation",
+)
+def check_missing_media(
+    ctx: typer.Context,
+    subjects_csv: Annotated[
+        Path,
+        typer.Argument(help=_(
+            "Path to the Zooniverse subjects export CSV/TSV file. "
+            "To obtain it, go to https://www.zooniverse.org/lab/{project_id}/data-exports "
+            "and click 'Request new subject export'."
+        )),
+    ],
+    collection: Annotated[int, typer.Argument(help=_("Collection ID in Trapper."))],
+    research_project: Annotated[
+        int,
+        typer.Option("--rp", "--research-project", help=_("ID of the research project.")),
+    ] = None,
+    classification_project: Annotated[
+        int,
+        typer.Option("--cp", "--classification-project", help=_("ID of the classification project linked to the collection.")),
+    ] = None,
+    subject_set_id: Annotated[
+        Optional[int],
+        typer.Option("--subject-set-id", "--ss", "--ss-id", help=_("Filter the CSV by subject set ID. If omitted, all rows are included.")),
+    ] = None,
+    deployments_input: Annotated[
+        Optional[str],
+        typer.Option("--deployments", "--d", help=_("Deployment IDs (comma or space separated). If omitted, auto-detected from collection name.")),
+    ] = None,
+    exclude_deployments_input: Annotated[
+        Optional[str],
+        typer.Option("--exclude-deployments", "--ed", help=_("Deployment IDs to skip.")),
+    ] = None,
+    n_images_seq: Annotated[int, typer.Option("--n-images-seq", help=_("Number of images per sequence."))] = None,
+    max_interval: Annotated[int, typer.Option("--max-interval", help=_("Maximum interval between images in a sequence (seconds)."))] = None,
+    pipeline: Annotated[
+        bool,
+        typer.Option("--pipeline", help=_("Output only missing media_ids separated by newlines (for shell pipelines).")),
+    ] = False,
+    config: Annotated[Path, typer.Option(hidden=True, callback=callback_with_override)] = None,
+) -> None:
+    """
+    Compute the set of media_ids Trapper expects in Zooniverse and report those absent from the CSV.
+    """
+    if not subjects_csv.exists():
+        TyperUtils.fatal(f"File not found: {subjects_csv}")
+
+    connector: TrapperZooniverseConnector = ctx.obj["connector"]
+    trapper_client: TrapperClient = ctx.obj["trapper_client"]
+
+    if not research_project or not classification_project or not collection:
+        TyperUtils.fatal("No research project, classification project or collection defined.")
+
+    cp_obj = trapper_client.classification_projects.get_all_by_research_project(research_project)
+    cp_selected = next((obj for obj in cp_obj.results if obj.pk == classification_project), None)
+    if not cp_selected:
+        TyperUtils.fatal(f"Classification project {classification_project} not found in research project {research_project}.")
+
+    collections_obj = trapper_client.collections.get_by_classification_project(classification_project)
+    collection_selected = next((obj for obj in collections_obj.results if obj.collection_pk == collection), None)
+    if not collection_selected:
+        TyperUtils.fatal(f"Collection {collection} not found in classification project {classification_project}.")
+
+    deployments = TyperUtils.parse_id_list(deployments_input, allow_stdin=False)
+    excluded_deployments = TyperUtils.parse_id_list(exclude_deployments_input, allow_stdin=False)
+    n_images_seq = n_images_seq or 5
+    max_interval = max_interval or 90
+
+    TyperUtils.info(_(f"Checking missing media for collection {collection} against {subjects_csv.name}…"))
+
+    with make_progress() as progress:
+        progress_callback = make_progress_callback(progress)
+        missing = connector.missing_media_id(
+            subjects_csv=subjects_csv,
+            collection=collection,
+            classification_project=classification_project,
+            subject_set_id=subject_set_id,
+            deployments=deployments,
+            blacklisted_deployments=excluded_deployments,
+            n_images_seq=n_images_seq,
+            max_interval=max_interval,
+            progress_callback=progress_callback,
+        )
+
+    if pipeline:
+        for mid in sorted(missing):
+            typer.echo(mid)
+        return
+
+    from rich.table import Table
+
+    ss_label = f" — subject set {subject_set_id}" if subject_set_id else ""
+
+    if not missing:
+        TyperUtils.success(_(f"No missing media IDs{ss_label} — all expected media are present in the CSV."))
+        return
+
+    table = Table(title=f"[red]Missing media IDs{ss_label}[/red]", show_lines=False)
+    table.add_column("media_id", style="red", justify="right")
+    for mid in sorted(missing):
+        table.add_row(str(mid))
+
+    TyperUtils.console.print(table)
+    TyperUtils.console.print(
+        f"[red]{len(missing)}[/red] media ID(s) expected by Trapper but absent from the CSV"
+    )
+
+
+@app.command(
+    name="check-duplicated-media",
+    help=_("Find media IDs that appear more than once in a Zooniverse subjects export CSV."),
+    short_help=_("Check for duplicate media IDs in a subjects export"),
+    rich_help_panel="Validation",
+)
+def check_duplicated_media(
+    ctx: typer.Context,
+    subjects_csv: Annotated[
+        Path,
+        typer.Argument(help=_(
+            "Path to the Zooniverse subjects export CSV/TSV file. "
+            "To obtain it, go to https://www.zooniverse.org/lab/{project_id}/data-exports "
+            "and click 'Request new subject export'."
+        )),
+    ],
+    subject_set_id: Annotated[
+        Optional[int],
+        typer.Option("--subject-set-id", "--ss", "--ss-id", help=_("Filter by subject set ID. If omitted, all rows are included.")),
+    ] = None,
+    pipeline: Annotated[
+        bool,
+        typer.Option("--pipeline", help=_("Output only duplicated media_ids separated by newlines (for shell pipelines).")),
+    ] = False,
+) -> None:
+    """
+    Read a Zooniverse subjects export and report every media_id that is linked to more
+    than one subject_id (i.e. the same Trapper media was uploaded multiple times).
+    """
+    if not subjects_csv.exists():
+        TyperUtils.fatal(f"File not found: {subjects_csv}")
+
+    connector: TrapperZooniverseConnector = ctx.obj["connector"]
+
+    with make_progress() as progress:
+        progress_callback = make_progress_callback(progress)
+        duplicates = connector.duplicated_media_id(subjects_csv, subject_set_id, progress_callback)
+
+    if pipeline:
+        for mid in sorted(duplicates):
+            typer.echo(mid)
+        return
+
+    from rich.table import Table
+
+    ss_label = f" — subject set {subject_set_id}" if subject_set_id else ""
+
+    if not duplicates:
+        TyperUtils.success(_(f"No duplicate media IDs found{ss_label}."))
+        return
+
+    table = Table(
+        title=f"[red]Duplicate media IDs{ss_label}[/red]",
+        show_lines=False,
+    )
+    table.add_column("media_id", style="red", justify="right")
+    table.add_column("subject_ids", style="yellow")
+
+    for mid in sorted(duplicates):
+        sids = duplicates[mid]
+        table.add_row(str(mid), ", ".join(str(s) for s in sids))
+
+    TyperUtils.console.print(table)
+    TyperUtils.console.print(
+        f"[red]{len(duplicates)}[/red] media ID(s) appear in more than one subject"
+    )
+
+
+@app.command(
+    name="check-unmatched-subjects",
+    help=_("Find subjects in a Zooniverse subjects export that have no extractable Trapper media ID."),
+    short_help=_("Check for subjects without a linked media ID"),
+    rich_help_panel="Validation",
+)
+def check_unmatched_subjects(
+    ctx: typer.Context,
+    subjects_csv: Annotated[
+        Path,
+        typer.Argument(help=_(
+            "Path to the Zooniverse subjects export CSV/TSV file. "
+            "To obtain it, go to https://www.zooniverse.org/lab/{project_id}/data-exports "
+            "and click 'Request new subject export'."
+        )),
+    ],
+    subject_set_id: Annotated[
+        Optional[int],
+        typer.Option("--subject-set-id", "--ss", "--ss-id", help=_("Filter by subject set ID. If omitted, all rows are included.")),
+    ] = None,
+    pipeline: Annotated[
+        bool,
+        typer.Option("--pipeline", help=_("Output only unmatched subject_ids separated by newlines (for shell pipelines).")),
+    ] = False,
+) -> None:
+    """
+    Read a Zooniverse subjects export and list every subject_id from which
+    no Trapper media_id can be extracted (missing or malformed metadata).
+    """
+    if not subjects_csv.exists():
+        TyperUtils.fatal(f"File not found: {subjects_csv}")
+
+    connector: TrapperZooniverseConnector = ctx.obj["connector"]
+
+    with make_progress() as progress:
+        progress_callback = make_progress_callback(progress)
+        unmatched = connector.unmatched_subject_id(subjects_csv, subject_set_id, progress_callback)
+
+    if pipeline:
+        for sid in unmatched:
+            typer.echo(sid)
+        return
+
+    from rich.table import Table
+
+    ss_label = f" — subject set {subject_set_id}" if subject_set_id else ""
+
+    if not unmatched:
+        TyperUtils.success(_(f"No unmatched subjects found{ss_label}."))
+        return
+
+    table = Table(
+        title=f"[red]Subjects without media ID{ss_label}[/red]",
+        show_lines=False,
+    )
+    table.add_column("subject_id", style="red", justify="right")
+
+    for sid in unmatched:
+        table.add_row(str(sid))
+
+    TyperUtils.console.print(table)
+    TyperUtils.console.print(
+        f"[red]{len(unmatched)}[/red] subject(s) with no extractable media ID"
+    )
 
 
 from wildintel_tools.ui.typer.commands.wizards.zooniverse import register_wizard_command

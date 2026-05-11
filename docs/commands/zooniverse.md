@@ -257,17 +257,105 @@ the `--exclude-subjects` option.
 
 ### Step 3 — Validate the subject set
 
-Before making the subject set live for classification, it is recommended to validate that the expected media were 
-correctly uploaded and that their metadata is correct. 
+Before making the subject set live for classification, verify that the upload completed correctly. The tools below all
+work from a **Zooniverse subjects export file** — download it from
+`https://www.zooniverse.org/lab/{project_id}/data-exports` → **Request new subject export**.
 
-To do this, use the `validate-subject-set` command. This command  compares the expected media in the selected collection
-and deployments with the subjects in the subject set, and reports any discrepancies such as missing media (expected but 
-not uploaded), extra media (uploaded but not expected), or subjects with incorrect metadata.
+Four dedicated commands cover different aspects of the validation. Use them individually for targeted checks or run
+`check-subject-set` to perform all of them at once.
 
-!!! example "Validate the subject set with ID 123 against the collection with ID 123 and the subjects listed in subjects_export.tsv"
+---
+
+#### Full check — `check-subject-set`
+
+Runs all four validations in a single pass and prints a consolidated report:
+
+- **Missing media** — media Trapper expected to upload but absent from the CSV.
+- **Extra media** — subjects present in the CSV that Trapper never intended to upload.
+- **Duplicated media** — media IDs linked to more than one subject (uploaded more than once).
+- **Unmatched subjects** — subjects whose metadata contains no extractable Trapper media ID.
+- **Metadata issues** — subjects whose metadata fields are incomplete or incorrect.
+
+!!! example "Full validation of collection 66 against a subjects export"
     ```console
-    $ wildintel-tools zooniverse validate-subject-set /path/to/subjects_export.tsv 123
+    $ wildintel-tools zooniverse check-subject-set european-camera-trap-project-subjects.csv 66 \
+        --rp 12 --cp 34 --ss 9876
     ```
+
+The summary line at the end shows all counters at a glance:
+
+```
+Summary: 1420 expected · 1418 uploaded · 2 missing · 0 extra · 0 duplicated · 1 unmatched · 0 metadata issues
+```
+
+---
+
+#### Check missing media — `check-missing-media`
+
+Follows the same media-selection logic as `import` (deployments, sequences, public-only, human-filtered) and reports
+every media ID that Trapper expects in the subject set but is absent from the CSV. Requires a Trapper connection.
+
+!!! example "Check for missing media in collection 66"
+    ```console
+    $ wildintel-tools zooniverse check-missing-media european-camera-trap-project-subjects.csv 66 \
+        --rp 12 --cp 34
+    ```
+
+Use `--pipeline` to get only the missing media IDs as plain output, one per line, suitable for shell pipelines:
+
+```console
+$ wildintel-tools zooniverse check-missing-media subjects.csv 66 --rp 12 --cp 34 --pipeline
+```
+
+---
+
+#### Check duplicated media — `check-duplicated-media`
+
+Scans the CSV and reports every media ID that appears linked to more than one subject ID. This indicates the same
+Trapper media was uploaded multiple times, which can skew classification results.
+
+!!! example "Check for duplicated media IDs"
+    ```console
+    $ wildintel-tools zooniverse check-duplicated-media european-camera-trap-project-subjects.csv
+    ```
+
+Filter to a specific subject set with `--ss`:
+
+```console
+$ wildintel-tools zooniverse check-duplicated-media subjects.csv --ss 9876
+```
+
+---
+
+#### Check unmatched subjects — `check-unmatched-subjects`
+
+Scans the CSV and lists every subject ID from which no Trapper `media_id` can be extracted. This usually indicates
+missing or malformed `origin` / `external_id` metadata fields.
+
+!!! example "Check for subjects with no media ID"
+    ```console
+    $ wildintel-tools zooniverse check-unmatched-subjects european-camera-trap-project-subjects.csv
+    ```
+
+---
+
+#### Check metadata only — `check-metadata`
+
+Validates that every subject in the CSV has all required metadata fields (`external_id`, `preview`, `link`,
+`thumbnail`, `origin`, `license`, `image_name`) and that a Trapper media ID can be extracted from them.
+Does **not** require a Trapper connection.
+
+!!! example "Check metadata for all subjects"
+    ```console
+    $ wildintel-tools zooniverse check-metadata european-camera-trap-project-subjects.csv
+    ```
+
+Use `--all` to display every subject (not just those with issues), or `--pipeline` to output only the
+`subject_id`s with problems for use in scripts:
+
+```console
+$ wildintel-tools zooniverse check-metadata subjects.csv --ss 9876 --pipeline | xargs ...
+```
 
 ### Step 4 — Import annotations back to Trapper
 

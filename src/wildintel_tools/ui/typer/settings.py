@@ -278,6 +278,10 @@ class ZooniverseConnectorSettings(BaseModel):
         default=30,
         description="Delay in seconds between upload retry attempts for a single subject.",
     )
+    upload_collection_max_workers: int | None = Field(
+        default=4,
+        description="Number of parallel workers for concurrent image download and upload.",
+    )
 
 class Settings(BaseModel):
     LOGGER: LoggerSettings =  Field(default_factory=LoggerSettings)

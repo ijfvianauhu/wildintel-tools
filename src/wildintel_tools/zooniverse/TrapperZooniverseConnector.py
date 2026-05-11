@@ -12,7 +12,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.error import URLError, HTTPError
 
 from pydantic import BaseModel, validator, HttpUrl
-from tenacity import stop_after_attempt, wait_fixed, before_sleep_log, retry, RetryError
+from tenacity import stop_after_attempt, wait_exponential, before_sleep_log, retry, RetryError
 from trapper_client.TrapperClient import TrapperClient
 from trapper_client.Schemas import (
     TrapperMediaList,
@@ -119,7 +119,7 @@ class TrapperZooniverseConnector:
         if set_total:
             log_parts.append("set_total")
 
-        self.logger.info(" | ".join(log_parts))
+        self.logger.debug(" | ".join(log_parts))
 
         if progress_callback:
             progress_callback(
@@ -151,6 +151,9 @@ class TrapperZooniverseConnector:
             dry_run: bool = False,
             skip_if_exists: bool = False,
             uploaded_media_ids: Optional[set] = None,
+            max_workers: int = 4,
+            media_ids: Optional[List[int]] = None,
+            excluded_media_ids: Optional[List[int]] = None,
     ) -> Report:
 
         deployments = list(deployments) if deployments is not None else None
@@ -192,13 +195,10 @@ class TrapperZooniverseConnector:
                                   description=f"Getting media for classification project {classification_project}, "
                                               f"collection {collection} and deployment {deployment}...")
 
-            # private_* in query is for obtaining url media for non-public media,
-            # de los media obtengo las url de la imágenes
-            media :TrapperMediaList = self.trapper.media.get_by_collection(
+            media: TrapperMediaList = self.trapper.media.get_by_collection(
                 classification_project, collection, {"deployment": deployment, "private_human": "False", "private_vehicle": "False"}
             )
             self._notify(progress_callback, "getting_media", state="end", set_total=True, total=len(media.results))
-
             self._notify(progress_callback, "getting_observations", state="start",
                 description=f"Getting observations from classification project {classification_project}, "
                             f"collection {collection} and deployment {deployment}...")
@@ -238,7 +238,7 @@ class TrapperZooniverseConnector:
 
             self._notify(progress_callback, "getting_url", state="start", description=f"Getting url for medias classified...")
 
-            media_map=self._merge_media_and_observations(media,observations)
+            media_map=self._merge_media_and_observations(media, observations)
             public_media_map = {media_id: entry for media_id, entry in media_map.items() if entry.filePublic}
 
             if len(media_map.keys()) == 0:
@@ -251,8 +251,6 @@ class TrapperZooniverseConnector:
                                                              filter_middle_humans=True)
             self._notify(progress_callback, "preparing_sequences", state="end", set_total=True, total=len(sequences))
 
-            total = sum(len(sequence) for sequence in sequences)
-
             # Crear SubjectSet antes de comenzar
             if dry_run:
                 self.logger.info(f"[DRY-RUN] Skipping subjectset creation: '{subjectset_name}'")
@@ -261,138 +259,138 @@ class TrapperZooniverseConnector:
                 self.logger.debug(f"Creando SubjectSet {subjectset_name} en Zooniverse")
                 subjectset = self.zoo.subjectsets.create(subjectset_name)
 
+            flat_media = [media for seq in sequences for media in seq]
+
+            # --- media whitelist / blacklist ---
+            if media_ids is not None:
+                allowed = set(media_ids)
+                before = len(flat_media)
+                flat_media = [m for m in flat_media if m["mediaID"] in allowed]
+                self.logger.info(
+                    f"media_ids whitelist: kept {len(flat_media)}/{before} media items"
+                )
+            if excluded_media_ids is not None:
+                blocked = set(excluded_media_ids)
+                before = len(flat_media)
+                flat_media = [m for m in flat_media if m["mediaID"] not in blocked]
+                self.logger.info(
+                    f"excluded_media_ids blacklist: kept {len(flat_media)}/{before} media items"
+                )
+
+            total = len(flat_media)
+
             self._notify(progress_callback, "synchronizing_images", state="start",
                      description=f"Synchronizing {total} images...",
                     total=total, set_total=True)
 
-            with (tempfile.TemporaryDirectory() as temp_dir):
-                for idx, seq in enumerate(sequences):
-                    for media in seq:
-                        media_id = media['mediaID']
-                        name = self._get_zoo_filename(media)
-                        local_path = os.path.join(temp_dir, name)
+            with tempfile.TemporaryDirectory() as temp_dir:
 
-                        if uploaded_media_ids and media_id in uploaded_media_ids:
-                            self._notify(progress_callback, "synchronizing_images",
-                                         state="running", advance=1,
-                                         item_name=f"{media_id}", item_status="end",
-                                         item_description="Already uploaded, skipped")
-                            report.add_success(f"{media_id}@media", "upload_skipped", **{"reason": "already uploaded"})
-                            continue
+                def process_one(media):
+                    media_id = media['mediaID']
+                    name = self._get_zoo_filename(media)
+                    local_path = os.path.join(temp_dir, name)
 
-                        self._notify(progress_callback, "synchronizing_images"
-                                           , state="running"
-                                           , advance=0
-                                           , item_description=f"↓↓ Downloading media to {str(Path(temp_dir) / name)}"
-                                           , item_name=f"{media_id}"
-                                           , item_status="start")
+                    if uploaded_media_ids and media_id in uploaded_media_ids:
+                        self._notify(progress_callback, "synchronizing_images",
+                                     state="running", advance=1,
+                                     item_name=f"{media_id}", item_status="end",
+                                     item_description="Already uploaded, skipped")
+                        report.add_success(f"{media_id}@media", "upload_skipped", **{"reason": "already uploaded"})
+                        return
 
-                        try:
-                            if dry_run:
-                                self.logger.info(f"[DRY-RUN] Skipping download of media {media_id}")
-                                self._notify(
-                                    progress_callback,
-                                    "synchronizing_images",
-                                    state="running",
-                                    advance=0,
-                                    item_description=f"[DRY-RUN] Simulated download of {str(Path(temp_dir) / name)}",
-                                    item_name=f"{media_id}",
-                                    item_status="end",
-                                )
-                                report.add_success(f"{media_id}@media", "download_simulated", **{"path": local_path})
-                            else:
-                                self._download_image_safe(str(media['filePath']), str(Path(temp_dir) / name),
-                                                          attempts=attempts, delay_seconds=delay)
-                                self._notify(
-                                    progress_callback,
-                                    "synchronizing_images",
-                                    state="running",
-                                    advance=0,
-                                    item_description=f"↓↓ Downloading media to {str(Path(temp_dir) / name)}",
-                                    item_name=f"{media_id}",
-                                    item_status="end",
-                                )
-                                report.add_success(f"{media_id}@media", "download", **{"path":local_path})
+                    self._notify(progress_callback, "synchronizing_images",
+                                 state="running", advance=0,
+                                 item_description=f"↓↓ Downloading media to {str(Path(temp_dir) / name)}",
+                                 item_name=f"{media_id}", item_status="start")
 
-                            if dry_run:
-                                self.logger.info(f"[DRY-RUN] Skipping upload of media {media_id} to Zooniverse")
-                                self._notify(
-                                    progress_callback,
-                                    "synchronizing_images",
-                                    state="running",
-                                    advance=1,
-                                    item_description=f"[DRY-RUN] Simulated upload to Zooniverse subject {subjectset_name}",
-                                    item_name=f"{media_id}",
-                                    item_status="end",
-                                )
-                                report.add_success(f"{media_id}@media", "upload_simulated", **{"subject_id": "dry-run", "path": local_path})
-                            else:
-                                self._notify(
-                                    progress_callback,
-                                    "synchronizing_images",
-                                    state="running",
-                                    advance=0,
-                                    item_description=f"↑↑↑ Uploading media to Zooniverse subject {subjectset_name}",
-                                    item_name=f"{media_id}",
-                                    item_status="start",
-                                )
-                                subject_metadata = self._build_metadata_from_trapper(
-                                    self.trapper, media_id, media["fileName"]
-                                )
-
-                                subject = self.zoo.subjects.create(
-                                    local_path,
-                                    subjectset,
-                                    subject_metadata,
-                                    max_attempts_per_subject,
-                                    delay_seconds_per_subject,
-                                    skip_if_exists=skip_if_exists,
-                                )
-
-                                report.add_success(f"{media_id}@media", "upload",
-                                                  **{"subject_id": subject.id, "path": local_path})
-
-                                if os.path.exists(local_path):
-                                    os.remove(local_path)
-                                    self.logger.debug(f"Removed temporary file {local_path}")
-
-                                self._notify(
-                                    progress_callback,
-                                    "synchronizing_images",
-                                    state="running",
-                                    advance=1,
-                                    item_description=f"↑↑↑ Uploading media to Zooniverse subject {subjectset_name}. {subject.id}",
-                                    item_name=f"{media_id}",
-                                    item_status="end",
-                                )
-
-                        except DownloadException as e:
+                    try:
+                        if dry_run:
+                            self.logger.info(f"[DRY-RUN] Skipping download of media {media_id}")
                             self._notify(
-                                progress_callback,
-                                "synchronizing_images",
-                                state="running",
-                                advance=1,
-                                item_description="Downloading media ↓",
-                                item_name=f"{media_id}",
-                                item_status="fail",
+                                progress_callback, "synchronizing_images",
+                                state="running", advance=0,
+                                item_description=f"[DRY-RUN] Simulated download of {str(Path(temp_dir) / name)}",
+                                item_name=f"{media_id}", item_status="end",
                             )
-                            report.add_error(f"{media_id}@media", "download", str(e),
-                                            **{"path":str(media['filePath'])})
-                        except UploadingException as e:
+                            report.add_success(f"{media_id}@media", "download_simulated", **{"path": local_path})
+                        else:
+                            self._download_image_safe(str(media['filePath']), str(Path(temp_dir) / name),
+                                                      attempts=attempts, delay_seconds=delay)
+                            # Advance bar as soon as download completes so the user
+                            # sees immediate progress even while uploads are in flight.
                             self._notify(
-                                    progress_callback,
-                                    "synchronizing_images",
-                                    state="running",
-                                    advance=1,
-                                    item_description=f"Uploading media {media_id} ↑",
-                                    item_name=f"{media_id}",
-                                    item_status="fail",
-                                )
-                            report.add_error(f"{media_id}@media", "upload", str(e),
-                                            **{"path": local_path})
-                        finally:
+                                progress_callback, "synchronizing_images",
+                                state="running", advance=1,
+                                item_description=f"↓↓ Downloaded {str(Path(temp_dir) / name)}",
+                                item_name=f"{media_id}", item_status="end",
+                            )
+                            report.add_success(f"{media_id}@media", "download", **{"path": local_path})
+
+                        if dry_run:
+                            self.logger.info(f"[DRY-RUN] Skipping upload of media {media_id} to Zooniverse")
+                            self._notify(
+                                progress_callback, "synchronizing_images",
+                                state="running", advance=1,
+                                item_description=f"[DRY-RUN] Simulated upload to Zooniverse subject {subjectset_name}",
+                                item_name=f"{media_id}", item_status="end",
+                            )
+                            report.add_success(f"{media_id}@media", "upload_simulated", **{"subject_id": "dry-run", "path": local_path})
+                        else:
+                            self._notify(
+                                progress_callback, "synchronizing_images",
+                                state="running", advance=0,
+                                item_description=f"↑↑↑ Uploading to Zooniverse subject {subjectset_name}",
+                                item_name=f"{media_id}", item_status="start",
+                            )
+                            subject_metadata = self._build_metadata_from_trapper(
+                                self.trapper, media_id, media["fileName"]
+                            )
+                            subject = self.zoo.subjects.create(
+                                local_path, subjectset, subject_metadata,
+                                max_attempts_per_subject, delay_seconds_per_subject,
+                                skip_if_exists=skip_if_exists,
+                            )
+                            report.add_success(f"{media_id}@media", "upload",
+                                              **{"subject_id": subject.id, "path": local_path})
                             if os.path.exists(local_path):
                                 os.remove(local_path)
+                                self.logger.debug(f"Removed temporary file {local_path}")
+                            # advance=0: already counted when download finished
+                            self._notify(
+                                progress_callback, "synchronizing_images",
+                                state="running", advance=0,
+                                item_description=f"↑↑↑ Uploaded to Zooniverse ({subject.id})",
+                                item_name=f"{media_id}", item_status="end",
+                            )
+
+                    except DownloadException as e:
+                        # Download failed → advance bar now (it wasn't advanced yet)
+                        self._notify(
+                            progress_callback, "synchronizing_images",
+                            state="running", advance=1,
+                            item_description=f"Download failed: {e}",
+                            item_name=f"{media_id}", item_status="fail",
+                        )
+                        report.add_error(f"{media_id}@media", "download", str(e),
+                                        **{"path": str(media['filePath'])})
+                    except UploadingException as e:
+                        # Download already advanced the bar → advance=0 here
+                        self._notify(
+                            progress_callback, "synchronizing_images",
+                            state="running", advance=0,
+                            item_description=f"Upload failed: {e}",
+                            item_name=f"{media_id}", item_status="fail",
+                        )
+                        report.add_error(f"{media_id}@media", "upload", str(e),
+                                        **{"path": local_path})
+                    finally:
+                        if os.path.exists(local_path):
+                            os.remove(local_path)
+
+                with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    futures = {executor.submit(process_one, media): media for media in flat_media}
+                    for f in as_completed(futures):
+                        pass
 
             self._notify(progress_callback, "synchronizing_images", state="end")
         report.finish()
@@ -406,8 +404,8 @@ class TrapperZooniverseConnector:
         dry_run: bool = False,
         white_list: Optional[List[int]] = None,
         black_list: Optional[List[int]] = None,
-        attempts: int = 3,
-        delay_seconds: int = 5,
+        attempts: int = 5,
+        delay_seconds: int = 15,
         max_workers: int = 1,
     ) -> Report:
         """
@@ -502,7 +500,7 @@ class TrapperZooniverseConnector:
 
             @retry(
                 stop=stop_after_attempt(attempts),
-                wait=wait_fixed(delay_seconds),
+                wait=wait_exponential(multiplier=delay_seconds, min=delay_seconds),
                 reraise=True,
                 before_sleep=before_sleep_log(self.logger, logging.WARNING),
             )
@@ -841,16 +839,19 @@ class TrapperZooniverseConnector:
 
         return ExtractorClass(), VoterClass
 
-    @retry(
-        stop=stop_after_attempt(5),
-        wait=wait_fixed(60),
-        reraise=False,
-        before_sleep=before_sleep_log(logging.getLogger(__name__), logging.WARNING),
-    )
     def _download_image(self, url: str, dest_path: str, attempts=5, delay_seconds=60) -> bool:
         """Descarga una imagen desde una URL con reintentos."""
-        urllib.request.urlretrieve(url, dest_path)
-        return True
+        @retry(
+            stop=stop_after_attempt(attempts),
+            wait=wait_exponential(multiplier=delay_seconds, min=delay_seconds),
+            reraise=False,
+            before_sleep=before_sleep_log(logging.getLogger(__name__), logging.WARNING),
+        )
+        def _do_download():
+            urllib.request.urlretrieve(url, dest_path)
+            return True
+
+        return _do_download()
 
     def _download_image_safe(self, url: str, dest_path: str, attempts=5, delay_seconds=60) -> bool:
         """Wrapper that raises DownloadException when retries are exhausted."""
@@ -1201,8 +1202,7 @@ class TrapperZooniverseConnector:
         """Return a mapping of media_id → subject_id from a Zooniverse subjects export.
 
         Only rows for which a media_id can be extracted are included.
-        When the same media_id appears more than once the last subject_id wins;
-        use :meth:`duplicated_media_id` to detect those cases beforehand.
+        When the same media_id appears more than once the last subject_id wins.
         """
         result: dict[int, int] = {}
         for row in cls._iter_subject_export_rows(csv_path, subject_set_id):
@@ -1216,63 +1216,94 @@ class TrapperZooniverseConnector:
             result[mid] = sid
         return result
 
-    @classmethod
     def unmatched_subject_id(
-        cls,
+        self,
         csv_path: Path,
         subject_set_id: Optional[int] = None,
+        progress_callback: Optional[Callable] = None,
     ) -> list[int]:
         """Return the list of subject_ids for which no media_id could be extracted."""
+        task_name = "scanning_unmatched"
+
+        rows = list(self._iter_subject_export_rows(csv_path, subject_set_id))
+        total = len(rows)
+
+        self._notify(
+            progress_callback, task_name, "start", 0, total,
+            f"Scanning {total} subjects for missing media IDs…", True,
+        )
+
         result: list[int] = []
-        for row in cls._iter_subject_export_rows(csv_path, subject_set_id):
-            if cls._media_id_from_subject_row(row) is not None:
+        for row in rows:
+            if self._media_id_from_subject_row(row) is not None:
+                self._notify(progress_callback, task_name, "running", 1)
                 continue
             try:
                 sid = int(row.get("subject_id", "").strip())
             except (ValueError, TypeError):
+                self._notify(progress_callback, task_name, "running", 1)
                 continue
             result.append(sid)
+            self._notify(
+                progress_callback, task_name, "running", 1,
+                item_name=str(sid), item_status="fail",
+                item_description="no media_id extractable",
+            )
+
+        self._notify(progress_callback, task_name, "end", 0)
+
         return result
 
-    @classmethod
     def duplicated_media_id(
-        cls,
+        self,
         csv_path: Path,
         subject_set_id: Optional[int] = None,
+        progress_callback: Optional[Callable] = None,
     ) -> dict[int, list[int]]:
         """Return a mapping of media_id → [subject_id, ...] for media_ids that appear more than once."""
+        task_name = "scanning_duplicates"
+
+        rows = list(self._iter_subject_export_rows(csv_path, subject_set_id))
+        total = len(rows)
+
+        self._notify(
+            progress_callback, task_name, "start", 0, total,
+            f"Scanning {total} subjects for duplicate media IDs…", True,
+        )
+
         counts: dict[int, list[int]] = defaultdict(list)
-        for row in cls._iter_subject_export_rows(csv_path, subject_set_id):
-            mid = cls._media_id_from_subject_row(row)
+        for row in rows:
+            mid = self._media_id_from_subject_row(row)
             if mid is None:
+                self._notify(progress_callback, task_name, "running", 1)
                 continue
             try:
                 sid = int(row.get("subject_id", "").strip())
             except (ValueError, TypeError):
+                self._notify(progress_callback, task_name, "running", 1)
                 continue
             counts[mid].append(sid)
+            self._notify(progress_callback, task_name, "running", 1)
+
+        self._notify(progress_callback, task_name, "end", 0)
+
         return {mid: sids for mid, sids in counts.items() if len(sids) > 1}
 
-    def validate_subject_set(
+    def _build_expected_media_ids(
         self,
-        subjects_csv: Path,
         collection: int,
         classification_project: int,
-        subject_set_id: Optional[int] = None,
         deployments: Optional[List[int]] = None,
         blacklisted_deployments: Optional[List[int]] = None,
         n_images_seq: int = 5,
         max_interval: int = 90,
         progress_callback: Optional[Callable] = None,
-    ) -> dict:
-        """Compare what Trapper expects to upload against what is in a subjects export CSV.
+    ) -> set[int]:
+        """Return the set of media_ids that Trapper expects to be in Zooniverse.
 
-        Returns a dict with keys:
-          - expected (set[int]): media_ids that should be in the subject set
-          - uploaded (dict[int, int]): media_id → subject_id from the CSV
-          - missing (set[int]): expected but absent from the CSV
-          - extra (set[int]): present in the CSV but not expected from Trapper
-          - metadata_issues (list[dict]): subjects whose metadata failed validation
+        Follows the same selection logic as upload_collection: public media only,
+        classified observations only (non-unclassified), grouped into sequences,
+        humans filtered from middle frames.
         """
         deployments = list(deployments) if deployments is not None else None
 
@@ -1333,16 +1364,78 @@ class TrapperZooniverseConnector:
                 for item in seq:
                     expected.add(item["mediaID"])
 
+        return expected
+
+    def missing_media_id(
+        self,
+        subjects_csv: Path,
+        collection: int,
+        classification_project: int,
+        subject_set_id: Optional[int] = None,
+        deployments: Optional[List[int]] = None,
+        blacklisted_deployments: Optional[List[int]] = None,
+        n_images_seq: int = 5,
+        max_interval: int = 90,
+        progress_callback: Optional[Callable] = None,
+    ) -> set[int]:
+        """Return media_ids that Trapper expects to be in Zooniverse but are absent from the CSV.
+
+        Uses the same selection logic as upload_collection to build the expected set,
+        then compares it against the media_ids found in the subjects export CSV.
+        """
+        expected = self._build_expected_media_ids(
+            collection, classification_project,
+            deployments, blacklisted_deployments,
+            n_images_seq, max_interval,
+            progress_callback,
+        )
+        uploaded_set = set(self.uploaded_media_id(subjects_csv, subject_set_id).keys())
+        return expected - uploaded_set
+
+    def validate_subject_set(
+        self,
+        subjects_csv: Path,
+        collection: int,
+        classification_project: int,
+        subject_set_id: Optional[int] = None,
+        deployments: Optional[List[int]] = None,
+        blacklisted_deployments: Optional[List[int]] = None,
+        n_images_seq: int = 5,
+        max_interval: int = 90,
+        progress_callback: Optional[Callable] = None,
+    ) -> dict:
+        """Compare what Trapper expects to upload against what is in a subjects export CSV.
+
+        Returns a dict with keys:
+          - expected (set[int]): media_ids that should be in the subject set
+          - uploaded (dict[int, int]): media_id → subject_id from the CSV
+          - missing (set[int]): expected but absent from the CSV
+          - extra (set[int]): present in the CSV but not expected from Trapper
+          - duplicated (dict[int, list[int]]): media_id → [subject_ids] for media uploaded more than once
+          - unmatched (list[int]): subject_ids with no extractable media_id
+          - metadata_issues (list[dict]): subjects whose metadata failed validation
+        """
+        expected = self._build_expected_media_ids(
+            collection, classification_project,
+            deployments, blacklisted_deployments,
+            n_images_seq, max_interval,
+            progress_callback,
+        )
+
         uploaded = self.uploaded_media_id(subjects_csv, subject_set_id)
         uploaded_set = set(uploaded.keys())
 
-        all_metadata = self.check_subject_metadata(subjects_csv, subject_set_id, self.trapper)
+        duplicated = self.duplicated_media_id(subjects_csv, subject_set_id, progress_callback)
+        unmatched = self.unmatched_subject_id(subjects_csv, subject_set_id, progress_callback)
+        all_metadata = self.check_subject_metadata(subjects_csv, subject_set_id, self.trapper, progress_callback)
 
         return {
             "expected": expected,
             "uploaded": uploaded,
             "missing": expected - uploaded_set,
             "extra": uploaded_set - expected,
+            "duplicated": duplicated,
+            "unmatched": unmatched,
             "metadata_issues": [r for r in all_metadata if r["issues"]],
         }
 
@@ -1350,12 +1443,12 @@ class TrapperZooniverseConnector:
         "external_id", "preview", "link", "thumbnail", "origin", "license", "image_name",
     )
 
-    @classmethod
     def check_subject_metadata(
-        cls,
+        self,
         csv_path: Path,
         subject_set_id: Optional[int] = None,
         trapper_client: Optional["TrapperClient"] = None,
+        progress_callback: Optional[Callable] = None,
     ) -> list[dict]:
         """Validate metadata for each subject in a Zooniverse subjects export.
 
@@ -1370,11 +1463,24 @@ class TrapperZooniverseConnector:
           - media_id (int | None)
           - issues (list[str]) — empty when the subject passes all checks
         """
+        task_name = "checking_metadata"
+
+        # Collect all rows upfront so we can report a meaningful total.
+        rows = list(self._iter_subject_export_rows(csv_path, subject_set_id))
+        total = len(rows)
+
+        self._notify(
+            progress_callback,
+            task_name, "start", 0, total,
+            f"Checking metadata for {total} subjects…", True,
+        )
+
         results: list[dict] = []
-        for row in cls._iter_subject_export_rows(csv_path, subject_set_id):
+        for row in rows:
             try:
                 sid = int(row.get("subject_id", "").strip())
             except (ValueError, TypeError):
+                self._notify(progress_callback, task_name, "running", 1)
                 continue
 
             ssid = row.get("subject_set_id", "")
@@ -1386,17 +1492,22 @@ class TrapperZooniverseConnector:
             except (json.JSONDecodeError, TypeError):
                 results.append({"subject_id": sid, "subject_set_id": ssid, "media_id": None,
                                  "issues": ["metadata is not valid JSON"]})
+                self._notify(
+                    progress_callback, task_name, "running", 1,
+                    item_name=str(sid), item_status="fail",
+                    item_description="metadata is not valid JSON",
+                )
                 continue
 
-            missing = [f for f in cls.REQUIRED_METADATA_FIELDS if not metadata.get(f)]
+            missing = [f for f in self.REQUIRED_METADATA_FIELDS if not metadata.get(f)]
             if missing:
                 issues.append(f"missing fields: {', '.join(missing)}")
 
-            media_id = cls._media_id_from_subject_row(row)
+            media_id = self._media_id_from_subject_row(row)
             if media_id is None:
                 issues.append("no media_id extractable from external_id or origin")
             elif trapper_client is not None:
-                expected = cls._build_metadata_from_trapper(trapper_client, media_id, "")
+                expected = self._build_metadata_from_trapper(trapper_client, media_id, "")
                 for field, expected_value in expected.items():
                     if field == "image_name":
                         continue
@@ -1410,5 +1521,15 @@ class TrapperZooniverseConnector:
                 "media_id": media_id,
                 "issues": issues,
             })
+
+            item_status = "fail" if issues else "end"
+            item_desc = "; ".join(issues) if issues else "OK"
+            self._notify(
+                progress_callback, task_name, "running", 1,
+                item_name=str(sid), item_status=item_status,
+                item_description=item_desc,
+            )
+
+        self._notify(progress_callback, task_name, "end", 0)
 
         return results
