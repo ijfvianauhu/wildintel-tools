@@ -9,7 +9,7 @@ from trapper_client.Schemas import TrapperDeploymentList
 from trapper_client.TrapperClient import TrapperClient
 
 from wildintel_tools.ui.typer.settings import (
-    Settings, SettingsManager, ZooniverseSettings, ZooniverseConnectorSettings,
+    Settings, SettingsManager, ZooniverseSettings, ZooniverseConnectorSettings, get_app_documents_dir,
 )
 from wildintel_tools.ui.typer.zooniverse import get_workflows, get_subject_sets
 from wildintel_tools.ui.typer.commands.zooniverse import download_ss, export_annotations, validate_subject_set
@@ -258,8 +258,11 @@ def run_export_wizard(ctx: typer.Context, settings: Settings) -> None:
         f"_{collection_selected.collection_pk}_{cp_selected.pk}"
         f"_{datetime.now():%Y%m%d%H%M}.csv"
     )
+    output_dir = get_app_documents_dir() / "zooniverse"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    default_observations_file = str(output_dir / default_csv_name)
     TyperUtils.console.print()
-    observations_filename = typer.prompt("CSV file to save annotations", default=default_csv_name)
+    observations_filename = typer.prompt("CSV file to save annotations", default=default_observations_file)
     observations_file = Path(observations_filename)
 
     verbose = typer.confirm("Show detail for each processed media in the progress bar?", default=True)
@@ -273,13 +276,16 @@ def run_export_wizard(ctx: typer.Context, settings: Settings) -> None:
         return
     TyperUtils.console.print()
 
+    all_selected = len(deployment_selected) == len(filtered)
+    deployments_arg = None if all_selected else [d.pk for d in deployment_selected]
+
     export_annotations(
         ctx,
         wf_id=wf_selected.id,
         ss_id=ss_selected.id,
         classification_project=cp_selected.pk,
         collection=collection_selected.collection_pk,
-        deployments=[d.pk for d in deployment_selected],
+        deployments=deployments_arg,
         observations_file=observations_file,
         verbose=verbose,
         save_zoo_annotations=save_zoo_annotations,
