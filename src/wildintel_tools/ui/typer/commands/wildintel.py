@@ -39,7 +39,8 @@ from typing import List, Any, Iterable
 
 import typer
 
-from wildintel_tools.ui.typer.settings import GeneralSettings, WildIntelSettings, Settings, SettingsManager
+from wildintel_tools.ui.typer.settings import GeneralSettings, WildIntelSettings, Settings
+from wildintel_tools.ui.typer.settings_manager import SettingsManager
 
 app = typer.Typer(
     help=_("Includes several utilities to validate and ensure the quality of collections and deployments produced within the WildIntel project"),

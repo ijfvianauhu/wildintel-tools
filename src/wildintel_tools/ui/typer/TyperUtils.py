@@ -26,7 +26,8 @@ from rich.table import Table
 from rich.progress import Progress, TextColumn, BarColumn, TimeElapsedColumn
 from typing import Callable, Dict, Any
 
-from wildintel_tools.ui.typer.settings import Settings, SettingsManager
+from wildintel_tools.ui.typer.settings import Settings
+from wildintel_tools.ui.typer.settings_manager import SettingsManager
 
 import logging
 

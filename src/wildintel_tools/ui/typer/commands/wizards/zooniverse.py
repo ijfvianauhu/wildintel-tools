@@ -9,8 +9,9 @@ from trapper_client.Schemas import TrapperDeploymentList
 from trapper_client.TrapperClient import TrapperClient
 
 from wildintel_tools.ui.typer.settings import (
-    Settings, SettingsManager, ZooniverseSettings, ZooniverseConnectorSettings, get_app_documents_dir,
+    Settings, ZooniverseSettings, ZooniverseConnectorSettings, get_app_documents_dir,
 )
+from wildintel_tools.ui.typer.settings_manager import SettingsManager
 from wildintel_tools.ui.typer.zooniverse import get_workflows, get_subject_sets
 from wildintel_tools.ui.typer.commands.zooniverse import download_ss, export_annotations, validate_subject_set
 from wildintel_tools.ui.typer.TyperUtils import TyperUtils
