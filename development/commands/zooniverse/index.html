@@ -1647,6 +1647,7 @@ is through the interactive setup wizard:</p>
 <li><strong>Delay between sequence upload attempts (seconds)</strong> — seconds to wait before retrying a failed sequence upload. Default: <code>15</code>.</li>
 <li><strong>Maximum attempts per subject</strong> — number of times the upload of a single subject (image) to Zooniverse is retried after a failure. Default: <code>5</code>.</li>
 <li><strong>Delay per subject retry (seconds)</strong> — seconds to wait before retrying the upload of a single subject. Combined with the per-subject attempt limit, this controls the backoff for quota or connectivity errors at subject level. Default: <code>30</code>.</li>
+<li><strong>Trapper username for Zooniverse observations (classifiedBy)</strong> — the Trapper account that will appear as the author of each observation generated from Zooniverse classifications. This must match the account used when importing the resulting CSV into Trapper (see Step 4). Default: <code>zooniverse@wildintel-project.org</code>.</li>
 </ul>
 <p>Once the wizard completes, verify that the connection details are correct by running:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>$<span class="w"> </span>wildintel-tools<span class="w"> </span>zooniverse<span class="w"> </span>test-connection
