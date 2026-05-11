@@ -232,13 +232,13 @@ class ZooniverseConnectorSettings(BaseModel):
         default=90,
         description="Maximum time gap in seconds between consecutive images in the same sequence.",
     )
-    upload_collection_attempts: int | None = Field(
+    upload_collection_download_attempts: int | None = Field(
         default=5,
         description="Maximum number of retry attempts when downloading a media file from Trapper.",
     )
-    upload_collection_delay: int | None = Field(
+    upload_collection_download_delay: int | None = Field(
         default=15,
-        description="Delay in seconds between download retry attempts.",
+        description="Delay in seconds between download retry attempts from Trapper.",
     )
     upload_collection_max_attempts_per_subject: int | None = Field(
         default=5,

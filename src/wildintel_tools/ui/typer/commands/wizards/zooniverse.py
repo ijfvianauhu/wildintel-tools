@@ -328,8 +328,8 @@ def run_setup_wizard(ctx: typer.Context, settings: Settings, settings_manager: S
     project_id_default = settings.ZOONIVERSE.zooniverse_project_id if settings else "myprojectid"
     seq_default = str(settings.ZOONIVERSE_CONNECTOR.upload_collection_n_images_seq if settings else 5)
     max_interval_default = str(settings.ZOONIVERSE_CONNECTOR.upload_collection_max_interval if settings else 90)
-    attempts_default = str(settings.ZOONIVERSE_CONNECTOR.upload_collection_attempts if settings else 5)
-    delay_default = str(settings.ZOONIVERSE_CONNECTOR.upload_collection_delay if settings else 15)
+    attempts_default = str(settings.ZOONIVERSE_CONNECTOR.upload_collection_download_attempts if settings else 5)
+    delay_default = str(settings.ZOONIVERSE_CONNECTOR.upload_collection_download_delay if settings else 15)
     max_per_subject_default = str(
         settings.ZOONIVERSE_CONNECTOR.upload_collection_max_attempts_per_subject if settings else 5
     )
@@ -358,13 +358,13 @@ def run_setup_wizard(ctx: typer.Context, settings: Settings, settings_manager: S
         "Maximum interval between upload batches (seconds)", max_interval_default,
         ZooniverseConnectorSettings, "upload_collection_max_interval",
     ))
-    upload_collection_attempts = int(TyperUtils.prompt_with_default(
-        "Maximum upload attempts per batch", attempts_default,
-        ZooniverseConnectorSettings, "upload_collection_attempts",
+    upload_collection_download_attempts = int(TyperUtils.prompt_with_default(
+        "Maximum download attempts per batch (from Trapper)", attempts_default,
+        ZooniverseConnectorSettings, "upload_collection_download_attempts",
     ))
-    upload_collection_delay = int(TyperUtils.prompt_with_default(
-        "Delay between upload attempts (seconds)", delay_default,
-        ZooniverseConnectorSettings, "upload_collection_delay",
+    upload_collection_download_delay = int(TyperUtils.prompt_with_default(
+        "Delay between download attempts (seconds)", delay_default,
+        ZooniverseConnectorSettings, "upload_collection_download_delay",
     ))
     upload_collection_max_attempts_per_subject = int(TyperUtils.prompt_with_default(
         "Maximum attempts per subject", max_per_subject_default,
@@ -385,8 +385,8 @@ def run_setup_wizard(ctx: typer.Context, settings: Settings, settings_manager: S
         "ZOONIVERSE.zooniverse_project_id": zooniverse_project_id,
         "ZOONIVERSE_CONNECTOR.upload_collection_n_images_seq": upload_collection_n_images_seq,
         "ZOONIVERSE_CONNECTOR.upload_collection_max_interval": upload_collection_max_interval,
-        "ZOONIVERSE_CONNECTOR.upload_collection_attempts": upload_collection_attempts,
-        "ZOONIVERSE_CONNECTOR.upload_collection_delay": upload_collection_delay,
+        "ZOONIVERSE_CONNECTOR.upload_collection_download_attempts": upload_collection_download_attempts,
+        "ZOONIVERSE_CONNECTOR.upload_collection_download_delay": upload_collection_download_delay,
         "ZOONIVERSE_CONNECTOR.upload_collection_max_attempts_per_subject": upload_collection_max_attempts_per_subject,
         "ZOONIVERSE_CONNECTOR.upload_collection_delay_seconds_per_subject": upload_collection_delay_seconds_per_subject,
         "ZOONIVERSE_CONNECTOR.annotations_classified_by": annotations_classified_by,
