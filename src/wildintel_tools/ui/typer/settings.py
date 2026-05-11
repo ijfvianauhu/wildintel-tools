@@ -293,6 +293,10 @@ class ZooniverseConnectorSettings(BaseModel):
         default=4,
         description="Number of parallel workers for concurrent image download and upload.",
     )
+    annotations_classified_by: str | None = Field(
+        default="zooniverse@wildintel-project.org",
+        description="Trapper username attributed as the classifier when uploading Zooniverse observations.",
+    )
 
 class Settings(BaseModel):
     LOGGER: LoggerSettings =  Field(default_factory=LoggerSettings)

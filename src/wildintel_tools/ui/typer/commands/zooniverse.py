@@ -614,6 +614,8 @@ def export_annotations(
     """
     connector: TrapperZooniverseConnector = ctx.obj["connector"]
     trapper_client: TrapperClient = ctx.obj["trapper_client"]
+    settings: Settings = ctx.obj.get("settings", Settings())
+    classified_by: str = settings.ZOONIVERSE_CONNECTOR.annotations_classified_by
 
     if observations_file is None:
         deps_str = "-".join(str(d) for d in deployments) if deployments else "all"
@@ -641,6 +643,7 @@ def export_annotations(
             deployments=deployments,
             verbose=verbose,
             save_zoo_annotations=save_zoo_annotations,
+            classified_by=classified_by,
         )
     except Exception as e:
         TyperUtils.fatal(_(f"Failed to export annotations: {e}"))

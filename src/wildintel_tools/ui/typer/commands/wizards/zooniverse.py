@@ -322,6 +322,9 @@ def run_setup_wizard(ctx: typer.Context, settings: Settings, settings_manager: S
     delay_per_subject_default = str(
         settings.ZOONIVERSE_CONNECTOR.upload_collection_delay_seconds_per_subject if settings else 30
     )
+    classified_by_default = (
+        settings.ZOONIVERSE_CONNECTOR.annotations_classified_by if settings else "zooniverse@wildintel-project.org"
+    )
 
     zooniverse_username = TyperUtils.prompt_with_default(
         "Enter your Zooniverse username", username_default, ZooniverseSettings, "zooniverse_username"
@@ -357,6 +360,10 @@ def run_setup_wizard(ctx: typer.Context, settings: Settings, settings_manager: S
         "Delay per subject (seconds)", delay_per_subject_default,
         ZooniverseConnectorSettings, "upload_collection_delay_seconds_per_subject",
     ))
+    annotations_classified_by = TyperUtils.prompt_with_default(
+        "Trapper username for Zooniverse observations (classifiedBy)", classified_by_default,
+        ZooniverseConnectorSettings, "annotations_classified_by",
+    )
 
     updates = {
         "ZOONIVERSE.zooniverse_username": zooniverse_username,
@@ -368,6 +375,7 @@ def run_setup_wizard(ctx: typer.Context, settings: Settings, settings_manager: S
         "ZOONIVERSE_CONNECTOR.upload_collection_delay": upload_collection_delay,
         "ZOONIVERSE_CONNECTOR.upload_collection_max_attempts_per_subject": upload_collection_max_attempts_per_subject,
         "ZOONIVERSE_CONNECTOR.upload_collection_delay_seconds_per_subject": upload_collection_delay_seconds_per_subject,
+        "ZOONIVERSE_CONNECTOR.annotations_classified_by": annotations_classified_by,
     }
 
     val = [

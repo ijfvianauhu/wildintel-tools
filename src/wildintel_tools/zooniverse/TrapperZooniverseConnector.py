@@ -548,6 +548,7 @@ class TrapperZooniverseConnector:
           max_workers: int = 4,
           save_zoo_annotations: bool = True,
           max_subjects: Optional[int] = None,
+          classified_by: Optional[str] = None,
   ):
         """
         Gerenates csv file with annotations from Zooniverse ready to import y Trapper.
@@ -728,7 +729,7 @@ class TrapperZooniverseConnector:
                             "id": obser_id,
                             "bboxes": None,
                             "classificationTimestamp": datetime.now(timezone.utc),
-                            "classifiedBy": self.trapper.user_name,
+                            "classifiedBy": classified_by or self.trapper.user_name,
                             "classificationMethod": "human",
                             #"observationComments": f"Automatically classified by Zooniverse in workflow {wf_key} for subject {subject_id}",
                         }

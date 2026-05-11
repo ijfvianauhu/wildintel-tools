@@ -70,6 +70,7 @@ The wizard will guide you through the following questions:
 - **Delay between sequence upload attempts (seconds)** — seconds to wait before retrying a failed sequence upload. Default: `15`.
 - **Maximum attempts per subject** — number of times the upload of a single subject (image) to Zooniverse is retried after a failure. Default: `5`.
 - **Delay per subject retry (seconds)** — seconds to wait before retrying the upload of a single subject. Combined with the per-subject attempt limit, this controls the backoff for quota or connectivity errors at subject level. Default: `30`.
+- **Trapper username for Zooniverse observations (classifiedBy)** — the Trapper account that will appear as the author of each observation generated from Zooniverse classifications. This must match the account used when importing the resulting CSV into Trapper (see Step 4). Default: `zooniverse@wildintel-project.org`.
 
 Once the wizard completes, verify that the connection details are correct by running:
 
