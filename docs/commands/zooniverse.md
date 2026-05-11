@@ -49,7 +49,7 @@ Before running any command, the connection to both Trapper and Zooniverse must b
 is through the interactive setup wizard:
 
 ```console
-$ uv run wildintel-tools zooniverse wizard setup
+$ wildintel-tools zooniverse wizard setup
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   Configure zooniverse module
@@ -161,7 +161,7 @@ The wizard guides you step by step through the entire import process, asking you
 deployments, and other options interactively. No prior knowledge of the command-line options is required.
 
 ```console
-$ uv run wildintel-tools zooniverse wizard import
+$ wildintel-tools zooniverse wizard import
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   Import a Trapper collection to Zooniverse
@@ -175,11 +175,12 @@ Continue? [y/N]:
 
 The wizard will guide you through the following steps:
 
-1. **Select the Trapper collection** — choose the collection whose images you want to upload.
-2. **Select or create a subject set** — choose an existing Zooniverse subject set or create a new one with a custom name.
-3. **Select the classification project** — if the collection is linked to more than one classification project, you will be prompted to pick one.
+1. **Select the research project** — Select the research project to which the classification project is linked.
+2. **Select the classification project** — Select the classification project to which the collection is linked.
+3. **Select the Trapper collection** — choose the collection whose images you want to upload.
 4. **Filter by deployments** *(optional)* — narrow the upload to specific deployments within the collection.
-5. **Review and confirm** — a summary of all selected options is shown before the upload starts.
+5. **Subject set name** — name of the Zooniverse subject set that will be created (or reused if it already exists). The wizard proposes a default built from the research project, collection and current month: `{rp_name}_{rp_pk}_{collection_name}_{collection_pk}_{YYYY-MM}`.
+6. **Review and confirm** — a summary of all selected options is shown before the upload starts.
 
 Once confirmed, the wizard launches the import and displays a live progress bar. After completion it prints a summary 
 report. The full report details can be accessed at any time by running:

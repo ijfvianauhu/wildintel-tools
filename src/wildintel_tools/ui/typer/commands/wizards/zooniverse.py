@@ -56,7 +56,9 @@ def run_import_wizard(ctx: typer.Context, settings: Settings) -> None:
 
     rp = trapper_client.research_projects.get_all()
     TyperUtils.console.print()
-    rp_selected, _ = TyperUtils.select_from_list(rp.results, title="Select a research project")
+    rp_selected = TyperUtils.select_box(
+        rp.results, id_attr="pk", name_attr="name", label="Select a research project", multi_select=False,
+    )
 
     cp = trapper_client.classification_projects.get_by_research_project(rp_selected.pk)
     if len(cp.results) == 0:
@@ -66,12 +68,14 @@ def run_import_wizard(ctx: typer.Context, settings: Settings) -> None:
         )
 
     TyperUtils.console.print()
-    cp_selected, _ = TyperUtils.select_from_list(cp.results, title="Select a classification project")
+    cp_selected = TyperUtils.select_box(
+        cp.results, id_attr="pk", name_attr="name", label="Select a classification project", multi_select=False,
+    )
 
     collections = trapper_client.collections.get_by_classification_project(cp_selected.pk)
     TyperUtils.console.print()
-    collection_selected, _ = TyperUtils.select_from_list(
-        collections.results, id_attr="collection_pk", title="Select a collection"
+    collection_selected = TyperUtils.select_box(
+        collections.results, id_attr="collection_pk", name_attr="name", label="Select a collection", multi_select=False,
     )
 
     TyperUtils.console.print()
@@ -82,8 +86,8 @@ def run_import_wizard(ctx: typer.Context, settings: Settings) -> None:
     filtered = [d for d in deployments.results if d.deployment_id.lower().startswith(prefix)]
 
     TyperUtils.console.print()
-    deployment_selected, _ = TyperUtils.select_from_list(
-        filtered, name_attr="deployment_id", title="Select a deployment", multi_select=True
+    deployment_selected = TyperUtils.select_box(
+        filtered, id_attr="pk", name_attr="deployment_id", label="Select a deployment", multi_select=True,
     )
 
     if not deployment_selected:
@@ -93,10 +97,18 @@ def run_import_wizard(ctx: typer.Context, settings: Settings) -> None:
     deployments_str = ",".join(deployment_pks)
     deployments_info = ", ".join([f"{d.deployment_id} ({d.pk})" for d in deployment_selected])
 
+    TyperUtils.console.print()
+    default_subjectset_name = (
+        f"{rp_selected.name}_{rp_selected.pk}"
+        f"_{collection_selected.name}_{collection_selected.collection_pk}"
+        f"_{datetime.now():%Y-%m}"
+    )
+    subjectset_name = typer.prompt("Subject set name", default=default_subjectset_name)
+
     msg = (
         f"We are going to import the images taken during deployments {deployments_info} "
         f"from collection {collection_selected.name} ({collection_selected.collection_pk}) "
-        f"into Zooniverse, using detection data from classification project "
+        f"into Zooniverse subject set {subjectset_name}, using detection data from classification project "
         f"{cp_selected.name} ({cp_selected.pk}) "
         f"within research project {rp_selected.name} ({rp_selected.pk}). "
         f"Are you sure?"
@@ -123,6 +135,7 @@ def run_import_wizard(ctx: typer.Context, settings: Settings) -> None:
         research_project=rp_selected.pk,
         classification_project=cp_selected.pk,
         deployments_input=deployments_str,
+        subjectset_name=subjectset_name,
         n_images_seq=settings.ZOONIVERSE_CONNECTOR.upload_collection_n_images_seq,
         max_interval=settings.ZOONIVERSE_CONNECTOR.upload_collection_max_interval,
         dry_run=dry_run,
