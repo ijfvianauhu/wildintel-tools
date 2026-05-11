@@ -657,12 +657,6 @@ def export_annotations(
         f"and upload '{observations_file.name}' checking only the option 'Import expert classifications'."
     ))
 
-    TyperUtils.console.print()
-    TyperUtils.console.print(
-        "[bold red]⚠  IMPORTANT:[/bold red] [bold]The import process  MUST be performed logged in {trapper_client.base_url} "
-        "as Trapper Zooniverse user[/bold]- "
-        f"Using a different account will cause the import to fail or produce incorrect results.")
-
 
     report_file = TyperUtils.save_report(report)
     TyperUtils.console.print()
