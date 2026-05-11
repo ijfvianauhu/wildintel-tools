@@ -458,8 +458,9 @@ Once confirmed, the wizard applies the consensus process and generates a CSV fil
 imported into Trapper. It prints the path of the generated CSV and the Trapper import URL.
 
 !!! warning "Important"
-    The CSV import into Trapper must be performed while logged in as the Zooniverse user configured in
-    `ZOONIVERSE.zooniverse_username`. Using a different account will cause the import to fail or produce incorrect results.
+    When the CSV is imported into Trapper, each observation's **Classified by** field will be linked to the user
+    configured in `ZOONIVERSE_CONNECTOR.annotations_classified_by`. If that user does not exist in Trapper, the
+    observations will be linked to the account that performed the import instead.
 
 #### Option B — Manual (`export` command)
 
@@ -524,8 +525,9 @@ file by enabling the `--save-zoo-annotations` flag:
     ```
 
 !!! warning "Important"
-    The CSV import into Trapper must be performed while logged in as the Zooniverse user configured in
-    `ZOONIVERSE.zooniverse_username`. Using a different account will cause the import to fail or produce incorrect results.
+    When the CSV is imported into Trapper, each observation's **Classified by** field will be linked to the user
+    configured in `ZOONIVERSE_CONNECTOR.annotations_classified_by`. If that user does not exist in Trapper, the
+    observations will be linked to the account that performed the import instead.
 
 ## Consensus process
 
@@ -778,10 +780,12 @@ Alias: `exp`
 | `--verbose / --no-verbose` | bool | `True` | Show per-media detail in the progress bar |
 | `--save-zoo-annotations / --no-save-zoo-annotations` | bool | `True` | Save the raw Zooniverse user opinions as a separate CSV with a `zoo_annotations_` prefix |
 
-After the export completes, the command prints the path of the generated observations CSV and the Trapper import URL. The CSV **must** be imported into Trapper while logged in as the configured Zooniverse user (`ZOONIVERSE.zooniverse_username`).
+After the export completes, the command prints the path of the generated observations CSV and the Trapper import URL.
 
 !!! warning "Important"
-    The CSV import into Trapper must be performed while logged in as the Zooniverse user configured in `ZOONIVERSE.zooniverse_username`. Using a different account will cause the import to fail or produce incorrect results.
+    When the CSV is imported into Trapper, each observation's **Classified by** field will be linked to the user
+    configured in `ZOONIVERSE_CONNECTOR.annotations_classified_by`. If that user does not exist in Trapper, the
+    observations will be linked to the account that performed the import instead.
 
 ---
 
