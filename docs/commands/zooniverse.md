@@ -189,6 +189,12 @@ report. The full report details can be accessed at any time by running:
 $ wildintel-tools reports view
 ```
 
+!!! tip
+    The wizard will ask whether you want to run in **dry-run mode** before starting the import. In dry-run mode no images are downloaded, no subject set is created and nothing is uploaded to Zooniverse. This is a safe way to validate how many images would be imported and check that the selection is correct before committing to the actual upload.
+
+!!! warning
+    If the number of images to upload is very large, the wizard is not recommended — it runs interactively in the foreground and will block your terminal for the entire duration of the upload. Use **Option B** (the `import` command) instead, which is better suited for long-running or automated imports.
+
 #### Option B — Manual (`import` command)
 
 To upload images use the `wildintel-tools zooniverse import` command. This command requires the Trapper collection
@@ -256,6 +262,62 @@ the `--exclude-subjects` option.
     You can download the subjects export file from **https://www.zooniverse.org/lab/{project_id}/data-exports** under 
     **Request new subject export**. Use the [`uploaded-media`](#uploaded-media) command to inspect the file and verify which
     media IDs have already been uploaded before running `import`.
+
+!!! tip "Processing many deployments with one report per deployment"
+    When the number of deployments is large and you want a separate report for each one, running the wizard or the
+    `import` command manually for each deployment is impractical. A simple shell script can automate this:
+
+    === "Bash"
+
+        ```bash
+        #!/bin/bash
+
+        # Configuration
+        PROJECT_ID=66
+        PROJECT_NAME="DONA_24_14_R0037_66_2026-04"
+        RP=14
+        CP=46
+        EXCLUDE_SUBJECTS="./european-camera-trap-project-subjects.csv"
+
+        # Deployments (space-separated PKs)
+        deployments="1081 1080 1047 1071 1083 1068 1036 1038 1063 1058"
+
+        for dep in $deployments; do
+            echo "Processing deployment $dep..."
+            uv run wildintel-tools zooniverse import "$PROJECT_ID" "$PROJECT_NAME" \
+                --rp "$RP" \
+                --cp "$CP" \
+                --deployments "$dep" \
+                --exclude-subjects "$EXCLUDE_SUBJECTS"
+        done
+
+        echo "All deployments processed."
+        ```
+
+    === "PowerShell"
+
+        ```powershell
+        # Configuration
+        $ProjectId      = 66
+        $ProjectName    = "DONA_24_14_R0037_66_2026-04"
+        $RP             = 14
+        $CP             = 46
+        $ExcludeSubjects = "./european-camera-trap-project-subjects.csv"
+
+        # Deployments (space-separated PKs)
+        $deployments = "1081 1080 1047 1071 1083 1068 1036 1038 1063 1058" -split " "
+
+        foreach ($dep in $deployments) {
+            Write-Host "Processing deployment $dep..."
+            uv run wildintel-tools zooniverse import $ProjectId $ProjectName `
+                --rp $RP `
+                --cp $CP `
+                --deployments $dep `
+                --exclude-subjects $ExcludeSubjects
+        }
+
+        Write-Host "All deployments processed."
+        ```
 
 ### Step 3 — Validate the subject set
 
