@@ -45,7 +45,8 @@ from typing import List, Dict, Tuple, Any
 
 import typer
 
-from wildintel_tools.ui.typer.settings import Settings, SettingsManager
+from wildintel_tools.ui.typer.settings import Settings
+from wildintel_tools.ui.typer.settings_manager import SettingsManager
 
 app = typer.Typer(
     help=_("Includes several utilities to obtained tada froem a Epicollect project"),

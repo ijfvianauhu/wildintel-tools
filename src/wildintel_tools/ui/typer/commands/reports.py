@@ -30,7 +30,7 @@ from pathlib import Path
 from wildintel_tools.reports import Report
 from wildintel_tools.ui.typer.i18n import _
 from wildintel_tools.ui.typer.TyperUtils import TyperUtils
-from wildintel_tools.ui.typer.settings import SettingsManager
+from wildintel_tools.ui.typer.settings_manager import SettingsManager
 
 app = typer.Typer(
     help=_("Manage project configurations"),

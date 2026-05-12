@@ -40,7 +40,7 @@ from typing import Optional, Any
 from pathlib import Path
 import requests
 from wildintel_tools.ui.typer.logger import logger, setup_logging
-from wildintel_tools.ui.typer.settings import SettingsManager
+from wildintel_tools.ui.typer.settings_manager import SettingsManager
 from wildintel_tools.ui.typer.TyperUtils import TyperUtils
 from wildintel_tools.ui.typer.commands import config
 from wildintel_tools.ui.typer.commands import reports

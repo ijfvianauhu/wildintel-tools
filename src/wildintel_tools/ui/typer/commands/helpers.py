@@ -30,7 +30,7 @@ from typing import Annotated, Any, List
 from typer_config import conf_callback_factory
 from wildintel_tools.ui.typer.i18n import _
 from wildintel_tools.ui.typer.TyperUtils import TyperUtils
-from wildintel_tools.ui.typer.settings import SettingsManager
+from wildintel_tools.ui.typer.settings_manager import SettingsManager
 
 from wildintel_tools.helpers import (
     check_ffmpeg,
