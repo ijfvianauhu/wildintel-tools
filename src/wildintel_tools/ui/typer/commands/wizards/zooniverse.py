@@ -4,8 +4,6 @@ from pathlib import Path
 from typing import Annotated, Any
 
 import typer
-from pydantic import SecretStr
-from trapper_client.Schemas import TrapperDeploymentList
 from trapper_client.TrapperClient import TrapperClient
 
 from wildintel_tools.ui.typer.settings import (
@@ -34,6 +32,21 @@ def _print_section(title: str) -> None:
     TyperUtils.console.print(f"[green]{'━' * 67}[/green]")
 
 
+def _make_trapper_client(settings: Settings) -> TrapperClient:
+    return TrapperClient(
+        base_url=str(settings.GENERAL.host),
+        user_name=settings.GENERAL.login,
+        user_password=settings.GENERAL.password.get_secret_value(),
+        access_token=None,
+    )
+
+
+def _get_filtered_deployments(trapper_client: TrapperClient, rp_pk: int, collection_name: str) -> list:
+    deployments = trapper_client.deployments.get_all(query={"research_project": rp_pk})
+    prefix = f"{collection_name}-".lower()
+    return [d for d in deployments.results if d.deployment_id.lower().startswith(prefix)]
+
+
 def run_import_wizard(ctx: typer.Context, settings: Settings) -> None:
     from wildintel_tools.ui.typer.commands.zooniverse import importation
 
@@ -48,21 +61,18 @@ def run_import_wizard(ctx: typer.Context, settings: Settings) -> None:
         typer.echo("Aborted.")
         return
 
-    trapper_client = TrapperClient(
-        base_url=str(settings.GENERAL.host),
-        user_name=settings.GENERAL.login,
-        user_password=settings.GENERAL.password.get_secret_value(),
-        access_token=None,
-    )
+    trapper_client = _make_trapper_client(settings)
 
     rp = trapper_client.research_projects.get_all()
+    if not rp.results:
+        TyperUtils.fatal("No research projects found in Trapper. Cannot continue.")
     TyperUtils.console.print()
     rp_selected = TyperUtils.select_box(
         rp.results, id_attr="pk", name_attr="name", label="Select a research project", multi_select=False,
     )
 
     cp = trapper_client.classification_projects.get_by_research_project(rp_selected.pk)
-    if len(cp.results) == 0:
+    if not cp.results:
         TyperUtils.fatal(
             f"No classification project found in research project "
             f"{rp_selected.name} ({rp_selected.pk}). Cannot continue."
@@ -74,17 +84,22 @@ def run_import_wizard(ctx: typer.Context, settings: Settings) -> None:
     )
 
     collections = trapper_client.collections.get_by_classification_project(cp_selected.pk)
+    if not collections.results:
+        TyperUtils.fatal(
+            f"No collections found in classification project "
+            f"{cp_selected.name} ({cp_selected.pk}). Cannot continue."
+        )
     TyperUtils.console.print()
     collection_selected = TyperUtils.select_box(
         collections.results, id_attr="collection_pk", name_attr="name", label="Select a collection", multi_select=False,
     )
 
     TyperUtils.console.print()
-    deployments: TrapperDeploymentList = trapper_client.deployments.get_all(
-        query={"research_project": rp_selected.pk}
-    )
-    prefix = f"{collection_selected.name}-".lower()
-    filtered = [d for d in deployments.results if d.deployment_id.lower().startswith(prefix)]
+    filtered = _get_filtered_deployments(trapper_client, rp_selected.pk, collection_selected.name)
+    if not filtered:
+        TyperUtils.fatal(
+            f"No deployments found in collection {collection_selected.name}. Cannot continue."
+        )
 
     TyperUtils.console.print()
     deployment_selected = TyperUtils.select_box(
@@ -156,12 +171,7 @@ def run_export_wizard(ctx: typer.Context, settings: Settings) -> None:
         typer.echo("Aborted.")
         return
 
-    trapper_client = TrapperClient(
-        base_url=str(settings.GENERAL.host),
-        user_name=settings.GENERAL.login,
-        user_password=settings.GENERAL.password.get_secret_value(),
-        access_token=None,
-    )
+    trapper_client = _make_trapper_client(settings)
     zooniverse_client = ZooniverseClient(
         project_id=settings.ZOONIVERSE.zooniverse_project_id,
         username=settings.ZOONIVERSE.zooniverse_username,
@@ -234,12 +244,7 @@ def run_export_wizard(ctx: typer.Context, settings: Settings) -> None:
         label="Select a collection", multi_select=False,
     )
 
-    deployments: TrapperDeploymentList = trapper_client.deployments.get_all(
-        query={"research_project": rp_selected.pk}
-    )
-    prefix = f"{collection_selected.name}-".lower()
-    filtered = [d for d in deployments.results if d.deployment_id.lower().startswith(prefix)]
-
+    filtered = _get_filtered_deployments(trapper_client, rp_selected.pk, collection_selected.name)
     if not filtered:
         TyperUtils.fatal(
             f"No deployments found in collection {collection_selected.name}. Cannot continue."
@@ -497,18 +502,15 @@ def run_validate_wizard(ctx: typer.Context, settings: Settings) -> None:
     if not subjects_csv.exists():
         TyperUtils.fatal(f"File not found: {subjects_csv}")
 
-    trapper_client = TrapperClient(
-        base_url=str(settings.GENERAL.host),
-        user_name=settings.GENERAL.login,
-        user_password=settings.GENERAL.password.get_secret_value(),
-        access_token=None,
-    )
+    trapper_client = _make_trapper_client(settings)
 
     TyperUtils.console.print()
     rp = trapper_client.research_projects.get_all()
     if not rp.results:
         TyperUtils.fatal("No research projects found in Trapper. Cannot continue.")
-    rp_selected, _ = TyperUtils.select_from_list(rp.results, title="Select a research project")
+    rp_selected = TyperUtils.select_box(
+        rp.results, id_attr="pk", name_attr="name", label="Select a research project", multi_select=False,
+    )
 
     cp = trapper_client.classification_projects.get_by_research_project(rp_selected.pk)
     if not cp.results:
@@ -517,7 +519,9 @@ def run_validate_wizard(ctx: typer.Context, settings: Settings) -> None:
             f"{rp_selected.name} ({rp_selected.pk}). Cannot continue."
         )
     TyperUtils.console.print()
-    cp_selected, _ = TyperUtils.select_from_list(cp.results, title="Select a classification project")
+    cp_selected = TyperUtils.select_box(
+        cp.results, id_attr="pk", name_attr="name", label="Select a classification project", multi_select=False,
+    )
 
     collections = trapper_client.collections.get_by_classification_project(cp_selected.pk)
     if not collections.results:
@@ -526,8 +530,9 @@ def run_validate_wizard(ctx: typer.Context, settings: Settings) -> None:
             f"{cp_selected.name} ({cp_selected.pk}). Cannot continue."
         )
     TyperUtils.console.print()
-    collection_selected, _ = TyperUtils.select_from_list(
-        collections.results, id_attr="collection_pk", title="Select a collection"
+    collection_selected = TyperUtils.select_box(
+        collections.results, id_attr="collection_pk", name_attr="name",
+        label="Select a collection", multi_select=False,
     )
 
     TyperUtils.console.print()
@@ -538,17 +543,15 @@ def run_validate_wizard(ctx: typer.Context, settings: Settings) -> None:
     subject_set_id = int(ss_id_str) if ss_id_str.strip() else None
 
     TyperUtils.console.print()
-    deployments = trapper_client.deployments.get_all(
-        query={"research_project": rp_selected.pk}
-    )
-    prefix = f"{collection_selected.name}-".lower()
-    filtered = [d for d in deployments.results if d.deployment_id.lower().startswith(prefix)]
+    filtered = _get_filtered_deployments(trapper_client, rp_selected.pk, collection_selected.name)
 
     deployment_selected = []
     if filtered:
         TyperUtils.console.print()
-        deployment_selected, _ = TyperUtils.select_from_list(
-            filtered, name_attr="deployment_id", title="Select deployments to validate (leave empty for all)", multi_select=True
+        deployment_selected = TyperUtils.select_box(
+            filtered, id_attr="pk", name_attr="deployment_id",
+            label="Select deployments to validate (leave empty for all)",
+            multi_select=True,
         )
 
     deployment_pks = [str(d.pk) for d in deployment_selected] if deployment_selected else []
