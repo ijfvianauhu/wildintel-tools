@@ -26,7 +26,7 @@ from rich.table import Table
 from rich.progress import Progress, TextColumn, BarColumn, TimeElapsedColumn
 from typing import Callable, Dict, Any
 
-from wildintel_tools.ui.typer.settings import Settings
+from wildintel_tools.ui.typer.settings import Settings, get_app_documents_dir
 from wildintel_tools.ui.typer.settings_manager import SettingsManager
 
 import logging
@@ -519,6 +519,24 @@ class TyperUtils:
             k, v = pair.split("=", 1)
             out[k.strip()] = v.strip()
         return out
+
+    @staticmethod
+    def resolve_output_path(
+        output: Optional[Path],
+        subfolder: str,
+        prefix: str,
+        ext: str = "csv",
+    ) -> Path:
+        """Return *output* as-is if provided, otherwise build a timestamped default path.
+
+        The default path is ``<app_documents>/<subfolder>/<prefix><YYYYMMDDHHMM>.<ext>``.
+        The directory is created automatically.
+        """
+        if output is not None:
+            return output
+        out_dir = get_app_documents_dir() / subfolder
+        out_dir.mkdir(parents=True, exist_ok=True)
+        return out_dir / f"{prefix}{datetime.now():%Y%m%d%H%M}.{ext}"
 
     def prompt_with_default(
             prompt_msg: str,

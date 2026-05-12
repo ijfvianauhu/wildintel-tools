@@ -2,7 +2,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Dict, Tuple, Any, Optional, Callable, Literal
-import csv, json
+import csv, json, statistics
 import logging, os
 import time as time_module
 import tempfile
@@ -1289,6 +1289,224 @@ class TrapperZooniverseConnector:
         self._notify(progress_callback, task_name, "end", 0)
 
         return {mid: sids for mid, sids in counts.items() if len(sids) > 1}
+
+    def estimate_upload(
+        self,
+        collection: int,
+        classification_project: int,
+        deployments: Optional[List[int]] = None,
+        blacklisted_deployments: Optional[List[int]] = None,
+        n_images_seq: int = 5,
+        max_interval: int = 90,
+        uploaded_media_ids: Optional[set] = None,
+        excluded_media_ids: Optional[set] = None,
+        progress_callback: Optional[Callable] = None,
+        max_workers: int = 1,
+    ) -> List[Dict[str, Any]]:
+        """Estimate the number of images to upload per deployment.
+
+        Applies the same selection logic as upload_collection and returns one
+        row per deployment with deploymentID, locationID, _id and estimated_photos.
+        """
+        all_deployments = self.trapper.deployments.get_all(query={"classification_project": classification_project})
+        depl_map = {
+            item.pk: item
+            for item in all_deployments.results
+            if item.pk is not None and item.deployment_id
+        }
+
+        if deployments is None:
+            collection_obj = self.trapper.collections.get_by_id(collection)
+            if collection_obj.results:
+                prefix = f"{collection_obj.results[0].name}-".lower()
+                deployment_pks = [pk for pk, d in depl_map.items() if d.deployment_id.lower().startswith(prefix)]
+            else:
+                deployment_pks = list(depl_map.keys())
+        else:
+            deployment_pks = list(deployments)
+
+        if blacklisted_deployments:
+            blacklist = set(blacklisted_deployments)
+            deployment_pks = [pk for pk in deployment_pks if pk not in blacklist]
+
+        def _process_deployment(pk: int) -> Optional[Dict[str, Any]]:
+            depl = depl_map.get(pk)
+            if depl is None:
+                return None
+            self._notify(progress_callback, "estimating", state="start",
+                         description=f"Estimating deployment {depl.deployment_id}...")
+
+            media = self.trapper.media.get_by_collection(
+                classification_project, collection,
+                {"deployment": pk, "private_human": "False", "private_vehicle": "False"},
+            )
+            observations = self.trapper.observations.results.get_by_collection(
+                classification_project, collection, query={"deployment": pk}
+            )
+            filtered_obs = [
+                obs for obs in observations.results
+                if obs.observationType and obs.observationType != "unclassified"
+            ]
+            obs_list = TrapperClassificationResultsList(
+                results=filtered_obs,
+                pagination=Pagination(page=1, page_size=len(filtered_obs), pages=1, count=len(filtered_obs)),
+            )
+            media_map = self._merge_media_and_observations(media, obs_list)
+            public_media_map = {mid: entry for mid, entry in media_map.items() if entry.filePublic}
+
+            if uploaded_media_ids:
+                public_media_map = {mid: e for mid, e in public_media_map.items() if int(mid) not in uploaded_media_ids}
+            if excluded_media_ids:
+                public_media_map = {mid: e for mid, e in public_media_map.items() if int(mid) not in excluded_media_ids}
+
+            sequences = self._generate_zoo_images_from_media_map(
+                public_media_map, max_interval, n_images_seq, filter_middle_humans=True
+            )
+            n_sequences = len(sequences)
+            estimated_photos = sum(len(seq) for seq in sequences)
+
+            durations = [
+                (seq[-1]["timestamp"] - seq[0]["timestamp"]).total_seconds()
+                for seq in sequences if len(seq) >= 2
+            ]
+            seq_duration_mean = round(statistics.mean(durations), 1) if durations else 0.0
+            seq_duration_max = round(max(durations), 1) if durations else 0.0
+            seq_duration_min = round(min(durations), 1) if durations else 0.0
+            seq_duration_variance = round(statistics.variance(durations), 1) if len(durations) >= 2 else 0.0
+
+            self._notify(progress_callback, "estimating", state="end",
+                         description=f"Deployment {depl.deployment_id}: {estimated_photos} images in {n_sequences} sequences")
+            return {
+                "deploymentID": depl.deployment_id,
+                "locationID": depl.location_id,
+                "_id": pk,
+                "total_media": len(media_map),
+                "n_sequences": n_sequences,
+                "estimated_photos": estimated_photos,
+                "seq_duration_mean_s": seq_duration_mean,
+                "seq_duration_max_s": seq_duration_max,
+                "seq_duration_min_s": seq_duration_min,
+                "seq_duration_variance_s2": seq_duration_variance,
+            }
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {executor.submit(_process_deployment, pk): pk for pk in deployment_pks}
+            rows = [r for f in as_completed(futures) if (r := f.result()) is not None]
+
+        rows.sort(key=lambda r: r["deploymentID"])
+        return rows
+
+    def analyze_sequences(
+        self,
+        collection: int,
+        classification_project: int,
+        deployments: Optional[List[int]] = None,
+        blacklisted_deployments: Optional[List[int]] = None,
+        n_images_seq: int = 5,
+        max_interval: int = 90,
+        progress_callback: Optional[Callable] = None,
+        max_workers: int = 1,
+    ) -> List[Dict[str, Any]]:
+        """Return one row per sequence with media IDs, dates and duration.
+
+        Applies the same filtering and sequence-splitting logic as estimate_upload
+        but returns sequence-level detail instead of per-deployment aggregates.
+        """
+        all_deployments = self.trapper.deployments.get_all(query={"classification_project": classification_project})
+        depl_map = {
+            item.pk: item
+            for item in all_deployments.results
+            if item.pk is not None and item.deployment_id
+        }
+
+        if deployments is None:
+            collection_obj = self.trapper.collections.get_by_id(collection)
+            if collection_obj.results:
+                prefix = f"{collection_obj.results[0].name}-".lower()
+                deployment_pks = [pk for pk, d in depl_map.items() if d.deployment_id.lower().startswith(prefix)]
+            else:
+                deployment_pks = list(depl_map.keys())
+        else:
+            deployment_pks = list(deployments)
+
+        if blacklisted_deployments:
+            blacklist = set(blacklisted_deployments)
+            deployment_pks = [pk for pk in deployment_pks if pk not in blacklist]
+
+        def _process_deployment(pk: int) -> List[Dict[str, Any]]:
+            depl = depl_map.get(pk)
+            if depl is None:
+                return []
+            self._notify(progress_callback, "analyzing", state="start",
+                         description=f"Analyzing deployment {depl.deployment_id}...")
+
+            media = self.trapper.media.get_by_collection(
+                classification_project, collection,
+                {"deployment": pk, "private_human": "False", "private_vehicle": "False"},
+            )
+            observations = self.trapper.observations.results.get_by_collection(
+                classification_project, collection, query={"deployment": pk}
+            )
+            filtered_obs = [
+                obs for obs in observations.results
+                if obs.observationType and obs.observationType != "unclassified"
+            ]
+            obs_list = TrapperClassificationResultsList(
+                results=filtered_obs,
+                pagination=Pagination(page=1, page_size=len(filtered_obs), pages=1, count=len(filtered_obs)),
+            )
+            media_map = self._merge_media_and_observations(media, obs_list)
+            public_media_map = {mid: entry for mid, entry in media_map.items() if entry.filePublic}
+
+            rows_converted = self._convert_timestamps_from_media_map(public_media_map)
+            grouped = self._group_by_deployment(rows_converted)
+
+            seq_rows = []
+            for group in grouped.values():
+                ordered = sorted(group, key=lambda x: x["timestamp"])
+                sequences: List[List[Dict]] = []
+                current_seq = [ordered[0]]
+                for prev, curr in zip(ordered, ordered[1:]):
+                    delta = (curr["timestamp"] - prev["timestamp"]).total_seconds()
+                    if delta <= max_interval:
+                        current_seq.append(curr)
+                    else:
+                        sequences.append(current_seq)
+                        current_seq = [curr]
+                sequences.append(current_seq)
+                sequences = self._filter_human_media_from_middle_sequences(sequences)
+
+                for seq_n, seq in enumerate(sequences, start=1):
+                    seq_sorted = sorted(seq, key=lambda x: x["timestamp"])
+                    first_ts = seq_sorted[0]["timestamp"]
+                    last_ts = seq_sorted[-1]["timestamp"]
+                    duration = (last_ts - first_ts).total_seconds()
+                    sampled = self._sample_sequence(seq_sorted, n_images_seq)
+                    media_ids = "|".join(str(img["mediaID"]) for img in sampled)
+                    seq_rows.append({
+                        "deploymentID": depl.deployment_id,
+                        "locationID": depl.location_id,
+                        "_id": pk,
+                        "sequence_n": seq_n,
+                        "total_images": len(seq_sorted),
+                        "media_ids": media_ids,
+                        "first_date": first_ts.isoformat(),
+                        "last_date": last_ts.isoformat(),
+                        "duration_s": round(duration, 1),
+                    })
+
+            self._notify(progress_callback, "analyzing", state="end",
+                         description=f"Deployment {depl.deployment_id}: {len(seq_rows)} sequences")
+            return seq_rows
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {executor.submit(_process_deployment, pk): pk for pk in deployment_pks}
+            all_rows: List[Dict[str, Any]] = []
+            for f in as_completed(futures):
+                all_rows.extend(f.result())
+
+        all_rows.sort(key=lambda r: (r["deploymentID"], r["sequence_n"]))
+        return all_rows
 
     def _build_expected_media_ids(
         self,

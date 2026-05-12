@@ -152,6 +152,24 @@ step (step 5) should appear.
 
 ### Step 2 — Upload images to Zooniverse
 
+!!! warning "Upload time"
+    The upload process can take a long time depending on the number of images and network speed.
+    Before starting, it is recommended to estimate how many images will be uploaded using the
+    `estimate-upload` command:
+
+    ```bash
+    wildintel-tools zooniverse estimate-upload <collection_id> --cp <classification_project_id>
+    ```
+
+    For example:
+
+    ```bash
+    wildintel-tools zooniverse estimate-upload 105 --cp 47
+    ```
+
+    This generates a CSV and prints a table with the estimated number of images per deployment,
+    number of sequences, and sequence duration statistics.
+
 There are two ways to upload images to Zooniverse: using the **interactive wizard** (recommended for first-time users)
 or running the **`import` command manually** (recommended for advanced users or automation).
 

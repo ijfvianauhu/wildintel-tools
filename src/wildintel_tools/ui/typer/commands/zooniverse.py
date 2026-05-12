@@ -13,7 +13,7 @@ from panoptes_client.panoptes import PanoptesAPIException
 from trapper_client.TrapperClient import TrapperClient
 
 from wildintel_tools.ui.typer.ZooUtils import ZooUtils
-from wildintel_tools.ui.typer.settings import Settings, get_app_documents_dir
+from wildintel_tools.ui.typer.settings import Settings
 from wildintel_tools.ui.typer.zooniverse import (
     check_connection,
     get_workflows,
@@ -647,11 +647,8 @@ def export_annotations(
 
     if observations_file is None:
         deps_str = "-".join(str(d) for d in deployments) if deployments else "all"
-        timestamp = datetime.now().strftime("%Y%m%d%H%M")
-        filename = f"wildintel_observations_wf{wf_id}_ss{ss_id}_cp{classification_project}_col{collection}_dep{deps_str}_{timestamp}.csv"
-        output_dir = get_app_documents_dir() / "zooniverse"
-        output_dir.mkdir(parents=True, exist_ok=True)
-        observations_file = output_dir / filename
+        prefix = f"wildintel_observations_wf{wf_id}_ss{ss_id}_cp{classification_project}_col{collection}_dep{deps_str}_"
+        observations_file = TyperUtils.resolve_output_path(None, "zooniverse", prefix)
 
     TyperUtils.info(
         _(
@@ -769,6 +766,183 @@ def download_ss(
     TyperUtils.success(_(f"Downloads complete. Reports saved in: {', '.join(str(f) for f in report_files)}"))
 
 app.command(name="dl_ss", hidden=True, help=_("Alias for download_ss")) (download_ss)
+
+
+@app.command(
+    "estimate-upload",
+    short_help=_("Estimate the number of images to upload per deployment"),
+    help=_("Estimates how many images would be uploaded to Zooniverse per deployment, applying the same filtering logic as the import command. Saves the result as a CSV."),
+    rich_help_panel=_("Helpers"),
+)
+def estimate_upload(
+    ctx: typer.Context,
+    collection: Annotated[int, typer.Argument(help=_("Collection ID"))] = ...,
+    classification_project: Annotated[
+        int,
+        typer.Option("--cp", "--classification-project", help=_("Classification project ID linked to the collection.")),
+    ] = None,
+    deployments_input: Annotated[
+        Optional[str],
+        typer.Option("--deployments", "--d", help=_("Deployment IDs (comma or space separated).")),
+    ] = None,
+    exclude_deployments_input: Annotated[
+        Optional[str],
+        typer.Option("--exclude-deployments", "--ed", help=_("Deployment IDs to skip (same format as --deployments).")),
+    ] = None,
+    n_images_seq: Annotated[int, typer.Option("--n-images-seq", help=_("Number of images per sequence."))] = None,
+    max_interval: Annotated[int, typer.Option("--max-interval", help=_("Maximum interval between images in a sequence (seconds)."))] = None,
+    workers: Annotated[int, typer.Option("--workers", "-w", help=_("Number of parallel workers for deployment processing."))] = None,
+    output: Annotated[
+        Optional[Path],
+        typer.Option("--output", "-o", help=_("Path for the output CSV. Defaults to the zooniverse documents folder.")),
+    ] = None,
+    config: Annotated[Path, typer.Option(hidden=True, callback=callback_with_override)] = None,
+) -> None:
+    connector: TrapperZooniverseConnector = ctx.obj["connector"]
+    settings: Settings = ctx.obj.get("settings", Settings())
+
+    n_images_seq = n_images_seq or settings.ZOONIVERSE_CONNECTOR.upload_collection_n_images_seq or 5
+    max_interval = max_interval or settings.ZOONIVERSE_CONNECTOR.upload_collection_max_interval or 90
+    workers = workers or settings.ZOONIVERSE_CONNECTOR.upload_collection_max_workers or 1
+
+    deployment_pks = TyperUtils.parse_id_list(deployments_input, allow_stdin=False)
+    blacklisted_pks = TyperUtils.parse_id_list(exclude_deployments_input, allow_stdin=False)
+
+    output = TyperUtils.resolve_output_path(output, "zooniverse", f"estimate_upload_col{collection}_")
+
+    TyperUtils.info(_(f"Estimating upload for collection {collection}…"))
+
+    try:
+        with make_progress() as progress:
+            progress_callback = make_progress_callback(progress)
+            rows = connector.estimate_upload(
+                collection=collection,
+                classification_project=classification_project,
+                deployments=deployment_pks,
+                blacklisted_deployments=blacklisted_pks,
+                n_images_seq=n_images_seq,
+                max_interval=max_interval,
+                progress_callback=progress_callback,
+                max_workers=workers,
+            )
+    except Exception as e:
+        TyperUtils.fatal(_(f"Estimation failed: {e}"))
+        return
+
+    if not rows:
+        TyperUtils.info(_("No deployments found for the given parameters."))
+        return
+
+    fields = [
+        "deploymentID", "locationID", "_id",
+        "total_media", "n_sequences",
+        "seq_duration_max_s", "seq_duration_mean_s", "seq_duration_min_s", "seq_duration_variance_s2",
+        "estimated_photos",
+    ]
+    with open(output, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fields)
+        writer.writeheader()
+        writer.writerows(rows)
+
+    table_fields = ["Deployment", "Location", "ID", "Total media", "Sequences",
+                    "Max dur.(s)", "Mean dur.(s)", "Min dur.(s)", "Var.(s²)", "Est. photos"]
+    TyperUtils.show_table(
+        [{"Deployment": r["deploymentID"], "Location": r["locationID"], "ID": r["_id"],
+          "Total media": r["total_media"], "Sequences": r["n_sequences"],
+          "Max dur.(s)": r["seq_duration_max_s"], "Mean dur.(s)": r["seq_duration_mean_s"],
+          "Min dur.(s)": r["seq_duration_min_s"], "Var.(s²)": r["seq_duration_variance_s2"],
+          "Est. photos": r["estimated_photos"]}
+         for r in rows],
+        title=f"Estimated upload — collection {collection}",
+        fields=table_fields,
+    )
+    total = sum(r["estimated_photos"] for r in rows)
+    TyperUtils.success(_(f"Total estimated photos: {total}. CSV saved at: {output}"))
+
+
+@app.command(
+    "analyze-sequences",
+    short_help=_("Analyse individual sequences per deployment"),
+    help=_("Generates a CSV with one row per sequence, listing media IDs, first/last date and duration."),
+    rich_help_panel=_("Helpers"),
+)
+def analyze_sequences(
+    ctx: typer.Context,
+    collection: Annotated[int, typer.Argument(help=_("Collection ID"))] = ...,
+    classification_project: Annotated[
+        int,
+        typer.Option("--cp", "--classification-project", help=_("Classification project ID linked to the collection.")),
+    ] = None,
+    deployments_input: Annotated[
+        Optional[str],
+        typer.Option("--deployments", "--d", help=_("Deployment IDs (comma or space separated).")),
+    ] = None,
+    exclude_deployments_input: Annotated[
+        Optional[str],
+        typer.Option("--exclude-deployments", "--ed", help=_("Deployment IDs to skip.")),
+    ] = None,
+    n_images_seq: Annotated[int, typer.Option("--n-images-seq", help=_("Number of images per sequence."))] = None,
+    max_interval: Annotated[int, typer.Option("--max-interval", help=_("Maximum interval between images in a sequence (seconds)."))] = None,
+    workers: Annotated[int, typer.Option("--workers", "-w", help=_("Number of parallel workers."))] = None,
+    output: Annotated[
+        Optional[Path],
+        typer.Option("--output", "-o", help=_("Path for the output CSV. Defaults to the zooniverse documents folder.")),
+    ] = None,
+    config: Annotated[Path, typer.Option(hidden=True, callback=callback_with_override)] = None,
+) -> None:
+    connector: TrapperZooniverseConnector = ctx.obj["connector"]
+    settings: Settings = ctx.obj.get("settings", Settings())
+
+    n_images_seq = n_images_seq or settings.ZOONIVERSE_CONNECTOR.upload_collection_n_images_seq or 5
+    max_interval = max_interval or settings.ZOONIVERSE_CONNECTOR.upload_collection_max_interval or 90
+    workers = workers or settings.ZOONIVERSE_CONNECTOR.upload_collection_max_workers or 1
+
+    deployment_pks = TyperUtils.parse_id_list(deployments_input, allow_stdin=False)
+    blacklisted_pks = TyperUtils.parse_id_list(exclude_deployments_input, allow_stdin=False)
+
+    output = TyperUtils.resolve_output_path(output, "zooniverse", f"sequences_col{collection}_")
+
+    TyperUtils.info(_(f"Analysing sequences for collection {collection}…"))
+
+    try:
+        with make_progress() as progress:
+            progress_callback = make_progress_callback(progress)
+            rows = connector.analyze_sequences(
+                collection=collection,
+                classification_project=classification_project,
+                deployments=deployment_pks,
+                blacklisted_deployments=blacklisted_pks,
+                n_images_seq=n_images_seq,
+                max_interval=max_interval,
+                progress_callback=progress_callback,
+                max_workers=workers,
+            )
+    except Exception as e:
+        TyperUtils.fatal(_(f"Analysis failed: {e}"))
+        return
+
+    if not rows:
+        TyperUtils.info(_("No sequences found for the given parameters."))
+        return
+
+    fields = ["deploymentID", "locationID", "_id", "sequence_n", "total_images", "media_ids", "first_date", "last_date", "duration_s"]
+    with open(output, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fields)
+        writer.writeheader()
+        writer.writerows(rows)
+
+    _PREVIEW_LIMIT = 100
+    preview = rows[:_PREVIEW_LIMIT]
+    table_fields = ["deploymentID", "locationID", "_id", "sequence_n", "total_images", "first_date", "last_date", "duration_s"]
+    TyperUtils.show_table(
+        [{f: r[f] for f in table_fields} for r in preview],
+        title=f"Sequences — collection {collection}",
+        fields=table_fields,
+    )
+    if len(rows) > _PREVIEW_LIMIT:
+        TyperUtils.info(_(f"Showing {_PREVIEW_LIMIT} of {len(rows)} sequences. Full results saved to: {output}"))
+    else:
+        TyperUtils.success(_(f"{len(rows)} sequences saved to: {output}"))
 
 
 @app.command("import",

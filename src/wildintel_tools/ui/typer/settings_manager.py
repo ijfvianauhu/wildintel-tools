@@ -3,10 +3,11 @@ import platform
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import List, Optional, Dict, get_origin, Union, get_args, Any
+from typing import List, Optional, Dict, get_origin, Union, get_args, Any, cast
 
 from dynaconf import Dynaconf
 from dynaconf import loaders
+
 from pydantic import BaseModel, SecretStr, TypeAdapter, ValidationError, HttpUrl
 
 from wildintel_tools.ui.typer.settings import (
@@ -26,7 +27,7 @@ class SettingsManager:
     - Parameter-level access and update utilities.
 
     :param settings_dir: Optional directory path where settings files are stored.
-                         Defaults to ``~/.trapper-tools``.
+                         Defaults to the platform-specific app directory (e.g. ``~/.config/wildintel-tools/`` on Linux).
     :type settings_dir: Optional[Path]
     """
 
@@ -53,21 +54,26 @@ class SettingsManager:
         :return: Path to the newly created settings file.
         """
         settings_file = self.settings_dir / f"{project_name}.toml"
+        template_created = template is None
         template = template or self._default_template_file()
 
-        if not template.exists():
-            raise FileNotFoundError(f"Settings template not found: {template}")
+        try:
+            if not template.exists():
+                raise FileNotFoundError(f"Settings template not found: {template}")
 
-        settings = Dynaconf(
-            settings_files=[str(template)],
-            load_dotenv=env_file,
-            envvar_prefix=False,
-            ignore_unknown_envvars=True,
-            validate_on_update="all",
-        )
+            settings = Dynaconf(
+                settings_files=[str(template)],
+                load_dotenv=env_file,
+                envvar_prefix=False,
+                ignore_unknown_envvars=True,
+                validate_on_update="all",
+            )
 
-        settings_model = SettingsManager.load_from_dict(settings.to_dict(), validate)
-        self.export_settings(settings_model, settings_file)
+            settings_model = SettingsManager.load_from_dict(settings.to_dict(), validate)
+            self.export_settings(settings_model, settings_file)
+        finally:
+            if template_created:
+                template.unlink(missing_ok=True)
 
         return settings_file
 
@@ -176,21 +182,15 @@ class SettingsManager:
         if not settings_file.exists():
             raise ValueError(f"Project '{project_name}' not found")
 
-        if platform.system() == "Windows":
-            default_editor = "notepad"
-        else:
-            default_editor = "nano"
-
-        editor = os.environ.get("EDITOR") or default_editor
+        if not editor:
+            editor = os.environ.get("EDITOR") or ("notepad" if platform.system() == "Windows" else "nano")
 
         temp_settings_file = settings_file.with_suffix(".tmp")
         temp_settings_file.write_text(settings_file.read_text())
 
         while True:
             try:
-                result = subprocess.run([editor, str(settings_file)], check=True)
-                if result.returncode != 0:
-                    raise RuntimeError(f"Editor {editor} exited with error")
+                subprocess.run([editor, str(settings_file)], check=True)
             except subprocess.CalledProcessError as e:
                 raise RuntimeError(f"Failed to open editor: {e}")
 
@@ -238,7 +238,7 @@ class SettingsManager:
         return section_model
 
     def _parse_value(self, section_model: BaseModel, key: str, value: Any):
-        field_info = section_model.model_fields[key]
+        field_info = type(section_model).model_fields[key]
         adapter = TypeAdapter(field_info.annotation)
         try:
             return adapter.validate_python(value)
@@ -293,14 +293,12 @@ class SettingsManager:
     @staticmethod
     def load_from_dict(settings: dict, validate: bool = True) -> Settings:
         """Load settings from a Python dictionary into a :class:`Settings` object."""
-        return Settings.model_validate(settings) if validate else SettingsManager._construct_recursive(Settings, settings)
+        if validate:
+            return Settings.model_validate(settings)
+        return cast(Settings, SettingsManager._construct_recursive(Settings, settings))
 
     @staticmethod
-    def from_dict(data: dict, validate: bool = True) -> Settings:
-        return SettingsManager.load_from_dict(data, validate)
-
-    @staticmethod
-    def to_plain_dict(settings: Settings, plain_secrets: bool = True) -> Any:
+    def to_plain_dict(settings: Any, plain_secrets: bool = True) -> Any:
         """Convert recursively BaseModel/SecretStr/Path/HttpUrl to serialisable Python types."""
         if isinstance(settings, SecretStr):
             return settings.get_secret_value() if plain_secrets else "**********"
@@ -369,7 +367,7 @@ class SettingsManager:
         return tmp_path
 
     @staticmethod
-    def _construct_recursive(model_cls: type[BaseModel], data: dict) -> BaseModel:
+    def _construct_recursive(model_cls: type[BaseModel], data: dict | None) -> BaseModel:
         """Build a model using model_construct() applied recursively to sub-models."""
         if data is None:
             return model_cls.model_construct()
@@ -392,7 +390,7 @@ class SettingsManager:
             elif isinstance(ann, type) and issubclass(ann, BaseModel):
                 sub = ann
 
-            if origin in (list, list.__class__) or getattr(ann, "__origin__", None) in (list,):
+            if origin is list:
                 args = get_args(ann)
                 if args:
                     elem = args[0]
