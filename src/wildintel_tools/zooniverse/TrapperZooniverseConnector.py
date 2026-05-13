@@ -1031,7 +1031,9 @@ class TrapperZooniverseConnector:
                 if not ("observations" in media and media["observations"] and "human" in media["observations"])
             ]
 
-            filtered_sequences.append(filtered_seq)
+            # Si una secuencia intermedia queda vacia tras el filtro, se descarta.
+            if filtered_seq:
+                filtered_sequences.append(filtered_seq)
 
         return filtered_sequences
 
@@ -1433,12 +1435,16 @@ class TrapperZooniverseConnector:
             blacklist = set(blacklisted_deployments)
             deployment_pks = [pk for pk in deployment_pks if pk not in blacklist]
 
+        self._notify(progress_callback, "__overall__", "setup",
+                     total=len(deployment_pks), description="Overall")
+
         def _process_deployment(pk: int) -> List[Dict[str, Any]]:
             depl = depl_map.get(pk)
             if depl is None:
                 return []
-            self._notify(progress_callback, "analyzing", state="start",
-                         description=f"Analyzing deployment {depl.deployment_id}...")
+            task_name = f"dep_{pk}"
+            self._notify(progress_callback, task_name, state="start",
+                         description=f"Analyzing {depl.deployment_id}…")
 
             media = self.trapper.media.get_by_collection(
                 classification_project, collection,
@@ -1459,11 +1465,14 @@ class TrapperZooniverseConnector:
             public_media_map = {mid: entry for mid, entry in media_map.items() if entry.filePublic}
 
             rows_converted = self._convert_timestamps_from_media_map(public_media_map)
+            rows_converted = [r for r in rows_converted if r.get("timestamp") is not None]
             grouped = self._group_by_deployment(rows_converted)
 
             seq_rows = []
             for group in grouped.values():
                 ordered = sorted(group, key=lambda x: x["timestamp"])
+                if not ordered:
+                    continue
                 sequences: List[List[Dict]] = []
                 current_seq = [ordered[0]]
                 for prev, curr in zip(ordered, ordered[1:]):
@@ -1477,6 +1486,8 @@ class TrapperZooniverseConnector:
                 sequences = self._filter_human_media_from_middle_sequences(sequences)
 
                 for seq_n, seq in enumerate(sequences, start=1):
+                    if not seq:
+                        continue
                     seq_sorted = sorted(seq, key=lambda x: x["timestamp"])
                     first_ts = seq_sorted[0]["timestamp"]
                     last_ts = seq_sorted[-1]["timestamp"]
@@ -1495,8 +1506,8 @@ class TrapperZooniverseConnector:
                         "duration_s": round(duration, 1),
                     })
 
-            self._notify(progress_callback, "analyzing", state="end",
-                         description=f"Deployment {depl.deployment_id}: {len(seq_rows)} sequences")
+            self._notify(progress_callback, task_name, state="end",
+                         description=f"{depl.deployment_id}: {len(seq_rows)} seq.")
             return seq_rows
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:

@@ -24,6 +24,8 @@ def make_progress() -> Progress:
 
 def make_progress_callback(progress: Progress, verbose: bool = True) -> Callable:
     task_registry: Dict[str, TaskID] = {}
+    overall_id: TaskID | None = None
+    _done_tasks: int = 0
 
     def get_or_create_task(task_name: str, total=None, description=None) -> TaskID:
         if task_name not in task_registry:
@@ -31,6 +33,12 @@ def make_progress_callback(progress: Progress, verbose: bool = True) -> Callable
                 description or task_name.replace("_", " ").title(), total=total
             )
         return task_registry[task_name]
+
+    def _advance_overall():
+        nonlocal _done_tasks
+        if overall_id is not None:
+            _done_tasks += 1
+            progress.update(overall_id, completed=_done_tasks)
 
     def callback(
         task_name: str,
@@ -43,6 +51,12 @@ def make_progress_callback(progress: Progress, verbose: bool = True) -> Callable
         item_status: Literal["start", "end", "fail"] | None = None,
         item_description: str | None = None,
     ):
+        nonlocal overall_id
+
+        if task_name == "__overall__" and state == "setup":
+            overall_id = progress.add_task(description or "Overall", total=total)
+            return
+
         task_id = get_or_create_task(task_name, total, description)
         label = description or task_name.replace("_", " ").title()
 
@@ -54,13 +68,14 @@ def make_progress_callback(progress: Progress, verbose: bool = True) -> Callable
         elif state == "end":
             task_obj = next((t for t in progress.tasks if t.id == task_id), None)
             completed = (task_obj.total if task_obj and task_obj.total else None) or 1
-            progress.update(task_id, completed=completed, description=f"✔️  {label}")
+            progress.update(task_id, completed=completed, total=completed, description=f"✔️  {label}")
             progress.stop_task(task_id)
             rendered = progress.make_tasks_table([task_obj]) if task_obj else None
             progress.remove_task(task_id)
             del task_registry[task_name]
             if rendered is not None:
                 progress.console.print(rendered)
+            _advance_overall()
             return
         elif state == "fail":
             task_obj = next((t for t in progress.tasks if t.id == task_id), None)
@@ -71,6 +86,7 @@ def make_progress_callback(progress: Progress, verbose: bool = True) -> Callable
             del task_registry[task_name]
             if rendered is not None:
                 progress.console.print(rendered)
+            _advance_overall()
             return
 
         if item_name is not None:

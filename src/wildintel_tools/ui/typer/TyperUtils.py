@@ -536,7 +536,7 @@ class TyperUtils:
             return output
         out_dir = get_app_documents_dir() / subfolder
         out_dir.mkdir(parents=True, exist_ok=True)
-        return out_dir / f"{prefix}{datetime.now():%Y%m%d%H%M}.{ext}"
+        return out_dir / f"{prefix}{datetime.now():%Y%m%d%H%M%S}.{ext}"
 
     def prompt_with_default(
             prompt_msg: str,
