@@ -8,6 +8,11 @@ on:
     types:
       - published
   workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag/release to upload artifacts to (e.g. v0.3.0)'
+        required: true
+        default: 'dev-latest'
 
 jobs:
   build-and-upload:
@@ -76,4 +81,5 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: dist/wildintel-tools-${{ matrix.pyinstaller_os }}.zip
+          tag_name: ${{ github.event.inputs.tag_name || github.ref_name }}
           token: ${{ secrets.PAT_TOKEN }}
