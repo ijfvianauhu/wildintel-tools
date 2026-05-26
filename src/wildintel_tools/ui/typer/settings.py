@@ -256,6 +256,14 @@ class ZooniverseConnectorSettings(BaseModel):
         default="zooniverse@wildintel-project.org",
         description="Trapper username attributed as the classifier when uploading Zooniverse observations.",
     )
+    annotations_max_file_size_mb: float | None = Field(
+        default=1.5,
+        description=(
+            "Maximum CSV file size in MB for annotation exports. "
+            "If the output exceeds this limit it is automatically split into "
+            "multiple _part001.csv, _part002.csv … files."
+        ),
+    )
 
 
 class Settings(BaseModel):

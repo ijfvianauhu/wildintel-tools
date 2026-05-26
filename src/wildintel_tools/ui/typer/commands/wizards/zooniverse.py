@@ -289,6 +289,35 @@ def run_export_wizard(ctx: typer.Context, settings: Settings) -> None:
         "Save the raw Zooniverse annotations (extracted user opinions) as a separate CSV?", default=True
     )
 
+    default_max_size = str(
+        settings.ZOONIVERSE_CONNECTOR.annotations_max_file_size_mb
+        if settings.ZOONIVERSE_CONNECTOR.annotations_max_file_size_mb is not None
+        else 1.5
+    )
+    max_file_size_str = typer.prompt(
+        "Maximum CSV file size in MB before splitting (leave blank to use settings value)",
+        default=default_max_size,
+    )
+    try:
+        max_file_size_mb = float(max_file_size_str) if max_file_size_str.strip() else None
+    except ValueError:
+        max_file_size_mb = None
+
+    TyperUtils.console.print()
+    upload = typer.confirm(
+        "Automatically upload the generated CSV(s) to Trapper after generating?\n"
+        "  (Uses browser automation via Playwright. "
+        "Trapper credentials from settings will be used.)",
+        default=False,
+    )
+    show_browser = False
+    if upload:
+        show_browser = typer.confirm(
+            "Show the browser window during the upload? "
+            "(headless by default — use visible window for debugging)",
+            default=False,
+        )
+
     TyperUtils.console.print()
     if not typer.confirm("Ready to export. Proceed?"):
         typer.echo("Aborted.")
@@ -308,6 +337,9 @@ def run_export_wizard(ctx: typer.Context, settings: Settings) -> None:
         observations_file=observations_file,
         verbose=verbose,
         save_zoo_annotations=save_zoo_annotations,
+        max_file_size_mb=max_file_size_mb,
+        upload=upload,
+        show_browser=show_browser,
     )
     typer.echo("Continuing...")
 
@@ -343,6 +375,11 @@ def run_setup_wizard(ctx: typer.Context, settings: Settings, settings_manager: S
     )
     classified_by_default = (
         settings.ZOONIVERSE_CONNECTOR.annotations_classified_by if settings else "zooniverse@wildintel-project.org"
+    )
+    max_file_size_mb_default = str(
+        settings.ZOONIVERSE_CONNECTOR.annotations_max_file_size_mb
+        if settings and settings.ZOONIVERSE_CONNECTOR.annotations_max_file_size_mb is not None
+        else 1.5
     )
 
     zooniverse_username = TyperUtils.prompt_with_default(
@@ -383,6 +420,15 @@ def run_setup_wizard(ctx: typer.Context, settings: Settings, settings_manager: S
         "Trapper username for Zooniverse observations (classifiedBy)", classified_by_default,
         ZooniverseConnectorSettings, "annotations_classified_by",
     )
+    annotations_max_file_size_mb_str = TyperUtils.prompt_with_default(
+        "Maximum CSV file size in MB before splitting (e.g. 1.5, leave blank to disable)",
+        max_file_size_mb_default,
+        ZooniverseConnectorSettings, "annotations_max_file_size_mb",
+    )
+    try:
+        annotations_max_file_size_mb = float(annotations_max_file_size_mb_str) if annotations_max_file_size_mb_str.strip() else None
+    except ValueError:
+        annotations_max_file_size_mb = None
 
     updates = {
         "ZOONIVERSE.zooniverse_username": zooniverse_username,
@@ -395,6 +441,7 @@ def run_setup_wizard(ctx: typer.Context, settings: Settings, settings_manager: S
         "ZOONIVERSE_CONNECTOR.upload_collection_max_attempts_per_subject": upload_collection_max_attempts_per_subject,
         "ZOONIVERSE_CONNECTOR.upload_collection_delay_seconds_per_subject": upload_collection_delay_seconds_per_subject,
         "ZOONIVERSE_CONNECTOR.annotations_classified_by": annotations_classified_by,
+        "ZOONIVERSE_CONNECTOR.annotations_max_file_size_mb": annotations_max_file_size_mb,
     }
 
     val = [

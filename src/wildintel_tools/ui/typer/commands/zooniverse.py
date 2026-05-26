@@ -132,6 +132,7 @@ override_mapping = {
     "timezone": ("WILDINTEL","timezone"),
     "ignore_dst": ("WILDINTEL","ignore_dst"),
     "convert_to_utc": ("WILDINTEL","convert_to_utc"),
+    "max_file_size_mb": ("ZOONIVERSE_CONNECTOR", "annotations_max_file_size_mb"),
 }
 
 callback_with_override = make_dynaconf_callback(override_mapping)
@@ -620,6 +621,39 @@ def export_annotations(
             help=_("Save the raw Zooniverse annotations (extracted user opinions) as a separate CSV alongside the observations file."),
         ),
     ] = True,
+    max_file_size_mb: Annotated[
+        Optional[float],
+        typer.Option(
+            "--max-file-size", "--mfs",
+            help=_(
+                "Maximum CSV file size in MB. If the output exceeds this limit it is split into "
+                "multiple _part001.csv, _part002.csv … files. "
+                "Defaults to the value in ZOONIVERSE_CONNECTOR.annotations_max_file_size_mb settings."
+            ),
+            callback=callback_with_override,
+        ),
+    ] = None,
+    upload: Annotated[
+        bool,
+        typer.Option(
+            "--upload/--no-upload",
+            help=_(
+                "Automatically upload the generated CSV(s) to Trapper after exporting, "
+                "using browser automation (Playwright). "
+                "Uses the Trapper credentials configured in settings (GENERAL.login / GENERAL.password)."
+            ),
+        ),
+    ] = False,
+    show_browser: Annotated[
+        bool,
+        typer.Option(
+            "--show-browser",
+            help=_(
+                "Show the browser window during the automatic upload (default: headless). "
+                "Only relevant when --upload is active. Useful for debugging."
+            ),
+        ),
+    ] = False,
     config: Annotated[
         Path,
         typer.Option(hidden=True, help=_("Configuration file"), callback=callback_with_override),
@@ -638,12 +672,17 @@ def export_annotations(
     :param classification_project: Trapper classification project ID.
     :param collection: Trapper collection ID.
     :param observations_file: Optional path to persist the raw observations file.
+    :param max_file_size_mb: Maximum output CSV size in MB before splitting.
+    :param upload: If True, automatically upload the generated CSV(s) to Trapper.
+    :param show_browser: If True, show the browser window during upload.
     :param config: Internal configuration option (dynamic callback).
     """
     connector: TrapperZooniverseConnector = ctx.obj["connector"]
     trapper_client: TrapperClient = ctx.obj["trapper_client"]
     settings: Settings = ctx.obj.get("settings", Settings())
     classified_by: str = settings.ZOONIVERSE_CONNECTOR.annotations_classified_by
+    if max_file_size_mb is None:
+        max_file_size_mb = settings.ZOONIVERSE_CONNECTOR.annotations_max_file_size_mb
 
     if observations_file is None:
         deps_str = "-".join(str(d) for d in deployments) if deployments else "all"
@@ -669,27 +708,92 @@ def export_annotations(
             verbose=verbose,
             save_zoo_annotations=save_zoo_annotations,
             classified_by=classified_by,
+            max_file_size_mb=max_file_size_mb,
         )
     except Exception as e:
         TyperUtils.fatal(_(f"Failed to export annotations: {e}"))
         return
 
-    TyperUtils.success(_(f"Annotations exported successfully from subject set {ss_id}."))
-    TyperUtils.success(_(f"Annotations Csv file was saved as  {observations_file}."))
-    TyperUtils.info(_(
-        f"To import the CSV into Trapper, go to:\n"
-        f"  {trapper_client.base_url}/media_classification/classification/import/\n"
-        f"and upload '{observations_file.name}' checking only the option 'Import expert classifications'."
-    ))
+    # ── Collect all generated CSV files (base + any _part001, _part002 …) ─────
+    parent = observations_file.parent
+    stem   = observations_file.stem
+    suffix = observations_file.suffix
+    generated_csv_files: List[Path] = []
+    if observations_file.exists():
+        generated_csv_files.append(observations_file)
+    generated_csv_files.extend(sorted(parent.glob(f"{stem}_part???{suffix}")))
+    if not generated_csv_files:
+        generated_csv_files = [observations_file]   # fallback (file may still be pending)
 
+    TyperUtils.success(_(f"Annotations exported successfully from subject set {ss_id}."))
+    for f in generated_csv_files:
+        TyperUtils.success(_(f"  → {f}"))
 
     report_file = TyperUtils.save_report(report)
     TyperUtils.console.print()
     TyperUtils.display_report(report)
     TyperUtils.success(_(f"Report saved at: {report_file}"))
 
-    import_url = str(trapper_client.base_url).rstrip("/") + "/media_classification/classification/import/"
+    # ── Manual upload hint (only when --no-upload) ────────────────────────────
+    if not upload:
+        import_url = str(trapper_client.base_url).rstrip("/") + "/media_classification/classification/import/"
+        TyperUtils.console.print()
+        TyperUtils.info(_(
+            f"To import the CSV(s) into Trapper, go to:\n"
+            f"  {import_url}\n"
+            f"and upload the file(s) above checking only 'Import expert classifications'.\n"
+            f"Or re-run this command with [bold]--upload[/bold] to do it automatically."
+        ))
+        return
+
+    # ── Automatic upload via TrapperNavigator ─────────────────────────────────
+    from wildintel_tools.navigator import TrapperNavigator
+
+    trapper_url      = str(settings.GENERAL.host)
+    trapper_username = settings.GENERAL.login
+    trapper_password = settings.GENERAL.password.get_secret_value()
+
     TyperUtils.console.print()
+    TyperUtils.info(_(
+        f"Uploading {len(generated_csv_files)} CSV file(s) to Trapper "
+        f"(project {classification_project}) via browser automation…"
+    ))
+    if show_browser:
+        TyperUtils.console.print("[yellow]⚠  Browser window will be visible (--show-browser)[/yellow]")
+
+    navigator = TrapperNavigator(
+        base_url=trapper_url,
+        username=trapper_username,
+        password=trapper_password,
+        headless=not show_browser,
+    )
+
+    try:
+        with make_progress() as progress:
+            upload_callback = make_progress_callback(progress)
+            upload_report = navigator.upload_expert_classifications(
+                csv_files=generated_csv_files,
+                project_id=classification_project,
+                progress_callback=upload_callback,
+            )
+    except Exception as e:
+        TyperUtils.fatal(_(f"Upload failed: {e}"))
+        return
+
+    TyperUtils.console.print()
+    TyperUtils.display_report(upload_report)
+    upload_report_file = TyperUtils.save_report(upload_report)
+    TyperUtils.success(_(f"Upload report saved at: {upload_report_file}"))
+
+    if upload_report.errors:
+        TyperUtils.console.print(
+            f"[red]⚠  {len(upload_report.errors)} file(s) failed to upload. "
+            f"Check the report for details.[/red]"
+        )
+    else:
+        TyperUtils.success(_(
+            f"All {len(generated_csv_files)} CSV file(s) uploaded successfully to Trapper."
+        ))
 
 
 app.command(name="exp", hidden=True, help=_("Alias for export")) (export_annotations)

@@ -114,13 +114,34 @@ def get_latest_github_release(owner: str, repo: str, timeout: float = 3.0) -> st
 def is_newer_version(current_version: str, latest_version: str) -> bool:
     """
     Returns True if latest_version is newer than current_version.
-    Assumes versions are in semantic versioning format: vMAJOR.MINOR.PATCH
+
+    Handles standard semantic versioning (``vMAJOR.MINOR.PATCH``) as well as
+    tags that contain pre-release suffixes (``v1.2.0-beta``, ``v1.2.0-rc1``)
+    or build metadata (``v1.2.0+build.1``).  Any non-numeric segment is
+    silently ignored, so ``v1.2.0.dev3`` is treated as ``(1, 2, 0)``.
+
+    Returns ``False`` whenever either version string cannot be parsed to at
+    least one numeric component (e.g. ``"dev-latest"``).
     """
 
-    def parse_version(v: str):
-        return tuple(int(x) for x in v.lstrip("v").split("."))
+    def parse_version(v: str) -> tuple[int, ...]:
+        # 1. Strip leading "v" or "V".
+        # 2. Discard pre-release suffix after the first "-" (e.g. "-beta", "-rc1").
+        # 3. Discard build metadata after the first "+" (e.g. "+build.42").
+        # 4. Split on "." and keep only purely numeric segments so that
+        #    "dev", "alpha", "rc1" … don't cause a ValueError.
+        clean = v.lstrip("vV").split("-")[0].split("+")[0]
+        parts = tuple(int(x) for x in clean.split(".") if x.isdigit())
+        return parts
 
-    return parse_version(latest_version) > parse_version(current_version)
+    current = parse_version(current_version)
+    latest  = parse_version(latest_version)
+
+    # If either string yielded no numeric parts we cannot compare — skip.
+    if not current or not latest:
+        return False
+
+    return latest > current
 
 
 @app.callback()

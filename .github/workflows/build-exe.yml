@@ -53,7 +53,10 @@ jobs:
 
       - name: Install project dependencies
         run: uv sync --all-extras --dev
-        
+
+      - name: Install Playwright browsers
+        run: uv run playwright install chromium --with-deps
+
       - name: Install python-magic-bin (Windows only)
         if: runner.os == 'Windows'
         run: uv pip install python-magic-bin
@@ -77,7 +80,15 @@ jobs:
         run: |
           Compress-Archive -Path "dist\${{ matrix.file_name }}" -DestinationPath "dist\wildintel-tools-${{ matrix.pyinstaller_os }}.zip" -Force
 
+      - name: Upload zip as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wildintel-tools-${{ matrix.pyinstaller_os }}
+          path: dist/wildintel-tools-${{ matrix.pyinstaller_os }}.zip
+          retention-days: 7
+
       - name: Upload zip to existing release
+        if: github.event_name == 'release' || github.event.inputs.tag_name != ''
         uses: softprops/action-gh-release@v1
         with:
           files: dist/wildintel-tools-${{ matrix.pyinstaller_os }}.zip

@@ -444,6 +444,10 @@ imported back into Trapper. As with the upload step, there are two ways to do th
 (recommended for first-time users) or running the **`export` command manually** (recommended for advanced users or
 automation).
 
+Both options support **automatic upload** to Trapper via browser automation (Playwright). When enabled, the tool logs
+into Trapper, navigates to the import form, selects the classification project, attaches each CSV and submits the
+form — no manual steps required.
+
 #### Option A — Wizard (recommended)
 
 The wizard guides you step by step through the entire export process, asking you to select the subject set, workflow,
@@ -465,20 +469,36 @@ Continue? [y/N]:
 
 The wizard will guide you through the following steps:
 
-1. **Select the Zooniverse subject set** — choose the subject set whose classifications you want to export.
-2. **Select the Zooniverse workflow** — choose the workflow in which volunteers performed the classifications.
-3. **Select the Trapper collection** — choose the destination collection in Trapper.
+1. **Select the Zooniverse workflow** — choose the workflow in which volunteers performed the classifications.
+2. **Select the Zooniverse subject set** — choose the subject set whose classifications you want to export.
+3. **Select the research project** — select the Trapper research project that owns the collection.
 4. **Select the classification project** — choose the Trapper classification project linked to that collection.
-5. **Filter by deployments** *(optional)* — restrict the export to specific deployments.
-6. **Review and confirm** — a summary of all selected options is shown before the export starts.
+5. **Select the Trapper collection** — choose the destination collection in Trapper.
+6. **Filter by deployments** *(optional)* — restrict the export to specific deployments.
+7. **Output file path** — name and location of the generated CSV (a default name is proposed).
+8. **Show progress detail** — whether to show per-media detail in the progress bar.
+9. **Save raw Zooniverse annotations** — whether to save the extracted user opinions as a companion CSV.
+10. **Maximum CSV file size** — if the output exceeds this limit (in MB) it will be split into multiple `_part001.csv`, `_part002.csv` … files. Defaults to the value in settings (`ZOONIVERSE_CONNECTOR.annotations_max_file_size_mb`).
+11. **Automatic upload to Trapper** — whether to upload the generated CSV(s) directly to Trapper using browser automation after the export finishes. If enabled, the wizard also asks whether the browser window should be visible (headless by default). The Trapper credentials configured in settings (`GENERAL.login` / `GENERAL.password`) are used.
+12. **Review and confirm** — a summary of all selected options is shown before the export starts.
 
-Once confirmed, the wizard applies the consensus process and generates a CSV file with observations ready to be
-imported into Trapper. It prints the path of the generated CSV and the Trapper import URL.
+Once confirmed, the wizard applies the consensus process and generates the CSV file(s). If automatic upload was
+requested, it then opens a browser, logs into Trapper and submits each file through the import form. Both the export
+report and the upload report are saved at the end.
 
 !!! warning "Important"
     When the CSV is imported into Trapper, each observation's **Classified by** field will be linked to the user
     configured in `ZOONIVERSE_CONNECTOR.annotations_classified_by`. If that user does not exist in Trapper, the
     observations will be linked to the account that performed the import instead.
+
+!!! tip "Playwright required for automatic upload"
+    The automatic upload feature requires [Playwright](https://playwright.dev/) to be installed. If it is not
+    present, the tool will attempt to install it automatically the first time the feature is used. You can also
+    install it manually:
+    ```bash
+    pip install playwright
+    playwright install chromium
+    ```
 
 #### Option B — Manual (`export` command)
 
@@ -488,8 +508,8 @@ labels were generated (using the `--wf` option). You also need to define the des
 classification project (`--cp`).
 
 The command applies a consensus process to the classifications collected in Zooniverse and generates a CSV file with
-observations that can be imported into Trapper. It also prints the path of the generated observations CSV and the URL
-to import it into Trapper.
+observations. By default it prints the path of the generated CSV and the Trapper import URL; with `--upload` it
+submits the file(s) directly to Trapper via browser automation.
 
 !!! example "Export classifications from Zooniverse workflow with ID 123 and subject set with ID 456 to Trapper collection with ID 789 and classification project with ID 101"
     ```bash
@@ -540,6 +560,38 @@ file by enabling the `--save-zoo-annotations` flag:
       --d 123,456 \
       --of /path/to/observations.csv \
       --save-zoo-annotations
+    ```
+
+If the output CSV is expected to be large, use `--max-file-size` to cap each part at a given size in MB. Files that
+exceed the limit are automatically split into `_part001.csv`, `_part002.csv`, etc.:
+
+!!! example "Same export splitting the output into 1.5 MB chunks"
+    ```bash
+    wildintel-tools zooniverse export \
+      --cp 101 --c 789 --ss 456 --wf 123 \
+      --max-file-size 1.5
+    ```
+
+#### Automatic upload to Trapper
+
+Add `--upload` to submit the generated CSV(s) directly to Trapper after the export, without any manual steps. The
+tool opens a headless browser, logs into Trapper using the credentials configured in settings, navigates to the
+import form and uploads each file with only **Import expert classifications** checked:
+
+!!! example "Export and automatically upload to Trapper"
+    ```bash
+    wildintel-tools zooniverse export \
+      --cp 101 --c 789 --ss 456 --wf 123 \
+      --upload
+    ```
+
+Add `--show-browser` to make the browser window visible during the upload (useful for debugging):
+
+!!! example "Export, upload and show the browser window"
+    ```bash
+    wildintel-tools zooniverse export \
+      --cp 101 --c 789 --ss 456 --wf 123 \
+      --upload --show-browser
     ```
 
 !!! warning "Important"
@@ -797,8 +849,16 @@ Alias: `exp`
 | `--observations-file, -of PATH` | Path | auto | Path to save the raw observations CSV before upload |
 | `--verbose / --no-verbose` | bool | `True` | Show per-media detail in the progress bar |
 | `--save-zoo-annotations / --no-save-zoo-annotations` | bool | `True` | Save the raw Zooniverse user opinions as a separate CSV with a `zoo_annotations_` prefix |
+| `--max-file-size, --mfs` | float | settings | Maximum CSV file size in MB. If the output exceeds this limit the file is split into `_part001.csv`, `_part002.csv` … |
+| `--upload / --no-upload` | flag | `--no-upload` | Automatically upload the generated CSV(s) to Trapper via browser automation (Playwright) immediately after export |
+| `--show-browser` | flag | off | Show the browser window during the automatic upload (headless by default). Only relevant when `--upload` is set. |
 
 After the export completes, the command prints the path of the generated observations CSV and the Trapper import URL.
+If `--upload` is provided, the CSV(s) are uploaded automatically using the Trapper credentials configured in `GENERAL` settings; no manual import step is required.
+
+!!! tip "Playwright dependency"
+    `--upload` requires Playwright to be installed (`pip install playwright && playwright install chromium`).
+    When running the standalone executable, Chromium is installed automatically on first use.
 
 !!! warning "Important"
     When the CSV is imported into Trapper, each observation's **Classified by** field will be linked to the user

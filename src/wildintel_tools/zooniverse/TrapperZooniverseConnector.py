@@ -549,6 +549,7 @@ class TrapperZooniverseConnector:
           save_zoo_annotations: bool = True,
           max_subjects: Optional[int] = None,
           classified_by: Optional[str] = None,
+          max_file_size_mb: Optional[float] = None,
   ):
         """
         Gerenates csv file with annotations from Zooniverse ready to import y Trapper.
@@ -766,12 +767,15 @@ class TrapperZooniverseConnector:
             if csv_path.is_dir():
                 csv_path = csv_path / f"annotations_{subjectset_id}_{wf_id}.csv"
             self.logger.debug(f"Saving observations to CSV in {csv_path}")
-            self._trapper_observations_to_csv(
+            generated_files = self._trapper_observations_to_csv(
                 flat_results,
                 csv_path,
                 ["observationType", "scientificName", "count", "classifiedBy",
                  "classificationMethod", "observationComments", "_id"],
+                max_size_mb=max_file_size_mb,
             )
+            for gf in generated_files:
+                self.logger.debug(f"Generated CSV: {gf}")
             if save_zoo_annotations and all_zoo_opinions:
                 zoo_csv_path = csv_path.parent / f"zoo_annotations_{csv_path.name}"
                 self.logger.debug(f"Saving zoo annotations to CSV in {zoo_csv_path}")
@@ -1098,34 +1102,90 @@ class TrapperZooniverseConnector:
 
         return resource_id
 
-    def _trapper_observations_to_csv(self, observations: List[TrapperObservationResultsTrapper]
-                                     , path: Path,
-                                     fields: Optional[List[str]] = None):
+    def _trapper_observations_to_csv(
+        self,
+        observations: List[TrapperObservationResultsTrapper],
+        path: Path,
+        fields: Optional[List[str]] = None,
+        max_size_mb: Optional[float] = None,
+    ) -> List[Path]:
+        """Escribe las observaciones en uno o varios CSV.
+
+        Si *max_size_mb* está definido y el contenido superaría ese tamaño,
+        el resultado se divide en ficheros ``_part001``, ``_part002``… con el
+        mismo algoritmo que usa ``merge_results.py``.
+
+        Returns:
+            Lista de :class:`Path` con los ficheros generados.
+        """
         import csv
+        import io
 
         def format_datetime(value):
             if isinstance(value, datetime):
                 return value.strftime("%Y-%m-%dT%H:%M:%S%z")
             return value
 
-        # Convertir modelos a dicts
+        # Convertir modelos a dicts y formatear fechas
         data = [obs.model_dump(by_alias=True) for obs in observations]
-
-        # Formatear las fechas
         for row in data:
             for key, value in row.items():
                 row[key] = format_datetime(value)
 
-        # Filtrar solo los campos indicados, si se proporcionan
+        # Filtrar campos
         if fields:
             data = [{k: v for k, v in row.items() if k in fields} for row in data]
-            fieldnames = fields
+            fieldnames = list(fields)
         else:
-            fieldnames = data[0].keys() if data else []
-        with path.open("w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(data)
+            fieldnames = list(data[0].keys()) if data else []
+
+        def _write_chunk(rows: list, dest: Path) -> Path:
+            with dest.open("w", newline="", encoding="utf-8") as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(rows)
+            return dest
+
+        # ── Sin límite de tamaño: un único fichero ────────────────────────────
+        if not data or max_size_mb is None:
+            return [_write_chunk(data, path)]
+
+        # ── Estimar bytes por fila con una muestra (≤ 200 filas) ─────────────
+        max_bytes    = int(max_size_mb * 1024 * 1024)
+        sample_size  = min(200, len(data))
+
+        buf = io.StringIO()
+        sample_writer = csv.DictWriter(buf, fieldnames=fieldnames)
+        sample_writer.writeheader()
+        sample_writer.writerows(data[:sample_size])
+        sample_text = buf.getvalue()
+
+        header_bytes     = len(sample_text.split("\n")[0].encode("utf-8")) + 1
+        sample_data_bytes = len(sample_text.encode("utf-8")) - header_bytes
+        bytes_per_row    = sample_data_bytes / sample_size if sample_size else 1
+        rows_per_chunk   = max(1, int((max_bytes - header_bytes) / bytes_per_row))
+
+        total_rows = len(data)
+        num_chunks = (total_rows + rows_per_chunk - 1) // rows_per_chunk
+
+        # ── Cabe en un único fichero ──────────────────────────────────────────
+        if num_chunks == 1:
+            return [_write_chunk(data, path)]
+
+        # ── Dividir en varios ficheros ────────────────────────────────────────
+        self.logger.debug(
+            f"CSV excede {max_size_mb} MB — dividiendo en {num_chunks} ficheros "
+            f"(~{rows_per_chunk} filas/fichero)"
+        )
+        generated: List[Path] = []
+        for i, start in enumerate(range(0, total_rows, rows_per_chunk), start=1):
+            chunk     = data[start : start + rows_per_chunk]
+            part_path = path.parent / f"{path.stem}_part{i:03d}{path.suffix}"
+            _write_chunk(chunk, part_path)
+            self.logger.debug(f"  Escrito {part_path.name}  ({len(chunk)} filas)")
+            generated.append(part_path)
+
+        return generated
 
     @staticmethod
     def _zoo_opinions_to_csv(opinions: List[tuple], path: Path) -> None:
