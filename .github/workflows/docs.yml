@@ -5,6 +5,8 @@ on:
     branches:
       - main
       - development
+    tags:
+      - 'v*'
 
 jobs:
   build:
@@ -31,7 +33,10 @@ jobs:
 
       - name: Deploy with mike
         run: |
-          if [ "${{ github.ref_name }}" == "main" ]; then
+          if [ "${{ github.ref_type }}" == "tag" ]; then
+            mike deploy --push --update-aliases ${{ github.ref_name }} latest
+            mike set-default --push latest
+          elif [ "${{ github.ref_name }}" == "main" ]; then
             mike deploy --push --update-aliases stable latest
             mike set-default --push latest
           else
