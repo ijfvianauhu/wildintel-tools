@@ -1,8 +1,10 @@
 site_name: wildintel-tools
 site_description: Utilities for validating and preparing wildlife monitoring data for the WildINTEL project and Trapper platform
 site_url: https://ijfvianauhu.github.io/wildintel-tools
+copyright: Copyright &copy; 2026 <a href="https://wildintel.eu/">WildINTEL</a>
+
 repo_url: https://github.com/ijfvianauhu/wildintel-tools
-repo_name: wildintel-tools
+repo_name: ijfvianauhu/wildintel-tools
 
 theme:
   name: material
@@ -31,18 +33,36 @@ theme:
     - search.highlight
     - content.code.copy
     - content.code.annotate
-    - navigation.tabs
+
 extra:
   version:
     provider: mike
+    default: latest
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/wildintelproject
+      name: WildINTEL on GitHub
+    - icon: fontawesome/brands/facebook
+      link: https://www.facebook.com/people/WildIntel/61556603674655/
+      name: WildINTEL on Facebook
+    - icon: simple/bluesky
+      link: https://bsky.app/profile/wildintel.bsky.social
+      name: WildINTEL on Bluesky
+    - icon: fontawesome/solid/globe
+      link: https://wildintel.eu/
+      name: WildINTEL website
 
 extra_css:
   - stylesheets/extras.css
 
+plugins:
+  - search
+
 markdown_extensions:
+  - toc:
+      title: On this page
   - admonition
   - pymdownx.details
-  - pymdownx.superfences
   - pymdownx.highlight:
       anchor_linenums: true
   - pymdownx.inlinehilite

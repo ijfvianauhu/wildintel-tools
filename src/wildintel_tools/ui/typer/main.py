@@ -55,7 +55,7 @@ from wildintel_tools.ui.typer.commands import zooniverse
 # --------------------------------------------------------------------------- #
 
 APP_NAME = "wildintel-tools"
-__version__ = "0.2.9"
+__version__ = "0.2.9.2"
 
 # --------------------------------------------------------------------------- #
 # Typer CLI definition
