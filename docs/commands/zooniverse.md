@@ -5,7 +5,18 @@ Automates the workflow between a [Trapper](https://trapper-project.org) instance
 1. **Upload** — images with bounding boxes detected and approved in Trapper are loaded into Zooniverse subject sets for citizen-science classification.
 2. **Import annotations** — classifications collected in Zooniverse are exported back to Trapper as observations, following a configurable consensus process.
 
-To support this workflow, a set of auxiliary commands is provided for querying and inspecting Zooniverse resources such as subjects, subject sets, workflows, and exported classification data.
+To support this workflow, a set of auxiliary commands is provided for querying and inspecting Zooniverse resources 
+such as subjects, subject sets, workflows, and exported classification data.
+
+The diagram below shows the complete sequence of interactions between Trapper, wildintel-tools and Zooniverse.
+Steps 1–3 cover the AI detection and approval process carried out in Trapper prior to the upload, and steps 4–6 cover
+how wildintel-tools fetches the filtered images, builds sequences and uploads them to Zooniverse as a subject set —
+both are described in [Upload and validation](#upload-and-validation).
+Step 7 represents the citizen-science classification performed directly by Zooniverse volunteers.
+Steps 8–10 cover the export of those annotations, the consensus process and the final import of observations back
+into Trapper — described in [Import annotations](#import-annotations).
+Before any of these steps can run, the connection to both platforms must be configured as described in
+[Configuration](#configuration).
 
 ```mermaid
 sequenceDiagram
@@ -37,13 +48,7 @@ sequenceDiagram
 
 ---
 
-## Quick start
-
-The workflow starts in Trapper, where an AI model is used to detect animals (bounding boxes) in a collection of images. 
-Once those detections are approved, the images are uploaded to Zooniverse for citizen-science classification. 
-The resulting annotations are then imported back into Trapper as observations.
-
-### Step 0 — Configuration
+## Configuration
 
 Before running any command, the connection to both Trapper and Zooniverse must be configured. The easiest way to do this 
 is through the interactive setup wizard:
@@ -81,6 +86,14 @@ $ wildintel-tools zooniverse test-connection
 ```
 
 A successful response confirms that wildintel-tools can authenticate against Zooniverse and is ready to use.
+
+![Zooniverse setup demo](../videos/zooniverse/setup.gif)
+
+## Upload and validation
+
+Once the tool is configured, the upload workflow begins in Trapper with an AI detection step to filter out humans
+and vehicles. The filtered images are then uploaded to Zooniverse as subject sets, and the upload is validated
+before making the subjects available for citizen-science classification.
 
 ### Step 1 — Run AI detection in Trapper
 
@@ -212,6 +225,8 @@ $ wildintel-tools reports view
 
 !!! warning
     If the number of images to upload is very large, the wizard is not recommended — it runs interactively in the foreground and will block your terminal for the entire duration of the upload. Use **Option B** (the `import` command) instead, which is better suited for long-running or automated imports.
+
+![Zooniverse import wizard demo](../videos/zooniverse/import.gif)
 
 #### Option B — Manual (`import` command)
 
@@ -437,18 +452,18 @@ Use `--all` to display every subject (not just those with issues), or `--pipelin
 $ wildintel-tools zooniverse check-metadata subjects.csv --ss 9876 --pipeline | xargs ...
 ```
 
-### Step 4 — Import annotations back to Trapper
+## Import annotations
 
 Once all the subjects in a subject set linked to a Zooniverse workflow have been classified, the annotations can be
-imported back into Trapper. As with the upload step, there are two ways to do this: using the **interactive wizard**
-(recommended for first-time users) or running the **`export` command manually** (recommended for advanced users or
+imported back into Trapper following a configurable consensus process. As with the upload step, there are two ways 
+to do this: using the **interactive wizard** (recommended for first-time users) or running the **`export` command manually** (recommended for advanced users or
 automation).
 
 Both options support **automatic upload** to Trapper via browser automation (Playwright). When enabled, the tool logs
 into Trapper, navigates to the import form, selects the classification project, attaches each CSV and submits the
 form — no manual steps required.
 
-#### Option A — Wizard (recommended)
+### Option A — Wizard (recommended)
 
 The wizard guides you step by step through the entire export process, asking you to select the subject set, workflow,
 collection, and classification project interactively. No prior knowledge of the command-line options is required.
@@ -500,7 +515,9 @@ report and the upload report are saved at the end.
     playwright install chromium
     ```
 
-#### Option B — Manual (`export` command)
+![Zooniverse export wizard demo](../videos/zooniverse/export.gif)
+
+### Option B — Manual (`export` command)
 
 Once all the subjects in a subject set linked to a Zooniverse workflow have been classified, use the `export` command.
 You must specify the subject set whose labels you want to import (using the `--ss` option) and the workflow where the
@@ -572,7 +589,7 @@ exceed the limit are automatically split into `_part001.csv`, `_part002.csv`, et
       --max-file-size 1.5
     ```
 
-#### Automatic upload to Trapper
+### Automatic upload to Trapper
 
 Add `--upload` to submit the generated CSV(s) directly to Trapper after the export, without any manual steps. The
 tool opens a headless browser, logs into Trapper using the credentials configured in settings, navigates to the

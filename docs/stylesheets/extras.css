@@ -19,6 +19,19 @@ article img {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
+.video-wrapper {
+  margin: 1.5rem 0;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow:
+    0 4px 8px rgba(0, 0, 0, 0.2),
+    0 10px 20px rgba(0, 0, 0, 0.15);
+}
+
+.video-wrapper video {
+  display: block;
+}
+
 :root {
   --md-primary-fg-color:        #006020;  /* verde oscuro del "Wild" */
   --md-primary-fg-color--light: #206040;  /* verde medio */
