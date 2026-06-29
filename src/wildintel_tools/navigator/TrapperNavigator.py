@@ -118,6 +118,7 @@ class TrapperNavigator:
                 None,
             ]
         ] = None,
+        delay_between_uploads: float = 0.0,
     ) -> Report:
         """
         Sube uno o varios CSV con clasificaciones humanas a Trapper.
@@ -139,6 +140,8 @@ class TrapperNavigator:
         project_id : int
             Identificador (PK) del proyecto de clasificación de Trapper
             en el que se importarán los resultados.
+        delay_between_uploads : float, optional
+            Segundos de espera entre subidas consecutivas. Por defecto 0 (sin espera).
         progress_callback : callable, optional
             Función de progreso con la firma::
 
@@ -332,6 +335,10 @@ class TrapperNavigator:
                             item_description=f"Importado correctamente → {page.url}",
                         )
                         report.add_success(label, "upload", f"redirect → {page.url}")
+
+                        if delay_between_uploads > 0 and idx < total:
+                            self.logger.debug(f"  Esperando {delay_between_uploads}s antes de la siguiente subida...")
+                            page.wait_for_timeout(delay_between_uploads * 1000)
 
                 except Exception as exc:
                     self.logger.error(f"  ERROR procesando {label}: {exc}")

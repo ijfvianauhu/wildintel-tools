@@ -154,6 +154,7 @@ class TrapperZooniverseConnector:
             max_workers: int = 4,
             media_ids: Optional[List[int]] = None,
             excluded_media_ids: Optional[List[int]] = None,
+            collapse_empty_sequences: bool = False,
     ) -> Report:
 
         deployments = list(deployments) if deployments is not None else None
@@ -248,7 +249,8 @@ class TrapperZooniverseConnector:
             self._notify(progress_callback, "preparing_sequences", state="start", description=f"Preparing sequences...")
 
             sequences = self._generate_zoo_images_from_media_map(public_media_map, max_interval, n_images_seq,
-                                                             filter_middle_humans=True)
+                                                             filter_middle_humans=True,
+                                                             collapse_empty_sequences=collapse_empty_sequences)
             self._notify(progress_callback, "preparing_sequences", state="end", set_total=True, total=len(sequences))
 
             # Crear SubjectSet antes de comenzar
@@ -943,7 +945,8 @@ class TrapperZooniverseConnector:
         return (json.dumps(sequences, indent=4, default=default_serializer))
 
     def _generate_zoo_images_from_media_map(self, media_map: Dict[str, MediaObservationEntry], max_interval : int,
-            n_images_seq:int, filter_middle_humans: bool =True) -> List[Dict[str, Any]]:
+            n_images_seq:int, filter_middle_humans: bool =True,
+            collapse_empty_sequences: bool = False) -> List[Dict[str, Any]]:
         """
         Given a set of media and its observations, generates a set of images sequences. Each sequence is a list of images
         taken within max_interval seconds. Each sequences is uniform sampling of n_images_seq images from the sequence.
@@ -958,6 +961,9 @@ class TrapperZooniverseConnector:
             Number of images to sample from each sequence.
         filter_middle_humans : bool
             If True, removes media classified as 'human' from intermediate sequences (not the first or last sequence of a deployment). Defaults to True.
+        collapse_empty_sequences : bool
+            If True, sequences where every image is classified as 'empty' are reduced to their second image only.
+            If the sequence has only one image it is kept as-is. Defaults to False.
 
         Returns
         -------
@@ -997,6 +1003,9 @@ class TrapperZooniverseConnector:
                 self.logger.debug(f"Filtering humans...")
                 sequences = self._filter_human_media_from_middle_sequences(sequences)
 
+            if collapse_empty_sequences:
+                self.logger.debug(f"Collapsing empty sequences...")
+                sequences = self._collapse_empty_sequences(sequences)
 
             # Muestreamos cada scuencias
             for seq in sequences:
@@ -1040,6 +1049,25 @@ class TrapperZooniverseConnector:
                 filtered_sequences.append(filtered_seq)
 
         return filtered_sequences
+
+    def _collapse_empty_sequences(
+        self, sequences: List[List[Dict[str, Any]]]
+    ) -> List[List[Dict[str, Any]]]:
+        """
+        Reduce sequences where every image is classified as 'empty' to their second image.
+        Sequences with a single image or with at least one non-empty image are left unchanged.
+        """
+        result = []
+        for seq in sequences:
+            all_empty = all(
+                "empty" in media.get("observations", [])
+                for media in seq
+            )
+            if all_empty and len(seq) > 1:
+                result.append([seq[1]])
+            else:
+                result.append(seq)
+        return result
 
     def _sample_sequence(self, rows: List[Dict], n_images_seq) -> List[Dict]:
         """Selecciona un subconjunto de imágenes distribuidas uniformemente."""
@@ -1364,6 +1392,7 @@ class TrapperZooniverseConnector:
         excluded_media_ids: Optional[set] = None,
         progress_callback: Optional[Callable] = None,
         max_workers: int = 1,
+        collapse_empty_sequences: bool = False,
     ) -> List[Dict[str, Any]]:
         """Estimate the number of images to upload per deployment.
 
@@ -1422,7 +1451,8 @@ class TrapperZooniverseConnector:
                 public_media_map = {mid: e for mid, e in public_media_map.items() if int(mid) not in excluded_media_ids}
 
             sequences = self._generate_zoo_images_from_media_map(
-                public_media_map, max_interval, n_images_seq, filter_middle_humans=True
+                public_media_map, max_interval, n_images_seq, filter_middle_humans=True,
+                collapse_empty_sequences=collapse_empty_sequences,
             )
             n_sequences = len(sequences)
             estimated_photos = sum(len(seq) for seq in sequences)
@@ -1588,6 +1618,7 @@ class TrapperZooniverseConnector:
         n_images_seq: int = 5,
         max_interval: int = 90,
         progress_callback: Optional[Callable] = None,
+        collapse_empty_sequences: bool = False,
     ) -> set[int]:
         """Return the set of media_ids that Trapper expects to be in Zooniverse.
 
@@ -1648,7 +1679,8 @@ class TrapperZooniverseConnector:
             media_map = self._merge_media_and_observations(media, observations)
             public_media_map = {mid: entry for mid, entry in media_map.items() if entry.filePublic}
             sequences = self._generate_zoo_images_from_media_map(
-                public_media_map, max_interval, n_images_seq, filter_middle_humans=True
+                public_media_map, max_interval, n_images_seq, filter_middle_humans=True,
+                collapse_empty_sequences=collapse_empty_sequences,
             )
             for seq in sequences:
                 for item in seq:
@@ -1667,6 +1699,7 @@ class TrapperZooniverseConnector:
         n_images_seq: int = 5,
         max_interval: int = 90,
         progress_callback: Optional[Callable] = None,
+        collapse_empty_sequences: bool = False,
     ) -> set[int]:
         """Return media_ids that Trapper expects to be in Zooniverse but are absent from the CSV.
 
@@ -1678,6 +1711,7 @@ class TrapperZooniverseConnector:
             deployments, blacklisted_deployments,
             n_images_seq, max_interval,
             progress_callback,
+            collapse_empty_sequences=collapse_empty_sequences,
         )
         uploaded_set = set(self.uploaded_media_id(subjects_csv, subject_set_id).keys())
         return expected - uploaded_set
@@ -1693,6 +1727,7 @@ class TrapperZooniverseConnector:
         n_images_seq: int = 5,
         max_interval: int = 90,
         progress_callback: Optional[Callable] = None,
+        collapse_empty_sequences: bool = False,
     ) -> dict:
         """Compare what Trapper expects to upload against what is in a subjects export CSV.
 
@@ -1710,6 +1745,7 @@ class TrapperZooniverseConnector:
             deployments, blacklisted_deployments,
             n_images_seq, max_interval,
             progress_callback,
+            collapse_empty_sequences=collapse_empty_sequences,
         )
 
         uploaded = self.uploaded_media_id(subjects_csv, subject_set_id)

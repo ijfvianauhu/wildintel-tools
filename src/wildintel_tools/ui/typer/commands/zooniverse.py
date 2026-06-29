@@ -684,6 +684,16 @@ def export_annotations(
     if max_file_size_mb is None:
         max_file_size_mb = settings.ZOONIVERSE_CONNECTOR.annotations_max_file_size_mb
 
+    _UPLOAD_MAX_FILE_SIZE_MB = 0.5
+    if upload:
+        if max_file_size_mb is None or max_file_size_mb > _UPLOAD_MAX_FILE_SIZE_MB:
+            if max_file_size_mb is not None and max_file_size_mb > _UPLOAD_MAX_FILE_SIZE_MB:
+                TyperUtils.warning(_(
+                    f"--max-file-size {max_file_size_mb} MB ignored: automatic upload "
+                    f"caps file size at {_UPLOAD_MAX_FILE_SIZE_MB} MB (500 KB) per file."
+                ))
+            max_file_size_mb = _UPLOAD_MAX_FILE_SIZE_MB
+
     if observations_file is None:
         deps_str = "-".join(str(d) for d in deployments) if deployments else "all"
         prefix = f"wildintel_observations_wf{wf_id}_ss{ss_id}_cp{classification_project}_col{collection}_dep{deps_str}_"
@@ -775,6 +785,7 @@ def export_annotations(
                 csv_files=generated_csv_files,
                 project_id=classification_project,
                 progress_callback=upload_callback,
+                delay_between_uploads=2.5,
             )
     except Exception as e:
         TyperUtils.fatal(_(f"Upload failed: {e}"))
@@ -1126,6 +1137,13 @@ def importation(
             help=_("Media IDs to skip (comma or space separated). These media will never be uploaded. Use '-' to read from stdin."),
         ),
     ] = None,
+    collapse_empty_sequences: Annotated[
+        bool,
+        typer.Option(
+            "--collapse-empty-sequences",
+            help=_("If set, sequences where every image is classified as 'empty' are reduced to their second image only."),
+        ),
+    ] = False,
     config: Annotated[Path, typer.Option(hidden=True, callback=callback_with_override)] = None,
 ) -> None:
     """
@@ -1199,6 +1217,7 @@ def importation(
             media_ids=media_ids,
             excluded_media_ids=excluded_media_ids,
             max_workers=settings.ZOONIVERSE_CONNECTOR.upload_collection_max_workers or 4,
+            collapse_empty_sequences=collapse_empty_sequences,
         )
 
         TyperUtils.success(f"Collection {collection} uploaded to Zooniverse subject set '{subjectset_name}'")
@@ -1352,6 +1371,13 @@ def validate_subject_set(
     ] = None,
     n_images_seq: Annotated[int, typer.Option("--n-images-seq", help=_("Number of images per sequence."))] = None,
     max_interval: Annotated[int, typer.Option("--max-interval", help=_("Maximum interval between images in a sequence (seconds)."))] = None,
+    collapse_empty_sequences: Annotated[
+        bool,
+        typer.Option(
+            "--collapse-empty-sequences",
+            help=_("Must match the flag used during import: sequences where every image is 'empty' were reduced to their second image only."),
+        ),
+    ] = False,
     config: Annotated[Path, typer.Option(hidden=True, callback=callback_with_override)] = None,
 ) -> None:
     """
@@ -1397,6 +1423,7 @@ def validate_subject_set(
             n_images_seq=n_images_seq,
             max_interval=max_interval,
             progress_callback=progress_callback,
+            collapse_empty_sequences=collapse_empty_sequences,
         )
 
 

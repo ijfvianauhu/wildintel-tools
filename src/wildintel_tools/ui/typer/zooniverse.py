@@ -65,6 +65,8 @@ def make_progress_callback(progress: Progress, verbose: bool = True) -> Callable
 
         if state == "start":
             progress.update(task_id, description=f"  {label}")
+        elif state == "advance":
+            progress.update(task_id, advance=advance, description=f"  {label}")
         elif state == "end":
             task_obj = next((t for t in progress.tasks if t.id == task_id), None)
             completed = (task_obj.total if task_obj and task_obj.total else None) or 1
@@ -191,6 +193,7 @@ def upload_collection( tzc : TrapperZooniverseConnector,
         media_ids: Optional[List[int]] = None,
         excluded_media_ids: Optional[List[int]] = None,
         max_workers: int = 4,
+        collapse_empty_sequences: bool = False,
 ) -> Report :
 
     TyperUtils.debug(f"Starting upload_collection with values:{locals().items()}")
@@ -214,6 +217,7 @@ def upload_collection( tzc : TrapperZooniverseConnector,
              media_ids=media_ids,
              excluded_media_ids=excluded_media_ids,
              max_workers=max_workers,
+             collapse_empty_sequences=collapse_empty_sequences,
         )
 
     return report
