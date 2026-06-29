@@ -252,6 +252,10 @@ class ZooniverseConnectorSettings(BaseModel):
         default=4,
         description="Number of parallel workers for concurrent image download and upload.",
     )
+    upload_collection_collapse_empty_sequences: bool = Field(
+        default=False,
+        description="If True, sequences where every image is classified as 'empty' are reduced to their second image only.",
+    )
     annotations_classified_by: str | None = Field(
         default="zooniverse@wildintel-project.org",
         description="Trapper username attributed as the classifier when uploading Zooniverse observations.",

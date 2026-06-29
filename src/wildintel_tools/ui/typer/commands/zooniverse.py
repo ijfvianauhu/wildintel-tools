@@ -1138,12 +1138,12 @@ def importation(
         ),
     ] = None,
     collapse_empty_sequences: Annotated[
-        bool,
+        Optional[bool],
         typer.Option(
             "--collapse-empty-sequences",
             help=_("If set, sequences where every image is classified as 'empty' are reduced to their second image only."),
         ),
-    ] = False,
+    ] = None,
     config: Annotated[Path, typer.Option(hidden=True, callback=callback_with_override)] = None,
 ) -> None:
     """
@@ -1195,6 +1195,9 @@ def importation(
             TyperUtils.fatal(f"Exclude-subjects file not found: {exclude_subjects}")
         uploaded_media_ids = _parse_uploaded_media_ids(exclude_subjects)
         TyperUtils.info(_(f"Excluding {len(uploaded_media_ids)} already-uploaded media IDs from {exclude_subjects.name}"))
+
+    if collapse_empty_sequences is None:
+        collapse_empty_sequences = settings.ZOONIVERSE_CONNECTOR.upload_collection_collapse_empty_sequences
 
     import wildintel_tools.ui.typer.zooniverse
 

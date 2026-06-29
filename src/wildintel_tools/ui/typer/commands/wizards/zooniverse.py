@@ -145,6 +145,13 @@ def run_import_wizard(ctx: typer.Context, settings: Settings) -> None:
         TyperUtils.console.print("[bold yellow]⚠  DRY-RUN mode enabled.[/bold yellow]")
     TyperUtils.console.print()
 
+    collapse_empty_sequences = typer.confirm(
+        "Collapse empty sequences? "
+        "(Sequences where every image is classified as 'empty' will be reduced to a single image)",
+        default=settings.ZOONIVERSE_CONNECTOR.upload_collection_collapse_empty_sequences,
+    )
+    TyperUtils.console.print()
+
     importation(
         ctx,
         collection=collection_selected.collection_pk,
@@ -155,6 +162,7 @@ def run_import_wizard(ctx: typer.Context, settings: Settings) -> None:
         n_images_seq=settings.ZOONIVERSE_CONNECTOR.upload_collection_n_images_seq,
         max_interval=settings.ZOONIVERSE_CONNECTOR.upload_collection_max_interval,
         dry_run=dry_run,
+        collapse_empty_sequences=collapse_empty_sequences,
     )
     typer.echo("Continuing...")
 
@@ -373,6 +381,9 @@ def run_setup_wizard(ctx: typer.Context, settings: Settings, settings_manager: S
     delay_per_subject_default = str(
         settings.ZOONIVERSE_CONNECTOR.upload_collection_delay_seconds_per_subject if settings else 30
     )
+    collapse_empty_sequences_default = (
+        settings.ZOONIVERSE_CONNECTOR.upload_collection_collapse_empty_sequences if settings else False
+    )
     classified_by_default = (
         settings.ZOONIVERSE_CONNECTOR.annotations_classified_by if settings else "zooniverse@wildintel-project.org"
     )
@@ -416,6 +427,11 @@ def run_setup_wizard(ctx: typer.Context, settings: Settings, settings_manager: S
         "Delay per subject (seconds)", delay_per_subject_default,
         ZooniverseConnectorSettings, "upload_collection_delay_seconds_per_subject",
     ))
+    upload_collection_collapse_empty_sequences = typer.confirm(
+        "Collapse empty sequences by default? "
+        "(Sequences where every image is 'empty' will be reduced to a single image)",
+        default=collapse_empty_sequences_default,
+    )
     annotations_classified_by = TyperUtils.prompt_with_default(
         "Trapper username for Zooniverse observations (classifiedBy)", classified_by_default,
         ZooniverseConnectorSettings, "annotations_classified_by",
@@ -440,6 +456,7 @@ def run_setup_wizard(ctx: typer.Context, settings: Settings, settings_manager: S
         "ZOONIVERSE_CONNECTOR.upload_collection_download_delay": upload_collection_download_delay,
         "ZOONIVERSE_CONNECTOR.upload_collection_max_attempts_per_subject": upload_collection_max_attempts_per_subject,
         "ZOONIVERSE_CONNECTOR.upload_collection_delay_seconds_per_subject": upload_collection_delay_seconds_per_subject,
+        "ZOONIVERSE_CONNECTOR.upload_collection_collapse_empty_sequences": upload_collection_collapse_empty_sequences,
         "ZOONIVERSE_CONNECTOR.annotations_classified_by": annotations_classified_by,
         "ZOONIVERSE_CONNECTOR.annotations_max_file_size_mb": annotations_max_file_size_mb,
     }
