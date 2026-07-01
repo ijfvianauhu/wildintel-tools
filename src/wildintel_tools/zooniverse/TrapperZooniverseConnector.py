@@ -1498,6 +1498,7 @@ class TrapperZooniverseConnector:
         max_interval: int = 90,
         progress_callback: Optional[Callable] = None,
         max_workers: int = 1,
+        collapse_empty_sequences: bool = False,
     ) -> List[Dict[str, Any]]:
         """Return one row per sequence with media IDs, dates and duration.
 
@@ -1574,6 +1575,8 @@ class TrapperZooniverseConnector:
                         current_seq = [curr]
                 sequences.append(current_seq)
                 sequences = self._filter_human_media_from_middle_sequences(sequences)
+                if collapse_empty_sequences:
+                    sequences = self._collapse_empty_sequences(sequences)
 
                 for seq_n, seq in enumerate(sequences, start=1):
                     if not seq:

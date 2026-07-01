@@ -907,6 +907,7 @@ def estimate_upload(
     n_images_seq: Annotated[int, typer.Option("--n-images-seq", help=_("Number of images per sequence."))] = None,
     max_interval: Annotated[int, typer.Option("--max-interval", help=_("Maximum interval between images in a sequence (seconds)."))] = None,
     workers: Annotated[int, typer.Option("--workers", "-w", help=_("Number of parallel workers for deployment processing."))] = None,
+    collapse_empty_sequences: Annotated[Optional[bool], typer.Option("--collapse-empty-sequences/--no-collapse-empty-sequences", help=_("Collapse sequences where every image is empty to a single image. Defaults to the settings value."))] = None,
     output: Annotated[
         Optional[Path],
         typer.Option("--output", "-o", help=_("Path for the output CSV. Defaults to the zooniverse documents folder.")),
@@ -919,6 +920,8 @@ def estimate_upload(
     n_images_seq = n_images_seq or settings.ZOONIVERSE_CONNECTOR.upload_collection_n_images_seq or 5
     max_interval = max_interval or settings.ZOONIVERSE_CONNECTOR.upload_collection_max_interval or 90
     workers = workers or settings.ZOONIVERSE_CONNECTOR.upload_collection_max_workers or 1
+    if collapse_empty_sequences is None:
+        collapse_empty_sequences = settings.ZOONIVERSE_CONNECTOR.upload_collection_collapse_empty_sequences
 
     deployment_pks = TyperUtils.parse_id_list(deployments_input, allow_stdin=False)
     blacklisted_pks = TyperUtils.parse_id_list(exclude_deployments_input, allow_stdin=False)
@@ -939,6 +942,7 @@ def estimate_upload(
                 max_interval=max_interval,
                 progress_callback=progress_callback,
                 max_workers=workers,
+                collapse_empty_sequences=collapse_empty_sequences,
             )
     except Exception as e:
         TyperUtils.fatal(_(f"Estimation failed: {e}"))
@@ -999,6 +1003,7 @@ def analyze_sequences(
     n_images_seq: Annotated[int, typer.Option("--n-images-seq", help=_("Number of images per sequence."))] = None,
     max_interval: Annotated[int, typer.Option("--max-interval", help=_("Maximum interval between images in a sequence (seconds)."))] = None,
     workers: Annotated[int, typer.Option("--workers", "-w", help=_("Number of parallel workers."))] = None,
+    collapse_empty_sequences: Annotated[Optional[bool], typer.Option("--collapse-empty-sequences/--no-collapse-empty-sequences", help=_("Collapse sequences where every image is empty to a single image. Defaults to the settings value."))] = None,
     output: Annotated[
         Optional[Path],
         typer.Option("--output", "-o", help=_("Path for the output CSV. Defaults to the zooniverse documents folder.")),
@@ -1011,6 +1016,8 @@ def analyze_sequences(
     n_images_seq = n_images_seq or settings.ZOONIVERSE_CONNECTOR.upload_collection_n_images_seq or 5
     max_interval = max_interval or settings.ZOONIVERSE_CONNECTOR.upload_collection_max_interval or 90
     workers = workers or settings.ZOONIVERSE_CONNECTOR.upload_collection_max_workers or 1
+    if collapse_empty_sequences is None:
+        collapse_empty_sequences = settings.ZOONIVERSE_CONNECTOR.upload_collection_collapse_empty_sequences
 
     deployment_pks = TyperUtils.parse_id_list(deployments_input, allow_stdin=False)
     blacklisted_pks = TyperUtils.parse_id_list(exclude_deployments_input, allow_stdin=False)
@@ -1031,6 +1038,7 @@ def analyze_sequences(
                 max_interval=max_interval,
                 progress_callback=progress_callback,
                 max_workers=workers,
+                collapse_empty_sequences=collapse_empty_sequences,
             )
     except Exception as e:
         TyperUtils.fatal(_(f"Analysis failed: {e}"))
